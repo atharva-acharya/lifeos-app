@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::vault::{self, FileInfo, note::Note};
 
 /// Bump when the schema changes; a mismatch drops and rebuilds the index.
-pub const SCHEMA_VERSION: i32 = 1;
+pub const SCHEMA_VERSION: i32 = 2;
 
 const SCHEMA: &str = "
 CREATE TABLE notes (
@@ -48,6 +48,13 @@ CREATE TABLE project (
     path TEXT PRIMARY KEY REFERENCES notes(path) ON DELETE CASCADE,
     project TEXT, status TEXT, step INTEGER, steps_total INTEGER, next_step TEXT, updated TEXT,
     last_log TEXT
+);
+CREATE TABLE outreach (
+    path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    sent TEXT, name TEXT, profile TEXT, company_role TEXT, contact_type TEXT,
+    status TEXT, last_update TEXT,
+    PRIMARY KEY (path, position)
 );
 CREATE TABLE project_steps (
     path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
@@ -175,6 +182,7 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
         Some(Note::Company(_)) => "company",
         Some(Note::Weekly(_)) => "weekly",
         Some(Note::Project(_)) => "project",
+        Some(Note::Outreach(_)) => "outreach",
         Some(Note::Other) => "other",
         None => "error",
     };
@@ -272,6 +280,24 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
                 )?;
             }
         }
+        Some(Note::Outreach(rows)) => {
+            for (i, r) in rows.iter().enumerate() {
+                tx.execute(
+                    "INSERT INTO outreach VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    params![
+                        p,
+                        i64::try_from(i).unwrap_or(i64::MAX),
+                        r.sent,
+                        r.name,
+                        r.profile,
+                        r.company_role,
+                        r.contact_type,
+                        r.status,
+                        r.last_update
+                    ],
+                )?;
+            }
+        }
         Some(Note::Other) | None => {}
     }
     Ok(entry.error.is_some())
@@ -298,7 +324,7 @@ mod tests {
     fn indexes_the_fixture_vault() {
         let mut index = Index::open_in_memory().expect("open");
         let stats = index.sync(&fixture()).expect("sync");
-        assert_eq!(stats.added, 8);
+        assert_eq!(stats.added, 9);
         assert_eq!(stats.errors, 1);
         assert_eq!(count(&index, "daily"), 2);
         assert_eq!(count(&index, "workout"), 1);
@@ -313,7 +339,7 @@ mod tests {
         let mut index = Index::open_in_memory().expect("open");
         index.sync(&fixture()).expect("sync");
         let again = index.sync(&fixture()).expect("sync");
-        assert_eq!(again.unchanged, 8);
+        assert_eq!(again.unchanged, 9);
         assert_eq!(again.added + again.updated + again.removed, 0);
     }
 
@@ -350,7 +376,7 @@ mod tests {
         let db = dir.path().join("index.db");
         fs::write(&db, b"this is not sqlite").expect("write");
         let mut index = Index::open(&db).expect("rebuilt");
-        assert_eq!(index.sync(&fixture()).expect("sync").added, 8);
+        assert_eq!(index.sync(&fixture()).expect("sync").added, 9);
     }
 
     #[test]
@@ -363,7 +389,7 @@ mod tests {
                 .expect("old schema");
         }
         let mut index = Index::open(&db).expect("open");
-        assert_eq!(index.sync(&fixture()).expect("sync").added, 8);
+        assert_eq!(index.sync(&fixture()).expect("sync").added, 9);
     }
 
     #[test]

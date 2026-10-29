@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
+use crate::jobs::{self, Jobs};
 use crate::live::LiveState;
 use crate::settings::{self, Settings};
 use crate::today::{self, Today};
@@ -97,6 +98,26 @@ pub fn get_today(
         Some(result) => result
             .map(|today| TodayResponse::Ready {
                 today: Box::new(today),
+            })
+            .map_err(|e| e.to_string()),
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum JobsResponse {
+    NoVault,
+    Ready { jobs: Box<Jobs> },
+}
+
+/// Company pipeline and outreach log from the vault.
+#[tauri::command]
+pub fn get_jobs(state: tauri::State<'_, LiveState>) -> Result<JobsResponse, String> {
+    match state.with_index(jobs::jobs) {
+        None => Ok(JobsResponse::NoVault),
+        Some(result) => result
+            .map(|jobs| JobsResponse::Ready {
+                jobs: Box::new(jobs),
             })
             .map_err(|e| e.to_string()),
     }

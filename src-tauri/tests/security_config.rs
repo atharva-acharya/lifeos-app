@@ -96,6 +96,7 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-get-settings",
             "allow-choose-vault-folder",
             "allow-get-today",
+            "allow-get-jobs",
         ]
     );
 }

@@ -1,5 +1,6 @@
 mod commands;
 pub mod index;
+pub mod jobs;
 mod live;
 pub mod settings;
 pub mod today;
@@ -27,7 +28,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::choose_vault_folder,
-            commands::get_today
+            commands::get_today,
+            commands::get_jobs
         ])
         .run(tauri::generate_context!())
         .expect("error while running Life OS");

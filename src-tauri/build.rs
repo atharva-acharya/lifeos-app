@@ -1,4 +1,9 @@
-const COMMANDS: &[&str] = &["get_settings", "choose_vault_folder", "get_today"];
+const COMMANDS: &[&str] = &[
+    "get_settings",
+    "choose_vault_folder",
+    "get_today",
+    "get_jobs",
+];
 
 fn main() {
     tauri_build::try_build(
