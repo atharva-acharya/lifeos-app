@@ -94,6 +94,13 @@ jobs:
       - name: End-to-end smoke test
         if: github.event_name == 'pull_request'
         run: pnpm e2e
+      - name: Diagnostics on e2e failure
+        if: failure() && github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          Get-Process | Where-Object { $_.Name -match 'lifeos|msedgewebview2' } | Format-Table Name, Id, SessionId
+          Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}' -ErrorAction SilentlyContinue | Select-Object pv
+          Get-WinEvent -LogName Application -MaxEvents 15 -ErrorAction SilentlyContinue | Where-Object { $_.LevelDisplayName -eq 'Error' } | Format-List TimeCreated, ProviderName, Message
       - name: Build (release)
         if: github.event_name != 'pull_request'
         run: pnpm tauri build --no-bundle -- --locked

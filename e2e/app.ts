@@ -39,12 +39,8 @@ export async function launchApp(): Promise<RunningApp> {
   child.on("error", (e) => (exited = `failed to start: ${e.message}`));
   child.on("exit", (code) => (exited = `exited with code ${String(code)}`));
 
-  const browser = await connect(() =>
-    exited
-      ? `app ${exited}
-${output}`
-      : null,
-  );
+  const describe = () => `app ${exited ?? "still running"}; output:\n${output || "(none)"}`;
+  const browser = await connect(() => exited !== null, describe);
   const page = await firstPage(browser);
   await page.waitForLoadState("domcontentloaded");
 
@@ -58,16 +54,18 @@ ${output}`
   };
 }
 
-async function connect(failure: () => string | null): Promise<Browser> {
+async function connect(hasExited: () => boolean, describe: () => string): Promise<Browser> {
   // A fresh CI runner can take a while to start WebView2 the first time.
   const deadline = Date.now() + 90_000;
   for (;;) {
     try {
       return await chromium.connectOverCDP(`http://127.0.0.1:${String(PORT)}`);
     } catch (err) {
-      const reason = failure();
-      if (reason) throw new Error(reason, { cause: err });
-      if (Date.now() > deadline) throw err;
+      if (hasExited() || Date.now() > deadline) {
+        const detail = describe();
+        console.error(detail);
+        throw new Error(`could not connect to the app: ${detail}`, { cause: err });
+      }
       await new Promise((r) => setTimeout(r, 500));
     }
   }
