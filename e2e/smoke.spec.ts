@@ -38,6 +38,19 @@ test("Today refreshes when a note changes on disk", async () => {
   });
 });
 
+test("Jobs shows the pipeline, outreach and saved applications", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Jobs" }).click();
+  await expect(page.getByRole("listitem", { name: "Screen" })).toContainText(
+    "Example Security Ltd",
+  );
+  await page.getByRole("tab", { name: "Outreach" }).click();
+  await expect(page.getByText("Alex Example")).toBeVisible();
+  await page.getByRole("tab", { name: "Applications" }).click();
+  await expect(page.getByRole("cell", { name: "Sample Bank" })).toBeVisible();
+  await expect(page.getByText("2 total")).toBeVisible();
+});
+
 test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings" }).click();

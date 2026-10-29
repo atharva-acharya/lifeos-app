@@ -13,6 +13,8 @@ pub const FILE_NAME: &str = "settings.json";
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub vault_path: Option<PathBuf>,
+    #[serde(default)]
+    pub google: Option<crate::google::GoogleConfig>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -94,6 +96,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let settings = Settings {
             vault_path: Some(PathBuf::from(r"D:\Notes\Life OS")),
+            google: None,
         };
         save(dir.path(), &settings).expect("save");
         assert_eq!(load(dir.path()).expect("load"), settings);

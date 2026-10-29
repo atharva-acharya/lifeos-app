@@ -7,6 +7,7 @@ import {
   type JobsResponse,
   type OutreachEntry,
 } from "../api";
+import { ApplicationsTab } from "../components/ApplicationsTab";
 import type { RouteId } from "../routes";
 
 type Tab = "applications" | "pipeline" | "outreach";
@@ -256,19 +257,7 @@ export function JobsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) 
 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "applications" ? (
-          <section className="card placeholder">
-            <span className="pill pill--pending">Not connected</span>
-            <p>Connect your Google Sheet in Settings to see your applications here.</p>
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                onNavigate("settings");
-              }}
-            >
-              Open settings
-            </button>
-          </section>
+          <ApplicationsTab onNavigate={onNavigate} />
         ) : response?.status === "noVault" ? (
           <section className="card placeholder">
             <span className="pill pill--pending">Not connected</span>

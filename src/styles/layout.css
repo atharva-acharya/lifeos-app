@@ -523,3 +523,78 @@
 .table tbody tr:hover td {
   background: var(--bg-hover);
 }
+
+.setting--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: var(--space-4);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.form input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-page);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.form__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.form .setting__error {
+  grid-column: 1 / -1;
+}
+
+.button--danger:hover:not(:disabled) {
+  border-color: var(--c-danger);
+  color: var(--c-danger);
+}
+
+.toolbar__search {
+  min-width: 220px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-page);
+  color: var(--text);
+  font: inherit;
+}
+
+.toolbar__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+}
+
+.counts strong {
+  color: var(--text);
+  font-size: 16px;
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: events, window controls and the app's own settings, Today and Jobs commands; no fs, shell, http or path access (threat model T5)",
+  "description": "Main window: events, window controls and the app's own settings, Today, Jobs and Google Sheets commands; no fs, shell, http or path access (threat model T5)",
   "windows": ["main"],
   "permissions": [
     "core:event:default",
@@ -9,6 +9,11 @@
     "allow-get-settings",
     "allow-choose-vault-folder",
     "allow-get-today",
+    "allow-save-google-config",
+    "allow-connect-google",
+    "allow-disconnect-google",
+    "allow-get-applications",
+    "allow-refresh-applications",
     "allow-get-jobs"
   ]
 }

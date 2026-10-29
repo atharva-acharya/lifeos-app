@@ -1,4 +1,6 @@
+pub mod applications;
 mod commands;
+pub mod google;
 pub mod index;
 pub mod jobs;
 mod live;
@@ -29,6 +31,11 @@ pub fn run() {
             commands::get_settings,
             commands::choose_vault_folder,
             commands::get_today,
+            commands::save_google_config,
+            commands::connect_google,
+            commands::disconnect_google,
+            commands::get_applications,
+            commands::refresh_applications,
             commands::get_jobs
         ])
         .run(tauri::generate_context!())

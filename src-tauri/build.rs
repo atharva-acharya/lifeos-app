@@ -2,6 +2,11 @@ const COMMANDS: &[&str] = &[
     "get_settings",
     "choose_vault_folder",
     "get_today",
+    "save_google_config",
+    "connect_google",
+    "disconnect_google",
+    "get_applications",
+    "refresh_applications",
     "get_jobs",
 ];
 

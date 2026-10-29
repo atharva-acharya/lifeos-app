@@ -23,6 +23,30 @@ export async function launchApp(): Promise<RunningApp> {
   cpSync(FIXTURE_VAULT, vault, { recursive: true });
   mkdirSync(data);
   writeFileSync(join(data, "settings.json"), JSON.stringify({ vaultPath: vault }));
+  // A saved copy of the Sheet, so the Applications tab works without Google.
+  writeFileSync(
+    join(data, "applications.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      missingColumns: [],
+      rows: [
+        {
+          applied: "2026-01-05",
+          company: "Example Security Ltd",
+          role: "SOC Analyst",
+          source: "Easy Apply",
+          status: "Applied",
+        },
+        {
+          applied: "2026-01-07",
+          company: "Sample Bank",
+          role: "Security Analyst",
+          source: "Company site",
+          status: "Rejected",
+        },
+      ],
+    }),
+  );
 
   const child: ChildProcess = spawn(EXE, [], {
     env: {
