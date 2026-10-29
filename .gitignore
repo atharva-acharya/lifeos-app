@@ -27,3 +27,10 @@ test-results/
 *.pfx
 *.p12
 *.key
+dist-ssr/
+src-tauri/gen/schemas/
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
