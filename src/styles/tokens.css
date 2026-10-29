@@ -1,0 +1,38 @@
+/* Design A, "studio dark" (requirements §4). */
+:root {
+  color-scheme: dark;
+
+  --bg-page: #141414;
+  --bg-sidebar: #1b1b1b;
+  --bg-card: #232323;
+  --bg-hover: #2b2b2b;
+  --border: #333333;
+
+  --text: #ececec;
+  --text-muted: #a3a3a3;
+
+  /* Colour meaning, used consistently. */
+  --c-read: #a78bfa; /* purple: read / viewed */
+  --c-progress: #fb923c; /* orange: in progress / editing / due */
+  --c-done: #4ade80; /* green: done / positive */
+  --c-pending: #facc15; /* yellow: pending */
+  --c-danger: #f87171; /* red: destructive */
+
+  --radius: 12px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display:
+    "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --fs-kicker: 12px;
+  --fs-body: 14px;
+  --fs-title: 26px;
+
+  --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--c-read);
+}
