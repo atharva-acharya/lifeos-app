@@ -1,0 +1,28 @@
+# Changelog from Conventional Commits (ADR 0005).
+
+[changelog]
+header = "# Changelog\n"
+body = """
+{% if version %}## {{ version | trim_start_matches(pat="v") }} ({{ timestamp | date(format="%Y-%m-%d") }}){% else %}## Unreleased{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for commit in commits %}- {{ commit.message | split(pat="\n") | first | trim }}
+{% endfor %}{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "<!-- 0 -->Features" },
+  { message = "^fix", group = "<!-- 1 -->Fixes" },
+  { message = "^perf", group = "<!-- 2 -->Performance" },
+  { message = "^test", group = "<!-- 3 -->Tests" },
+  { message = "^(ci|build)", group = "<!-- 4 -->Build and CI" },
+  { message = "^docs", group = "<!-- 5 -->Docs" },
+  { message = "^(chore|refactor|style)", group = "<!-- 6 -->Maintenance" },
+  { message = ".*", skip = true },
+]
+tag_pattern = "v[0-9].*"
