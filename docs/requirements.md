@@ -30,7 +30,7 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 ### 3.2 Job search
 - Applications table from the Sheet: filter by status and source, sort, search; counts by stage.
 - Company notes (stage pipeline view: applied, replied, screen, interview, offer, rejected) with next action and date.
-- Outreach log (`Jobs/Outreach.md`): who, when, status (sent / accepted / replied).
+- Outreach log (`Jobs/Outreach.md`, `type: outreach-log`, a Markdown table with columns Sent, Name, Profile, Company / role, Type, Status, Last update): who, when, contact type (recruiter / hiring manager / peer), status (sent / accepted / messaged / replied / withdrawn).
 - Charts: applications per week, reply rate by source (company site vs Easy Apply vs agency).
 
 ### 3.3 Fitness
@@ -105,3 +105,4 @@ Each phase ends with a working, released build and owner sign-off before the nex
 - 2026-10-29: version 1 scope agreed (design A).
 - 2026-10-29: Default vault path removed from this document (kept in local settings only, per privacy rule). No functional change.
 - 2026-10-29: Scope change agreed with owner after v0.1.0. Added Health section with Apple Health import via an iPhone auto-export app and iCloud Drive (route A), Apple-inspired motion; added Money module (budgets, CSV import, bill splitting with friends, income analytics), no bank linking. Phases now 5: Money becomes phase 4, Editor + search moves to phase 5 (release 1.0). Deferred: live workout logging (future iOS app), Gmail viewer, bank linking. Sidebar gains Health and Money.
+- 2026-10-29: Outreach log described as it exists in the vault: table columns listed, contact type added, statuses are sent / accepted / messaged / replied / withdrawn (was three). Phase 1 signed off by the owner.

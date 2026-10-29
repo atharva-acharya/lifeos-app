@@ -70,6 +70,43 @@ export async function onIndexUpdated(onChange: () => void): Promise<() => void> 
   return listen("index-updated", onChange);
 }
 
+export interface CompanyCard {
+  path: string;
+  company: string | null;
+  role: string | null;
+  stage: string;
+  applied: string | null;
+  contact: string | null;
+  nextAction: string | null;
+  nextDate: string | null;
+}
+
+export interface Stage {
+  stage: string;
+  companies: CompanyCard[];
+}
+
+export interface OutreachEntry {
+  sent: string | null;
+  name: string | null;
+  profile: string | null;
+  companyRole: string | null;
+  contactType: string | null;
+  status: string | null;
+  lastUpdate: string | null;
+}
+
+export interface Jobs {
+  pipeline: Stage[];
+  outreach: OutreachEntry[];
+}
+
+export type JobsResponse = { status: "noVault" } | { status: "ready"; jobs: Jobs };
+
+export function getJobs(): Promise<JobsResponse> {
+  return invoke<JobsResponse>("get_jobs");
+}
+
 export interface GoogleView {
   clientId: string;
   sheetId: string;

@@ -101,6 +101,7 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-disconnect-google",
             "allow-get-applications",
             "allow-refresh-applications",
+            "allow-get-jobs",
         ]
     );
 }

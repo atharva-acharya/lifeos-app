@@ -7,6 +7,7 @@ const COMMANDS: &[&str] = &[
     "disconnect_google",
     "get_applications",
     "refresh_applications",
+    "get_jobs",
 ];
 
 fn main() {

@@ -2,6 +2,7 @@ pub mod applications;
 mod commands;
 pub mod google;
 pub mod index;
+pub mod jobs;
 mod live;
 pub mod settings;
 pub mod today;
@@ -34,7 +35,8 @@ pub fn run() {
             commands::connect_google,
             commands::disconnect_google,
             commands::get_applications,
-            commands::refresh_applications
+            commands::refresh_applications,
+            commands::get_jobs
         ])
         .run(tauri::generate_context!())
         .expect("error while running Life OS");

@@ -40,11 +40,24 @@ export function ApplicationsTab({ onNavigate }: { onNavigate: (id: RouteId) => v
   const [source, setSource] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("applied");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setNow(Date.now());
+    }, 60_000);
+    return () => {
+      clearInterval(id);
+    };
+  }, []);
 
   const refresh = useCallback(() => {
     setRefreshing(true);
     refreshApplications()
-      .then(setView)
+      .then((v) => {
+        setView(v);
+        setNow(Date.now());
+      })
       .catch(() => undefined)
       .finally(() => {
         setRefreshing(false);
@@ -169,7 +182,7 @@ export function ApplicationsTab({ onNavigate }: { onNavigate: (id: RouteId) => v
         </label>
         <div className="toolbar__summary">
           <span className="muted">
-            {view.cache ? `Updated ${ago(view.cache.fetchedAt, Date.now())}` : "Not loaded yet"}
+            {view.cache ? `Updated ${ago(view.cache.fetchedAt, now)}` : "Not loaded yet"}
           </span>
           {view.connected && (
             <button type="button" className="button" disabled={refreshing} onClick={refresh}>
