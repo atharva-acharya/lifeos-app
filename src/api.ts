@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface AppSettings {
   vaultPath: string | null;
+  google: GoogleView;
 }
 
 export function getSettings(): Promise<AppSettings> {
@@ -67,4 +68,58 @@ export function getToday(date: string): Promise<TodayResponse> {
 export async function onIndexUpdated(onChange: () => void): Promise<() => void> {
   const { listen } = await import("@tauri-apps/api/event");
   return listen("index-updated", onChange);
+}
+
+export interface GoogleView {
+  clientId: string;
+  sheetId: string;
+  hasSecret: boolean;
+  configured: boolean;
+  connected: boolean;
+}
+
+export function saveGoogleConfig(
+  clientId: string,
+  clientSecret: string,
+  sheetId: string,
+): Promise<AppSettings> {
+  return invoke<AppSettings>("save_google_config", { clientId, clientSecret, sheetId });
+}
+
+export function connectGoogle(): Promise<AppSettings> {
+  return invoke<AppSettings>("connect_google");
+}
+
+export function disconnectGoogle(): Promise<AppSettings> {
+  return invoke<AppSettings>("disconnect_google");
+}
+
+export interface Application {
+  applied: string | null;
+  company: string | null;
+  role: string | null;
+  source: string | null;
+  inbox: string | null;
+  status: string | null;
+  lastUpdate: string | null;
+  daysSince: string | null;
+  followUp: string | null;
+  email: string | null;
+  notes: string | null;
+  messageId: string | null;
+}
+
+export interface ApplicationsView {
+  configured: boolean;
+  connected: boolean;
+  cache: { fetchedAt: number; rows: Application[]; missingColumns: string[] } | null;
+  error: string | null;
+}
+
+export function getApplications(): Promise<ApplicationsView> {
+  return invoke<ApplicationsView>("get_applications");
+}
+
+export function refreshApplications(): Promise<ApplicationsView> {
+  return invoke<ApplicationsView>("refresh_applications");
 }

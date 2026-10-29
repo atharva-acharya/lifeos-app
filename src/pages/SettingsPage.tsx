@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { chooseVaultFolder, getSettings, type AppSettings } from "../api";
+import { GoogleSettings } from "../components/GoogleSettings";
 
 type Status = "loading" | "ready" | "choosing";
 
@@ -82,6 +83,8 @@ export function SettingsPage() {
           {status === "choosing" ? "Choosing…" : vault ? "Change folder" : "Choose folder"}
         </button>
       </section>
+
+      {settings && <GoogleSettings google={settings.google} onChange={setSettings} />}
     </>
   );
 }
