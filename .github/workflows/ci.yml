@@ -72,7 +72,6 @@ jobs:
 
   build:
     name: Build app
-    needs: [web, rust]
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -88,4 +87,10 @@ jobs:
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tauri build --no-bundle -- --locked
+      # Pull requests get a fast debug build; main gets the optimised release build.
+      - name: Build (debug)
+        if: github.event_name == 'pull_request'
+        run: pnpm tauri build --debug --no-bundle -- --locked
+      - name: Build (release)
+        if: github.event_name != 'pull_request'
+        run: pnpm tauri build --no-bundle -- --locked
