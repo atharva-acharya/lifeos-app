@@ -5,7 +5,8 @@ pub mod guard;
 pub mod note;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
 
@@ -24,16 +25,37 @@ pub struct Entry {
     pub error: Option<String>,
 }
 
-/// Reads every Markdown note under `root`. Links, junctions, hidden folders,
-/// `old/` and oversized files are skipped; parse errors are recorded, never fatal.
-pub fn scan(root: &Path) -> std::io::Result<Vec<Entry>> {
+/// A Markdown file found in the vault, before it is read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileInfo {
+    /// Vault-relative path with forward slashes.
+    pub rel: String,
+    pub abs: PathBuf,
+    pub len: u64,
+    /// Modification time in milliseconds since the Unix epoch.
+    pub mtime_ms: i64,
+}
+
+/// Lists every Markdown note under `root`. Links, junctions, hidden folders
+/// and `old/` are skipped.
+pub fn list(root: &Path) -> std::io::Result<Vec<FileInfo>> {
     let mut out = Vec::new();
     walk(root, "", &mut out)?;
-    out.sort_by(|a, b| a.path.cmp(&b.path));
+    out.sort_by(|a, b| a.rel.cmp(&b.rel));
     Ok(out)
 }
 
-fn walk(dir: &Path, prefix: &str, out: &mut Vec<Entry>) -> std::io::Result<()> {
+/// Reads and parses every note under `root`; parse errors are recorded, never fatal.
+pub fn scan(root: &Path) -> std::io::Result<Vec<Entry>> {
+    Ok(list(root)?.into_iter().map(|f| read(&f)).collect())
+}
+
+/// Reads and parses one listed note.
+pub fn read(file: &FileInfo) -> Entry {
+    read_entry(&file.abs, file.rel.clone(), file.len)
+}
+
+fn walk(dir: &Path, prefix: &str, out: &mut Vec<FileInfo>) -> std::io::Result<()> {
     for item in fs::read_dir(dir)? {
         let item = item?;
         let name = item.file_name().to_string_lossy().into_owned();
@@ -51,7 +73,18 @@ fn walk(dir: &Path, prefix: &str, out: &mut Vec<Entry>) -> std::io::Result<()> {
                 walk(&item.path(), &rel, out)?;
             }
         } else if guard::check_relative(&rel).is_ok() {
-            out.push(read_entry(&item.path(), rel, meta.len()));
+            let mtime_ms = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .and_then(|d| i64::try_from(d.as_millis()).ok())
+                .unwrap_or(0);
+            out.push(FileInfo {
+                rel,
+                abs: item.path(),
+                len: meta.len(),
+                mtime_ms,
+            });
         }
     }
     Ok(())

@@ -1,17 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { invoke } from "../test/tauri-mocks";
 import { SettingsPage } from "./SettingsPage";
-
-const invoke = vi.hoisted(() => vi.fn());
-vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
 const VAULT = "D:\\Notes\\Life OS";
 
 describe("SettingsPage", () => {
-  beforeEach(() => {
-    invoke.mockReset();
-  });
-
   it("asks for a vault when none is set", async () => {
     invoke.mockResolvedValueOnce({ vaultPath: null });
     render(<SettingsPage />);

@@ -95,6 +95,7 @@ fn capability_grants_only_events_window_and_app_commands() {
             "core:window:default",
             "allow-get-settings",
             "allow-choose-vault-folder",
+            "allow-get-today",
         ]
     );
 }
