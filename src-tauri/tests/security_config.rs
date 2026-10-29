@@ -80,7 +80,7 @@ fn prototype_is_frozen() {
 }
 
 #[test]
-fn capability_grants_only_events_and_window() {
+fn capability_grants_only_events_window_and_app_commands() {
     let cap: Value = serde_json::from_str(CAPABILITY).expect("capability is valid JSON");
     let perms: Vec<&str> = cap["permissions"]
         .as_array()
@@ -88,7 +88,15 @@ fn capability_grants_only_events_and_window() {
         .iter()
         .map(|p| p.as_str().expect("permission is a string"))
         .collect();
-    assert_eq!(perms, ["core:event:default", "core:window:default"]);
+    assert_eq!(
+        perms,
+        [
+            "core:event:default",
+            "core:window:default",
+            "allow-get-settings",
+            "allow-choose-vault-folder",
+        ]
+    );
 }
 
 #[test]
