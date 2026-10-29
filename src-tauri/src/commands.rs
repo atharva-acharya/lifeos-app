@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
+use crate::applications::{self, Cache};
+use crate::google::{self, GoogleConfig};
 use crate::live::LiveState;
 use crate::settings::{self, Settings};
 use crate::today::{self, Today};
@@ -14,12 +16,33 @@ use crate::today::{self, Today};
 #[serde(rename_all = "camelCase")]
 pub struct SettingsView {
     pub vault_path: Option<String>,
+    pub google: GoogleView,
+}
+
+/// What the UI may know about the Google setup. The client secret and
+/// tokens never leave the Rust core.
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleView {
+    pub client_id: String,
+    pub sheet_id: String,
+    pub has_secret: bool,
+    pub configured: bool,
+    pub connected: bool,
 }
 
 impl From<Settings> for SettingsView {
     fn from(s: Settings) -> Self {
+        let google = s.google.map_or_else(GoogleView::default, |g| GoogleView {
+            configured: g.is_complete(),
+            has_secret: !g.client_secret.is_empty(),
+            client_id: g.client_id,
+            sheet_id: g.sheet_id,
+            connected: google::is_connected(),
+        });
         Self {
             vault_path: s.vault_path.map(|p| p.to_string_lossy().into_owned()),
+            google,
         }
     }
 }
@@ -100,4 +123,115 @@ pub fn get_today(
             })
             .map_err(|e| e.to_string()),
     }
+}
+
+/// Saves the Google client and Sheet details. An empty secret keeps the
+/// stored one, so the UI never needs to read it back.
+#[tauri::command]
+pub fn save_google_config(
+    app: AppHandle,
+    client_id: String,
+    client_secret: String,
+    sheet_id: String,
+) -> Result<SettingsView, String> {
+    let sheet_id = sheet_id.trim().to_owned();
+    if !google::valid_sheet_id(&sheet_id) {
+        return Err(google::GoogleError::BadSheetId.to_string());
+    }
+    let dir = config_dir(&app)?;
+    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+    let previous = current.google.take().unwrap_or_default();
+    let secret = client_secret.trim();
+    current.google = Some(GoogleConfig {
+        client_id: client_id.trim().to_owned(),
+        client_secret: if secret.is_empty() {
+            previous.client_secret
+        } else {
+            secret.to_owned()
+        },
+        sheet_id,
+    });
+    settings::save(&dir, &current).map_err(|e| e.to_string())?;
+    Ok(current.into())
+}
+
+fn google_config(app: &AppHandle) -> Result<GoogleConfig, String> {
+    let dir = config_dir(app)?;
+    settings::load(&dir)
+        .map_err(|e| e.to_string())?
+        .google
+        .filter(GoogleConfig::is_complete)
+        .ok_or_else(|| google::GoogleError::NotConfigured.to_string())
+}
+
+/// Opens Google sign-in in the browser and stores the refresh token.
+#[tauri::command]
+pub async fn connect_google(app: AppHandle) -> Result<SettingsView, String> {
+    let config = google_config(&app)?;
+    google::connect(&config).await.map_err(|e| e.to_string())?;
+    get_settings(app)
+}
+
+/// Revokes and forgets the Google token.
+#[tauri::command]
+pub async fn disconnect_google(app: AppHandle) -> Result<SettingsView, String> {
+    google::disconnect().await.map_err(|e| e.to_string())?;
+    get_settings(app)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationsView {
+    pub configured: bool,
+    pub connected: bool,
+    pub cache: Option<Cache>,
+    /// Set when a refresh failed; the cached copy is still shown.
+    pub error: Option<String>,
+}
+
+fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    match test_data_dir() {
+        Some(dir) => Ok(dir),
+        None => app.path().app_local_data_dir().map_err(|e| e.to_string()),
+    }
+}
+
+fn applications_view(app: &AppHandle, error: Option<String>) -> Result<ApplicationsView, String> {
+    let configured = google_config(app).is_ok();
+    Ok(ApplicationsView {
+        configured,
+        connected: configured && google::is_connected(),
+        cache: applications::load(&cache_dir(app)?),
+        error,
+    })
+}
+
+/// The last saved copy of the Sheet; never touches the network.
+#[tauri::command]
+pub fn get_applications(app: AppHandle) -> Result<ApplicationsView, String> {
+    applications_view(&app, None)
+}
+
+/// Fetches the Sheet now and updates the saved copy. Failures keep the old
+/// copy and are reported alongside it.
+#[tauri::command]
+pub async fn refresh_applications(app: AppHandle) -> Result<ApplicationsView, String> {
+    let config = match google_config(&app) {
+        Ok(c) => c,
+        Err(e) => return applications_view(&app, Some(e)),
+    };
+    let error = match google::fetch_sheet(&config).await {
+        Ok(rows) => {
+            let (rows, missing_columns) = applications::from_rows(&rows);
+            let cache = Cache {
+                fetched_at: applications::now_ms(),
+                rows,
+                missing_columns,
+            };
+            applications::save(&cache_dir(&app)?, &cache).map_err(|e| e.to_string())?;
+            None
+        }
+        Err(e) => Some(e.to_string()),
+    };
+    applications_view(&app, error)
 }

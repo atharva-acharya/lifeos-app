@@ -1,4 +1,6 @@
+pub mod applications;
 mod commands;
+pub mod google;
 pub mod index;
 mod live;
 pub mod settings;
@@ -27,7 +29,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::choose_vault_folder,
-            commands::get_today
+            commands::get_today,
+            commands::save_google_config,
+            commands::connect_google,
+            commands::disconnect_google,
+            commands::get_applications,
+            commands::refresh_applications
         ])
         .run(tauri::generate_context!())
         .expect("error while running Life OS");
