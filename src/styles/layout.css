@@ -116,3 +116,71 @@
 .main:focus-visible {
   box-shadow: none;
 }
+
+.setting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  max-width: 760px;
+}
+
+.setting__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.setting__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.setting__help {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.setting__value {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0;
+}
+
+.setting__error {
+  margin: 0;
+  color: var(--c-danger);
+}
+
+.path {
+  padding: 2px var(--space-2);
+  border-radius: 6px;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.button {
+  flex: none;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-hover);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--c-read);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

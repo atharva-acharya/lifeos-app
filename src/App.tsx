@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { ALL_ROUTES, type RouteId } from "./routes";
 import "./styles/global.css";
 import "./styles/layout.css";
@@ -31,7 +32,7 @@ export default function App() {
     <div className="shell">
       <Sidebar current={current} onNavigate={setCurrent} />
       <main className="main" ref={mainRef} tabIndex={-1} aria-label={route.label}>
-        <PlaceholderPage route={route} />
+        {route.id === "settings" ? <SettingsPage /> : <PlaceholderPage route={route} />}
       </main>
     </div>
   );

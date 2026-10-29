@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: events and window controls only; no fs, shell, http or path access (threat model T5)",
+  "description": "Main window: events, window controls and the app's own settings commands; no fs, shell, http or path access (threat model T5)",
   "windows": ["main"],
-  "permissions": ["core:event:default", "core:window:default"]
+  "permissions": [
+    "core:event:default",
+    "core:window:default",
+    "allow-get-settings",
+    "allow-choose-vault-folder"
+  ]
 }
