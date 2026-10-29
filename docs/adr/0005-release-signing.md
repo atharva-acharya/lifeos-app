@@ -3,9 +3,11 @@
 Status: accepted · Date: 2026-10-29
 
 ## Context
+
 Each phase ends with a released build. Requirements ask for a signed installer, a CycloneDX SBOM, a changelog and checksums.
 
 ## Decision
+
 - **Trigger:** pushing a tag `vX.Y.Z` on `main` runs `release.yml` in a protected `release` environment (manual approval).
 - **Version** from the tag; set in `package.json`, `Cargo.toml` and `tauri.conf.json` by the release workflow check (mismatch fails).
 - **Artefacts:** NSIS installer (`.exe`) and MSI from `tauri build`.
@@ -17,8 +19,10 @@ Each phase ends with a released build. Requirements ask for a signed installer, 
 - **No auto-updater** in version 1 (keeps the app offline apart from the Sheets API).
 
 ## Alternatives
+
 - **Azure Trusted Signing:** about $10/month and identity validation; individual sign-up is limited by region. Kept as fallback.
 - **Self-signed certificate:** free but Windows SmartScreen still warns; no real trust value.
 
 ## Consequences
+
 - SignPath approval needs a public repo with an OSI licence and some history; apply once phase 1 is merged.
