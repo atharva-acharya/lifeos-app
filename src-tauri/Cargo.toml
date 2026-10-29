@@ -5,7 +5,7 @@ description = "Desktop dashboards and editor for a Markdown Life OS vault"
 authors = ["Atharva Acharya"]
 license = "MIT"
 repository = "https://github.com/atharva-acharya/lifeos-app"
-rust-version = "1.85"
+rust-version = "1.95"
 edition = "2024"
 
 [lib]
