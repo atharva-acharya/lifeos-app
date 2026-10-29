@@ -57,6 +57,7 @@ button {
   font-size: var(--fs-kicker);
   font-weight: 600;
   border: 1px solid currentColor;
+  white-space: nowrap;
 }
 
 .pill--read {

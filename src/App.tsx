@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
+import { JobsPage } from "./pages/JobsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TodayPage } from "./pages/TodayPage";
@@ -35,6 +36,8 @@ export default function App() {
       <main className="main" ref={mainRef} tabIndex={-1} aria-label={route.label}>
         {route.id === "today" ? (
           <TodayPage onNavigate={setCurrent} />
+        ) : route.id === "jobs" ? (
+          <JobsPage onNavigate={setCurrent} />
         ) : route.id === "settings" ? (
           <SettingsPage />
         ) : (

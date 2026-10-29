@@ -50,6 +50,8 @@ pub enum Note {
     Company(Company),
     Weekly(Weekly),
     Project(Project),
+    /// `Jobs/Outreach.md`: one table of contacts.
+    Outreach(Vec<OutreachEntry>),
     /// A note with no front matter or a `type` the app does not model.
     Other,
 }
@@ -126,6 +128,20 @@ pub const STAGES: &[&str] = &[
     "offer",
     "rejected",
 ];
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutreachEntry {
+    pub sent: Option<String>,
+    pub name: Option<String>,
+    pub profile: Option<String>,
+    pub company_role: Option<String>,
+    pub contact_type: Option<String>,
+    pub status: Option<String>,
+    pub last_update: Option<String>,
+}
+
+pub const OUTREACH_STATUSES: &[&str] = &["sent", "accepted", "messaged", "replied", "withdrawn"];
+
 pub const WORKOUT_DAYS: &[&str] = &["Push A", "Pull A", "Legs", "Push B", "Pull B"];
 
 /// Parses a note's text into a typed model.
@@ -198,6 +214,7 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
             steps: checklist(body),
             last_log: last_log(body),
         }),
+        Some("outreach-log") => Note::Outreach(outreach_table(body)),
         _ => Note::Other,
     })
 }
@@ -223,6 +240,65 @@ pub fn last_log(body: &str) -> Option<String> {
         }
     }
     last
+}
+
+/// Reads the first Markdown table in the body, matching columns by header
+/// name (case-insensitive), so reordering columns is harmless.
+pub fn outreach_table(body: &str) -> Vec<OutreachEntry> {
+    let mut rows = body
+        .lines()
+        .map(str::trim)
+        .skip_while(|l| !l.starts_with('|'))
+        .take_while(|l| l.starts_with('|'));
+    let Some(header) = rows.next() else {
+        return Vec::new();
+    };
+    let headers: Vec<String> = cells(header).iter().map(|h| h.to_lowercase()).collect();
+    let col = |names: &[&str]| headers.iter().position(|h| names.contains(&h.as_str()));
+    let (sent, name, profile, company, kind, status, updated) = (
+        col(&["sent", "date"]),
+        col(&["name"]),
+        col(&["profile"]),
+        col(&["company / role", "company/role", "company"]),
+        col(&["type"]),
+        col(&["status"]),
+        col(&["last update", "updated"]),
+    );
+    rows.filter(|r| !is_separator(r))
+        .map(|r| {
+            let c = cells(r);
+            let get = |i: Option<usize>| {
+                i.and_then(|i| c.get(i))
+                    .map(|v| v.trim_matches('`').trim().to_owned())
+                    .filter(|v| !v.is_empty())
+            };
+            OutreachEntry {
+                sent: get(sent),
+                name: get(name),
+                profile: get(profile),
+                company_role: get(company),
+                contact_type: get(kind),
+                status: get(status).map(|s| s.to_lowercase()),
+                last_update: get(updated),
+            }
+        })
+        .filter(|e| e != &OutreachEntry::default())
+        .collect()
+}
+
+fn cells(row: &str) -> Vec<String> {
+    row.trim()
+        .trim_start_matches('|')
+        .trim_end_matches('|')
+        .split('|')
+        .map(|c| c.trim().to_owned())
+        .collect()
+}
+
+fn is_separator(row: &str) -> bool {
+    cells(row)
+        .iter()
+        .all(|c| !c.is_empty() && c.chars().all(|ch| matches!(ch, '-' | ':' | ' ')))
 }
 
 pub fn checklist(body: &str) -> Vec<(bool, String)> {
@@ -482,6 +558,49 @@ mod tests {
             Err(ParseError::Yaml(_))
         ));
         assert_eq!(parse("---\n- a\n- b\n---\n"), Err(ParseError::NotAMap));
+    }
+
+    #[test]
+    fn parses_outreach_table_by_header() {
+        let text = "---
+type: outreach-log
+---
+# Outreach
+Intro text.
+
+| Sent | Name | Profile | Company / role | Type | Status | Last update |
+|---|---|---|---|---|---|---|
+| 2026-01-05 | Alex Example | linkedin.com/in/alex | Example Ltd / SOC Analyst | Recruiter | `replied` | 2026-01-07 |
+| 2026-01-06 | Jo Sample | | Sample Bank | Peer | Sent | |
+
+After the table.
+";
+        let Ok(Note::Outreach(rows)) = parse(text) else {
+            panic!("expected outreach");
+        };
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].name.as_deref(), Some("Alex Example"));
+        assert_eq!(
+            rows[0].company_role.as_deref(),
+            Some("Example Ltd / SOC Analyst")
+        );
+        assert_eq!(rows[0].status.as_deref(), Some("replied"));
+        assert_eq!(rows[1].status.as_deref(), Some("sent"));
+        assert_eq!(rows[1].profile, None);
+    }
+
+    #[test]
+    fn outreach_columns_can_be_reordered_or_missing() {
+        let body = "| Status | Name |
+|:--|--:|
+| accepted | Sam |
+";
+        let rows = outreach_table(body);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name.as_deref(), Some("Sam"));
+        assert_eq!(rows[0].status.as_deref(), Some("accepted"));
+        assert_eq!(rows[0].sent, None);
+        assert!(outreach_table("no table here").is_empty());
     }
 
     #[test]

@@ -20,6 +20,7 @@ fn reads_every_note_and_skips_hidden_archived_and_non_markdown() {
             "Inbox.md",
             "Jobs/Companies/Example Security Ltd.md",
             "Jobs/Companies/Sample Bank.md",
+            "Jobs/Outreach.md",
             "Projects/home-lab.md",
             "Weekly/2026-W02.md",
         ]
@@ -37,6 +38,7 @@ fn types_each_note() {
             Some(Note::Company(_)) => "company",
             Some(Note::Weekly(_)) => "weekly",
             Some(Note::Project(_)) => "project",
+            Some(Note::Outreach(_)) => "outreach",
             Some(Note::Other) => "other",
             None => "error",
         }
