@@ -85,7 +85,8 @@ jobs:
         run: cargo deny --locked check
       - name: cargo audit
         working-directory: src-tauri
-        run: cargo audit --deny unsound --deny yanked
+        # Unsound/unmaintained advisories are enforced by cargo deny for the shipped target.
+        run: cargo audit --deny yanked
 
   gitleaks:
     name: Gitleaks
