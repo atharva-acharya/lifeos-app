@@ -1,6 +1,6 @@
 # ADR 0006: Google Sheets access
 
-Status: proposed · Date: 2026-10-29
+Status: accepted · Date: 2026-10-29
 
 ## Context
 

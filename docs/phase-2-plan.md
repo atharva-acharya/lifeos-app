@@ -1,6 +1,6 @@
 # Phase 2 plan: Jobs
 
-Status: proposed 2026-10-29.
+Status: approved by owner 2026-10-29.
 
 Goal (requirements §3.2): the Jobs page shows applications live from the owner's Google Sheet, the company pipeline from vault notes, the outreach log and job-search charts. Ends with `v0.2.0` and owner sign-off.
 
