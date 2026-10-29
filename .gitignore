@@ -1,0 +1,29 @@
+# Private working files (never commit)
+CLAUDE.md
+.claude/
+
+# Local settings and secrets
+.env
+*.local.json
+credentials*.json
+token*.json
+
+# Build output
+node_modules/
+dist/
+target/
+src-tauri/target/
+*.log
+
+# Local index and test output
+*.db
+*.sqlite
+*.sqlite-*
+coverage/
+playwright-report/
+test-results/
+
+# Signing material
+*.pfx
+*.p12
+*.key
