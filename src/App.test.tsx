@@ -1,12 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
+import { invoke } from "./test/tauri-mocks";
 
 describe("App shell", () => {
-  it("opens on Today", () => {
+  beforeEach(() => {
+    invoke.mockResolvedValue({ status: "noVault" });
+  });
+
+  it("opens on Today", async () => {
     render(<App />);
-    expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByText("Not connected")).toBeInTheDocument();
   });
 
   it("lists every module in the sidebar with settings at the bottom", () => {

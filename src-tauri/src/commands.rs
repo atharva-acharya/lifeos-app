@@ -6,7 +6,9 @@ use std::path::PathBuf;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
+use crate::live::LiveState;
 use crate::settings::{self, Settings};
+use crate::today::{self, Today};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +24,7 @@ impl From<Settings> for SettingsView {
     }
 }
 
-fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_config_dir().map_err(|e| e.to_string())
 }
 
@@ -49,8 +51,39 @@ pub async fn choose_vault_folder(app: AppHandle) -> Result<SettingsView, String>
 
     let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
     if let Some(folder) = picked {
-        current.vault_path = Some(settings::validate_vault(&folder).map_err(|e| e.to_string())?);
+        let vault = settings::validate_vault(&folder).map_err(|e| e.to_string())?;
+        current.vault_path = Some(vault.clone());
         settings::save(&dir, &current).map_err(|e| e.to_string())?;
+        crate::live::start(&app, &vault)?;
     }
     Ok(current.into())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum TodayResponse {
+    /// No vault chosen yet, or it is still being indexed.
+    NoVault,
+    Ready {
+        today: Box<Today>,
+    },
+}
+
+/// Today's dashboard for `date` (the owner's local date, YYYY-MM-DD).
+#[tauri::command]
+pub fn get_today(
+    state: tauri::State<'_, LiveState>,
+    date: String,
+) -> Result<TodayResponse, String> {
+    if !crate::vault::note::is_iso_date(&date) {
+        return Err("date must look like 2026-10-29".to_owned());
+    }
+    match state.with_index(|index| today::today(index, &date)) {
+        None => Ok(TodayResponse::NoVault),
+        Some(result) => result
+            .map(|today| TodayResponse::Ready {
+                today: Box::new(today),
+            })
+            .map_err(|e| e.to_string()),
+    }
 }

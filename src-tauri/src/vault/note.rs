@@ -114,6 +114,8 @@ pub struct Project {
     pub updated: Option<String>,
     /// Ordered checklist from the body: (done, text).
     pub steps: Vec<(bool, String)>,
+    /// Last entry of the `## Log` section, if any.
+    pub last_log: Option<String>,
 }
 
 pub const STAGES: &[&str] = &[
@@ -194,6 +196,7 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
             next_step: f.string("next_step")?,
             updated: f.date("updated")?,
             steps: checklist(body),
+            last_log: last_log(body),
         }),
         _ => Note::Other,
     })
@@ -201,6 +204,27 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
 
 /// Reads `- [ ] step` / `- [x] step` lines under a `## Steps` heading, or
 /// anywhere if the note has no such heading.
+/// Returns the last list item under a `## Log` heading.
+pub fn last_log(body: &str) -> Option<String> {
+    let mut in_log = false;
+    let mut last = None;
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("## ") {
+            in_log = trimmed.eq_ignore_ascii_case("## log");
+            continue;
+        }
+        if in_log
+            && let Some(item) = trimmed
+                .strip_prefix("- ")
+                .or_else(|| trimmed.strip_prefix("* "))
+        {
+            last = Some(item.trim().to_owned());
+        }
+    }
+    last
+}
+
 pub fn checklist(body: &str) -> Vec<(bool, String)> {
     let has_heading = body
         .lines()
@@ -322,7 +346,7 @@ impl Fields<'_> {
     }
 }
 
-fn is_iso_date(s: &str) -> bool {
+pub fn is_iso_date(s: &str) -> bool {
     let b = s.as_bytes();
     b.len() == 10
         && b[4] == b'-'
@@ -419,6 +443,20 @@ mod tests {
                 (false, "Third".to_owned())
             ]
         );
+        assert_eq!(p.last_log.as_deref(), Some("[ ] not a step"));
+    }
+
+    #[test]
+    fn reads_last_log_entry() {
+        let body = "## Steps
+- [ ] a
+## Log
+- 2026-01-01: started
+- 2026-01-02: kept going
+## Notes
+- unrelated
+";
+        assert_eq!(last_log(body).as_deref(), Some("2026-01-02: kept going"));
     }
 
     #[test]

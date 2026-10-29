@@ -1,7 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
+import { invoke, listen } from "./tauri-mocks";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke }));
+vi.mock("@tauri-apps/api/event", () => ({ listen }));
 
 afterEach(() => {
   cleanup();
+  invoke.mockReset();
 });
