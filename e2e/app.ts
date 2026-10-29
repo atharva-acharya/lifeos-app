@@ -30,10 +30,21 @@ export async function launchApp(): Promise<RunningApp> {
       LIFEOS_DATA_DIR: data,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${String(PORT)}`,
     },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
   });
+  let output = "";
+  let exited: string | null = null;
+  child.stdout?.on("data", (d: Buffer) => (output += d.toString()));
+  child.stderr?.on("data", (d: Buffer) => (output += d.toString()));
+  child.on("error", (e) => (exited = `failed to start: ${e.message}`));
+  child.on("exit", (code) => (exited = `exited with code ${String(code)}`));
 
-  const browser = await connect();
+  const browser = await connect(() =>
+    exited
+      ? `app ${exited}
+${output}`
+      : null,
+  );
   const page = await firstPage(browser);
   await page.waitForLoadState("domcontentloaded");
 
@@ -47,12 +58,15 @@ export async function launchApp(): Promise<RunningApp> {
   };
 }
 
-async function connect(): Promise<Browser> {
-  const deadline = Date.now() + 30_000;
+async function connect(failure: () => string | null): Promise<Browser> {
+  // A fresh CI runner can take a while to start WebView2 the first time.
+  const deadline = Date.now() + 90_000;
   for (;;) {
     try {
       return await chromium.connectOverCDP(`http://127.0.0.1:${String(PORT)}`);
     } catch (err) {
+      const reason = failure();
+      if (reason) throw new Error(reason, { cause: err });
       if (Date.now() > deadline) throw err;
       await new Promise((r) => setTimeout(r, 500));
     }
