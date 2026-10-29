@@ -1,12 +1,14 @@
 # Threat model
 
-Version 0.1 · 2026-10-29 · Method: STRIDE per trust boundary. Reviewed at the end of every phase.
+Version 0.2 · 2026-10-29 · Method: STRIDE per trust boundary. Reviewed at the end of every phase.
 
 ## Assets
 
 1. Vault notes (personal health, job search and journal data): confidentiality and integrity.
 2. Google OAuth refresh token (phase 2).
 3. Integrity of the released installer and its dependencies.
+4. Health data from Apple Health exports (phase 3): confidentiality.
+5. Money records: transactions, budgets, balances with friends (phase 4): confidentiality and integrity.
 
 ## Trust boundaries
 
@@ -15,6 +17,8 @@ Version 0.1 · 2026-10-29 · Method: STRIDE per trust boundary. Reviewed at the 
                             |  \
                          (B3)   (B4: HTTPS)
                      [index.db]   [Google Sheets API]
+[Health export folder (iCloud Drive)] --(B6)--> [Rust core]
+[Bank CSV files] --(B7)--> [Rust core] --> [Vault Money/]
 [Source + deps] --(B5: CI/CD)--> [Signed installer] --> [Owner's PC]
 ```
 
@@ -37,6 +41,11 @@ Version 0.1 · 2026-10-29 · Method: STRIDE per trust boundary. Reviewed at the 
 | T13 | B5       | Info disclosure | Secrets or personal data committed                                                 | Gitleaks + push protection; `.gitignore` for settings/credentials; synthetic fixtures only                                                    | 1     |
 | T14 | B5       | Spoofing        | Tampered installer                                                                 | Authenticode signing via SignPath, Sigstore attestations, SHA256 checksums                                                                    | 1     |
 | T15 | all      | Repudiation     | No record of what the app changed                                                  | Local append-only log of writes/moves in app data (path, time, hash before/after); no note content logged                                     | 4     |
+| T16 | B6       | Tampering / DoS | Malformed or huge health export file crashes or stalls the importer                | Read-only access to the configured folder only; size cap per file; schema-validated parsing; bad files recorded, never fatal                  | 3     |
+| T17 | B6       | Info disclosure | Health data copied or leaked                                                       | Stays on the owner's devices (iCloud Drive sync is the owner's own); app makes no network calls; index in local app data                      | 3     |
+| T18 | B7       | Tampering       | Malicious bank CSV (formula payloads, huge rows, odd encodings)                    | Parsed as data only, never evaluated; size and row limits; preview before import; duplicates skipped                                          | 4     |
+| T19 | B7       | Tampering       | Import or split edits corrupt money records                                        | Atomic writes, round-trip tests, every change undoable via `old/` backups                                                                     | 4     |
+| T20 | all      | Info disclosure | Financial data leaks via logs or crash reports                                     | No telemetry; logs never contain amounts, descriptions or names                                                                               | 4     |
 
 ## Out of scope
 

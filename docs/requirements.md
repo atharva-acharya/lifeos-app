@@ -17,7 +17,9 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
   - Weekly `Weekly/YYYY-Www.md`: `type: weekly`, `week`, `arc_week`, `avg_weight`, `weight_change`, `target_change`, `sessions`, `protein_days`, `avg_steps`, `applications`, `replies`, `study_hours`
   - Project tracker (new, see 3.4): `type: project`, `project`, `status`, `step`, `steps_total`, `next_step`, `updated`
 - **Job applications:** read live from a Google Sheet (tab `Applications`; columns Applied, Company, Role, Source, Inbox, Status, Last update, Days since, Follow up?, Email, Notes, Message ID). Read-only OAuth scope. Sheet ID and credentials live in local settings, never in the repo.
-- **Privacy:** no telemetry, no cloud services other than the read-only Google Sheets API. Personal data never enters the repository, tests or screenshots (tests use synthetic fixtures).
+- **Health data (Apple Health):** the owner's iPhone runs an auto-export app (Health Auto Export or equivalent) that writes daily JSON files to an iCloud Drive folder; iCloud for Windows syncs that folder to the PC. The app reads only that folder (path in local settings), read-only. Metrics: steps, active energy, resting heart rate, heart rate variability, sleep (duration and stages), body mass, workouts. The export files are the source of truth; the app indexes them.
+- **Money data:** stored in the vault under `Money/`, so it stays with the owner's notes. Records: transaction (date, amount, direction income/expense, category, description, account, optional split: who shares it and each share), budget (month, category, limit), settle-up (date, friend, amount, direction). The exact file format is fixed in the phase 4 design note and recorded in this change log before build.
+- **Privacy:** no telemetry, no cloud services other than the read-only Google Sheets API. Health files arrive through the owner's own iCloud Drive sync; the app itself makes no new network calls. No bank connections. Personal data never enters the repository, tests or screenshots (tests use synthetic fixtures).
 
 ## 3. Modules (version 1)
 
@@ -48,6 +50,17 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 ### 3.6 Search
 - Ctrl+K command palette: notes, companies, projects, and actions (new daily note, log weight).
 
+### 3.7 Health
+- Apple-inspired design within design A: activity rings (steps, active energy, sleep goal), spring animations on cards and charts, smooth transitions between day, week and month; all motion respects "reduce motion".
+- Today ring summary; trends for resting heart rate, HRV, sleep (duration and stages) and weight; workouts imported from Apple Health alongside vault workout logs.
+- Shows when the last export arrived, and a clear message if the export folder goes stale.
+
+### 3.8 Money (budget tracker)
+- Quick add for expenses and income; import of bank statement CSVs (column mapping saved per bank; duplicates skipped).
+- Monthly budgets by category: spent vs limit, colour-coded (green under, orange near, red over).
+- Bill splitting: split an expense with friends (equal, by amount or by share); running balance per friend ("Sam owes you £12"); record settle-ups.
+- Income analytics: income by source and month, savings rate, spending by category over time, month-on-month comparison.
+
 ## 4. Design (option A, "studio dark")
 
 - Dark UI: page `#141414`, sidebar `#1b1b1b`, cards `#232323` with `#333` border, 12px radius.
@@ -55,7 +68,7 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 - Colour meaning, used consistently: purple = read/viewed, orange = in progress/editing/due, green = done/positive, yellow = pending, red = destructive.
 - File-type and category badges; rounded status pills.
 - The active item (current project step, item being edited) has a slow breathing highlight; respects "reduce motion".
-- Left sidebar: Today, Jobs, Fitness, Projects, Search; settings at the bottom.
+- Left sidebar: Today, Jobs, Fitness, Health, Money, Projects, Search; settings at the bottom.
 
 ## 5. Non-functional
 
@@ -74,10 +87,16 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 
 ## 7. Phases
 
-1. **Foundation:** repo, CI/CD with all gates green, app shell (sidebar, theme, settings), vault reader + SQLite index, Today page.
+1. **Foundation:** repo, CI/CD with all gates green, app shell (sidebar, theme, settings), vault reader + SQLite index, Today page. *(Released as v0.1.0.)*
 2. **Jobs:** Sheets integration, pipeline view, outreach log, job charts.
-3. **Fitness + Projects:** charts, tracker, resume-here.
-4. **Editor + search:** forms + Markdown editor, Ctrl+K, release 1.0.
+3. **Fitness, Health + Projects:** fitness charts, Apple Health import and Health section, projects tracker and resume-here.
+4. **Money:** budget tracker, bill splitting, income analytics; introduces safe note writing (atomic, round-trip safe) that the editor reuses.
+5. **Editor + search:** forms + Markdown editor, Ctrl+K, release 1.0.
+
+### Deferred (not in version 1)
+- Live workout logging (Hevy/Strong style): belongs in a future iOS app, where logging happens at the gym.
+- Mail viewer (Gmail): revisit after the Sheet-based job search is in use.
+- Bank account linking (Open Banking): CSV import covers version 1.
 
 Each phase ends with a working, released build and owner sign-off before the next starts.
 
@@ -85,3 +104,4 @@ Each phase ends with a working, released build and owner sign-off before the nex
 
 - 2026-10-29: version 1 scope agreed (design A).
 - 2026-10-29: Default vault path removed from this document (kept in local settings only, per privacy rule). No functional change.
+- 2026-10-29: Scope change agreed with owner after v0.1.0. Added Health section with Apple Health import via an iPhone auto-export app and iCloud Drive (route A), Apple-inspired motion; added Money module (budgets, CSV import, bill splitting with friends, income analytics), no bank linking. Phases now 5: Money becomes phase 4, Editor + search moves to phase 5 (release 1.0). Deferred: live workout logging (future iOS app), Gmail viewer, bank linking. Sidebar gains Health and Money.
