@@ -91,6 +91,9 @@ jobs:
       - name: Build (debug)
         if: github.event_name == 'pull_request'
         run: pnpm tauri build --debug --no-bundle -- --locked
+      - name: End-to-end smoke test
+        if: github.event_name == 'pull_request'
+        run: pnpm e2e
       - name: Build (release)
         if: github.event_name != 'pull_request'
         run: pnpm tauri build --no-bundle -- --locked

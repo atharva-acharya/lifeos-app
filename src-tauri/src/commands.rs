@@ -24,8 +24,22 @@ impl From<Settings> for SettingsView {
     }
 }
 
+/// Debug builds only: `LIFEOS_DATA_DIR` points settings and the index at a
+/// throwaway folder so end-to-end tests never touch the owner's real data.
+/// Release builds ignore it.
+pub(crate) fn test_data_dir() -> Option<PathBuf> {
+    if cfg!(debug_assertions) {
+        std::env::var_os("LIFEOS_DATA_DIR").map(PathBuf::from)
+    } else {
+        None
+    }
+}
+
 pub(crate) fn config_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path().app_config_dir().map_err(|e| e.to_string())
+    match test_data_dir() {
+        Some(dir) => Ok(dir),
+        None => app.path().app_config_dir().map_err(|e| e.to_string()),
+    }
 }
 
 #[tauri::command]
