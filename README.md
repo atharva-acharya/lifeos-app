@@ -6,6 +6,8 @@ A Windows desktop app for a Markdown + YAML "Life OS" note vault (Obsidian-compa
 
 ![Today page with synthetic demo data](docs/images/today.png)
 
+![Job charts with synthetic demo data](docs/images/job-charts.jpg)
+
 ## Highlights
 
 - **Local-first.** Your notes stay the source of truth; a disposable SQLite index makes dashboards fast. No telemetry.
