@@ -5,6 +5,7 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { FitnessPage } from "./pages/FitnessPage";
 import { JobsPage } from "./pages/JobsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TodayPage } from "./pages/TodayPage";
 import { ALL_ROUTES, type RouteId } from "./routes";
@@ -52,6 +53,8 @@ export default function App() {
             <JobsPage onNavigate={navigate} />
           ) : route.id === "fitness" ? (
             <FitnessPage onNavigate={navigate} />
+          ) : route.id === "projects" ? (
+            <ProjectsPage onNavigate={navigate} />
           ) : route.id === "settings" ? (
             <SettingsPage />
           ) : (

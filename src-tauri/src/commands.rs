@@ -12,6 +12,7 @@ use crate::fitness::{self, Fitness};
 use crate::google::{self, GoogleConfig};
 use crate::jobs::{self, Jobs};
 use crate::live::LiveState;
+use crate::projects::{self, Projects};
 use crate::settings::{self, Settings};
 use crate::today::{self, Today};
 use crate::updates::{self, Pending, UpdateInfo};
@@ -310,6 +311,27 @@ pub fn get_fitness(
         Some(result) => result
             .map(|fitness| FitnessResponse::Ready {
                 fitness: Box::new(fitness),
+            })
+            .map_err(|e| e.to_string()),
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum ProjectsResponse {
+    NoVault,
+    Ready { projects: Box<Projects> },
+}
+
+/// Project trackers: steps, progress, next step and log. Takes no arguments,
+/// so nothing from the UI reaches the vault.
+#[tauri::command]
+pub fn get_projects(state: tauri::State<'_, LiveState>) -> Result<ProjectsResponse, String> {
+    match state.with_index(projects::projects) {
+        None => Ok(ProjectsResponse::NoVault),
+        Some(result) => result
+            .map(|projects| ProjectsResponse::Ready {
+                projects: Box::new(projects),
             })
             .map_err(|e| e.to_string()),
     }

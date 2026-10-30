@@ -1,0 +1,373 @@
+//! Data for the Projects page (requirements §3.4), read from the index.
+
+use std::path::Path;
+
+use rusqlite::params;
+use serde::Serialize;
+
+use crate::index::Index;
+use crate::vault::note::LogEntry;
+
+/// At most this many projects are sent to the UI.
+const MAX_PROJECTS: i64 = 200;
+
+#[derive(Debug, Default, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Projects {
+    pub projects: Vec<ProjectView>,
+    /// Notes under `Projects/` the app could not read.
+    pub parse_errors: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StepView {
+    pub text: String,
+    pub done: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectView {
+    pub path: String,
+    pub name: String,
+    pub status: Option<String>,
+    pub active: bool,
+    pub updated: Option<String>,
+    pub steps: Vec<StepView>,
+    pub done: i64,
+    pub total: i64,
+    /// Index of the first unchecked step.
+    pub current: Option<usize>,
+    pub next_step: Option<String>,
+    pub last_log: Option<LogEntry>,
+    /// Newest first.
+    pub log: Vec<LogEntry>,
+}
+
+struct Row {
+    path: String,
+    project: Option<String>,
+    status: Option<String>,
+    step: Option<i64>,
+    steps_total: Option<i64>,
+    next_step: Option<String>,
+    updated: Option<String>,
+}
+
+/// Same rule as Today's resume: no status, `active` or `in progress`.
+fn is_active(status: Option<&str>) -> bool {
+    status.is_none_or(|s| {
+        let s = s.trim();
+        s.eq_ignore_ascii_case("active") || s.eq_ignore_ascii_case("in progress")
+    })
+}
+
+pub fn projects(index: &Index) -> rusqlite::Result<Projects> {
+    let conn = index.conn();
+    let rows: Vec<Row> = conn
+        .prepare(
+            "SELECT path, project, status, step, steps_total, next_step, updated FROM project
+             ORDER BY (status IS NULL OR lower(trim(status)) IN ('active', 'in progress')) DESC,
+                      updated IS NULL, updated DESC, path
+             LIMIT ?1",
+        )?
+        .query_map(params![MAX_PROJECTS], |r| {
+            Ok(Row {
+                path: r.get(0)?,
+                project: r.get(1)?,
+                status: r.get(2)?,
+                step: r.get(3)?,
+                steps_total: r.get(4)?,
+                next_step: r.get(5)?,
+                updated: r.get(6)?,
+            })
+        })?
+        .collect::<Result<_, _>>()?;
+
+    let mut steps_query =
+        conn.prepare("SELECT text, done FROM project_steps WHERE path = ?1 ORDER BY position")?;
+    let mut log_query =
+        conn.prepare("SELECT date, text FROM project_log WHERE path = ?1 ORDER BY position DESC")?;
+
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let steps: Vec<StepView> = steps_query
+            .query_map(params![row.path], |r| {
+                Ok(StepView {
+                    text: r.get(0)?,
+                    done: r.get::<_, i64>(1)? != 0,
+                })
+            })?
+            .collect::<Result<_, _>>()?;
+        let log: Vec<LogEntry> = log_query
+            .query_map(params![row.path], |r| {
+                Ok(LogEntry {
+                    date: r.get(0)?,
+                    text: r.get(1)?,
+                })
+            })?
+            .collect::<Result<_, _>>()?;
+
+        let (done, total, current) = if steps.is_empty() {
+            // No checklist: the front matter is all there is.
+            let total = row.steps_total.unwrap_or(0).max(0);
+            (row.step.unwrap_or(0).clamp(0, total), total, None)
+        } else {
+            let done = steps.iter().filter(|s| s.done).count();
+            (
+                i64::try_from(done).unwrap_or(i64::MAX),
+                i64::try_from(steps.len()).unwrap_or(i64::MAX),
+                steps.iter().position(|s| !s.done),
+            )
+        };
+        let all_done = total > 0 && done >= total;
+        let next_step = match current {
+            Some(i) => Some(steps[i].text.clone()),
+            None if all_done => None,
+            None => row.next_step.clone(),
+        };
+        let name = row.project.clone().unwrap_or_else(|| {
+            Path::new(&row.path)
+                .file_stem()
+                .map_or_else(|| row.path.clone(), |s| s.to_string_lossy().into_owned())
+        });
+        out.push(ProjectView {
+            active: is_active(row.status.as_deref()),
+            path: row.path,
+            name,
+            status: row.status,
+            updated: row.updated,
+            steps,
+            done,
+            total,
+            current,
+            next_step,
+            last_log: log.first().cloned(),
+            log,
+        });
+    }
+
+    Ok(Projects {
+        projects: out,
+        parse_errors: conn.query_row(
+            "SELECT COUNT(*) FROM notes WHERE kind = 'error' AND path LIKE ?1",
+            params!["Projects/%"],
+            |r| r.get(0),
+        )?,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fmt::Write as _;
+    use std::fs;
+
+    fn fixture_index() -> Index {
+        let mut index = Index::open_in_memory().expect("open");
+        index
+            .sync(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vault"))
+            .expect("sync");
+        index
+    }
+
+    fn vault_with(files: &[(&str, &str)]) -> Index {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for (path, text) in files {
+            let full = dir.path().join(path);
+            fs::create_dir_all(full.parent().expect("parent")).expect("mkdir");
+            fs::write(full, text).expect("write");
+        }
+        let mut index = Index::open_in_memory().expect("open");
+        index.sync(dir.path()).expect("sync");
+        index
+    }
+
+    fn find<'a>(p: &'a Projects, name: &str) -> &'a ProjectView {
+        p.projects.iter().find(|v| v.name == name).expect("project")
+    }
+
+    #[test]
+    fn fixture_projects_are_ordered_active_first_then_newest() {
+        let p = projects(&fixture_index()).expect("projects");
+        let names: Vec<&str> = p.projects.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(
+            names,
+            ["home-lab", "notes-only", "garden-planner", "reading-list"]
+        );
+        assert_eq!(p.parse_errors, 0);
+    }
+
+    #[test]
+    fn active_project_with_a_checklist() {
+        let p = projects(&fixture_index()).expect("projects");
+        let v = find(&p, "home-lab");
+        assert!(v.active);
+        assert_eq!((v.done, v.total, v.current), (1, 3, Some(1)));
+        assert_eq!(v.next_step.as_deref(), Some("Set up log forwarding"));
+        assert!(v.steps[0].done && !v.steps[1].done);
+        assert_eq!(
+            v.last_log,
+            Some(LogEntry {
+                date: Some("2026-01-13".to_owned()),
+                text: "Hypervisor running.".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn paused_project_keeps_its_place_and_undated_log() {
+        let p = projects(&fixture_index()).expect("projects");
+        let v = find(&p, "garden-planner");
+        assert!(!v.active);
+        assert_eq!((v.done, v.total, v.current), (2, 4, Some(2)));
+        assert_eq!(v.next_step.as_deref(), Some("Order seeds"));
+        // Newest first by position: the undated line was written last.
+        assert_eq!(v.log.len(), 2);
+        assert_eq!(v.log[0].date, None);
+        assert_eq!(v.log[0].text, "Waiting on spring.");
+        assert_eq!(v.log[1].date.as_deref(), Some("2026-02-18"));
+        assert_eq!(v.last_log.as_ref(), v.log.first());
+    }
+
+    #[test]
+    fn done_project_has_no_current_or_next_step() {
+        let p = projects(&fixture_index()).expect("projects");
+        let v = find(&p, "reading-list");
+        assert!(!v.active);
+        assert_eq!((v.done, v.total, v.current), (2, 2, None));
+        assert_eq!(v.next_step, None);
+    }
+
+    #[test]
+    fn without_a_checklist_front_matter_is_the_fallback() {
+        let p = projects(&fixture_index()).expect("projects");
+        let v = find(&p, "notes-only");
+        assert!(v.steps.is_empty());
+        assert_eq!((v.done, v.total, v.current), (1, 4, None));
+        assert_eq!(v.next_step.as_deref(), Some("Draft the outline"));
+        assert_eq!(v.last_log, None);
+        assert!(v.log.is_empty());
+    }
+
+    #[test]
+    fn fallback_is_clamped_and_hides_next_step_when_complete() {
+        let index = vault_with(&[
+            (
+                "Projects/over.md",
+                "---\ntype: project\nstep: 9\nsteps_total: 4\nnext_step: Stale\n---\n",
+            ),
+            (
+                "Projects/negative.md",
+                "---\ntype: project\nstep: -3\nsteps_total: 4\n---\n",
+            ),
+            ("Projects/bare.md", "---\ntype: project\n---\n"),
+        ]);
+        let p = projects(&index).expect("projects");
+        let over = find(&p, "over");
+        assert_eq!((over.done, over.total), (4, 4));
+        assert_eq!(over.next_step, None);
+        let neg = find(&p, "negative");
+        assert_eq!((neg.done, neg.total), (0, 4));
+        let bare = find(&p, "bare");
+        assert_eq!((bare.done, bare.total, bare.current), (0, 0, None));
+        assert!(bare.active, "no status counts as active");
+    }
+
+    #[test]
+    fn status_is_case_and_space_insensitive() {
+        let index = vault_with(&[
+            (
+                "Projects/a.md",
+                "---\ntype: project\nstatus: \" In Progress \"\n---\n",
+            ),
+            (
+                "Projects/b.md",
+                "---\ntype: project\nstatus: blocked\n---\n",
+            ),
+        ]);
+        let p = projects(&index).expect("projects");
+        assert!(find(&p, "a").active);
+        assert!(!find(&p, "b").active);
+    }
+
+    #[test]
+    fn unreadable_project_notes_are_counted() {
+        let index = vault_with(&[
+            (
+                "Projects/bad.md",
+                "---\ntype: project\nsteps_total: lots\n---\n",
+            ),
+            ("Jobs/bad.md", "---\ntype: company\nstage: ghosted\n---\n"),
+        ]);
+        let p = projects(&index).expect("projects");
+        assert_eq!(p.parse_errors, 1);
+        assert!(p.projects.is_empty());
+    }
+
+    #[test]
+    fn empty_vault_gives_no_projects() {
+        let p = projects(&vault_with(&[])).expect("projects");
+        assert!(p.projects.is_empty());
+        assert_eq!(p.parse_errors, 0);
+    }
+
+    #[test]
+    fn at_most_200_projects() {
+        let files: Vec<(String, String)> = (0..205)
+            .map(|i| {
+                (
+                    format!("Projects/p{i:03}.md"),
+                    "---\ntype: project\n---\n".to_owned(),
+                )
+            })
+            .collect();
+        let refs: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(a, b)| (a.as_str(), b.as_str()))
+            .collect();
+        let p = projects(&vault_with(&refs)).expect("projects");
+        assert_eq!(p.projects.len(), 200);
+    }
+
+    #[test]
+    fn keeps_only_the_newest_thousand_log_entries() {
+        let mut text = String::from("---\ntype: project\n---\n## Log\n");
+        for i in 0..1005 {
+            writeln!(text, "- entry {i}").expect("write");
+        }
+        let index = vault_with(&[("Projects/long.md", &text)]);
+        let p = projects(&index).expect("projects");
+        let v = find(&p, "long");
+        assert_eq!(v.log.len(), 1000);
+        assert_eq!(v.log[0].text, "entry 1004");
+        assert_eq!(v.log[999].text, "entry 5");
+    }
+
+    #[test]
+    fn reads_a_note_in_the_tracker_format() {
+        let note = "---\ntype: project\nproject: lifeos-app\nstatus: active\nstep: 4\nsteps_total: 7\nnext_step: \"Phase 3: build the projects page\"\nupdated: 2026-10-30\n---\n# Life OS app\nFree text about the project.\n## Steps\n- [x] Scaffold the app\n- [x] Read the vault\n- [x] Today page\n- [x] Jobs page\n- [ ] Fitness page\n- [ ] Projects page\n- [ ] Writes\n## Log\n- 2026-10-28: Jobs page shipped.\n- 2026-10-29: Fitness page started.\n";
+        let index = vault_with(&[("Projects/lifeos-app.md", note)]);
+        let p = projects(&index).expect("projects");
+        let v = find(&p, "lifeos-app");
+        assert_eq!((v.done, v.total, v.current), (4, 7, Some(4)));
+        // The UI shows "Step 5 of 7".
+        assert_eq!(v.current.map(|c| c + 1), Some(5));
+        // The checklist wins over the quoted front matter value.
+        assert_eq!(v.next_step.as_deref(), Some("Fitness page"));
+        assert_eq!(v.updated.as_deref(), Some("2026-10-30"));
+        assert_eq!(v.log.len(), 2);
+        assert_eq!(v.log[0].date.as_deref(), Some("2026-10-29"));
+        assert_eq!(v.log[0].text, "Fitness page started.");
+    }
+
+    #[test]
+    fn quoted_next_step_with_a_colon_is_kept_without_a_checklist() {
+        let note = "---\ntype: project\nproject: x\nstep: 1\nsteps_total: 3\nnext_step: \"Phase 3: build it\"\n---\n";
+        let p = projects(&vault_with(&[("Projects/x.md", note)])).expect("projects");
+        assert_eq!(
+            find(&p, "x").next_step.as_deref(),
+            Some("Phase 3: build it")
+        );
+    }
+}

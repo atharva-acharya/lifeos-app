@@ -119,6 +119,16 @@ pub struct Project {
     pub steps: Vec<(bool, String)>,
     /// Last entry of the `## Log` section, if any.
     pub last_log: Option<String>,
+    /// Every bullet of the `## Log` section, in file order.
+    pub log: Vec<LogEntry>,
+}
+
+/// One bullet of a project's `## Log`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogEntry {
+    pub date: Option<String>,
+    pub text: String,
 }
 
 /// `Fitness/Plan.md`: the training plan's span and goals. Every field is optional.
@@ -304,6 +314,7 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
             updated: f.date("updated")?,
             steps: checklist(body),
             last_log: last_log(body),
+            log: log_entries(body),
         }),
         Some("plan") => Note::Plan(Plan {
             name: f.string("name")?,
@@ -340,6 +351,66 @@ pub fn last_log(body: &str) -> Option<String> {
         }
     }
     last
+}
+
+/// Splits a leading ISO date off a log bullet. The date must be followed by
+/// `:`, ` - `, ` – ` or whitespace; otherwise the whole bullet is the text.
+fn split_log_item(item: &str) -> LogEntry {
+    if let Some(head) = item.get(..10)
+        && is_iso_date(head)
+    {
+        let rest = &item[10..];
+        let text = if let Some(r) = rest.strip_prefix(':') {
+            Some(r)
+        } else if let Some(r) = rest
+            .strip_prefix(" - ")
+            .or_else(|| rest.strip_prefix(" – "))
+        {
+            Some(r)
+        } else if rest.starts_with(char::is_whitespace) {
+            Some(rest)
+        } else {
+            None
+        };
+        if let Some(text) = text {
+            let text = text.trim();
+            if !text.is_empty() {
+                return LogEntry {
+                    date: Some(head.to_owned()),
+                    text: text.to_owned(),
+                };
+            }
+        }
+    }
+    LogEntry {
+        date: None,
+        text: item.to_owned(),
+    }
+}
+
+/// Returns the bullets under a `## Log` heading, in file order. Empty
+/// bullets are skipped.
+pub fn log_entries(body: &str) -> Vec<LogEntry> {
+    let mut in_log = false;
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("## ") {
+            in_log = trimmed.eq_ignore_ascii_case("## log");
+            continue;
+        }
+        if in_log
+            && let Some(item) = trimmed
+                .strip_prefix("- ")
+                .or_else(|| trimmed.strip_prefix("* "))
+        {
+            let item = item.trim();
+            if !item.is_empty() {
+                out.push(split_log_item(item));
+            }
+        }
+    }
+    out
 }
 
 /// Reads the first Markdown table in the body, matching columns by header
@@ -620,6 +691,51 @@ mod tests {
             ]
         );
         assert_eq!(p.last_log.as_deref(), Some("[ ] not a step"));
+    }
+
+    #[test]
+    fn log_entries_split_dates_and_text() {
+        let body = "## Log
+- 2026-01-02: dated colon
+- 2026-01-03 - dash
+- 2026-01-04 – en dash
+- 2026-01-05 spaced
+- 2026-13-40: bad date
+- no date here
+- 2026-01-06:no space
+- 2026-01-077 glued
+* star bullet
+- 
+- ééééééééééé accents
+- 2026-01-08
+";
+        let e = log_entries(body);
+        let got: Vec<(Option<&str>, &str)> = e
+            .iter()
+            .map(|x| (x.date.as_deref(), x.text.as_str()))
+            .collect();
+        assert_eq!(got[0], (Some("2026-01-02"), "dated colon"));
+        assert_eq!(got[1], (Some("2026-01-03"), "dash"));
+        assert_eq!(got[2], (Some("2026-01-04"), "en dash"));
+        assert_eq!(got[3], (Some("2026-01-05"), "spaced"));
+        assert_eq!(got[4], (None, "2026-13-40: bad date"));
+        assert_eq!(got[5], (None, "no date here"));
+        assert_eq!(got[6], (Some("2026-01-06"), "no space"));
+        assert_eq!(got[7], (None, "2026-01-077 glued"));
+        assert_eq!(got[8], (None, "star bullet"));
+        assert_eq!(got[9], (None, "ééééééééééé accents"));
+        assert_eq!(got[10], (None, "2026-01-08"));
+        assert_eq!(got.len(), 11);
+    }
+
+    #[test]
+    fn log_entries_only_from_log_section() {
+        assert!(log_entries("## Log\n").is_empty());
+        assert!(log_entries("## Steps\n- [x] a\n- b\n").is_empty());
+        let body = "## Steps\n- [x] a\n## LOG\n- 2026-01-02: x\n## Other\n- y\n";
+        let e = log_entries(body);
+        assert_eq!(e.len(), 1);
+        assert_eq!(e[0].text, "x");
     }
 
     #[test]

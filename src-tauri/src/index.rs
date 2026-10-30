@@ -11,7 +11,10 @@ use serde::Serialize;
 use crate::vault::{self, FileInfo, note::Note};
 
 /// Bump when the schema changes; a mismatch drops and rebuilds the index.
-pub const SCHEMA_VERSION: i32 = 3;
+pub const SCHEMA_VERSION: i32 = 4;
+
+/// Most log entries kept per project note (the newest).
+const MAX_LOG_ENTRIES: usize = 1000;
 
 const SCHEMA: &str = "
 CREATE TABLE notes (
@@ -65,6 +68,13 @@ CREATE TABLE project_steps (
     path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     done INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY (path, position)
+);
+CREATE TABLE project_log (
+    path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    date TEXT,
     text TEXT NOT NULL,
     PRIMARY KEY (path, position)
 );
@@ -285,6 +295,19 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
                     params![p, i64::try_from(i).unwrap_or(i64::MAX), done, text],
                 )?;
             }
+            // Keep the newest entries; positions stay as in the file.
+            let skip = pr.log.len().saturating_sub(MAX_LOG_ENTRIES);
+            for (i, entry) in pr.log.iter().enumerate().skip(skip) {
+                tx.execute(
+                    "INSERT INTO project_log VALUES (?1, ?2, ?3, ?4)",
+                    params![
+                        p,
+                        i64::try_from(i).unwrap_or(i64::MAX),
+                        entry.date,
+                        entry.text
+                    ],
+                )?;
+            }
         }
         Some(Note::Plan(pl)) => {
             tx.execute(
@@ -345,15 +368,16 @@ mod tests {
     fn indexes_the_fixture_vault() {
         let mut index = Index::open_in_memory().expect("open");
         let stats = index.sync(&fixture()).expect("sync");
-        assert_eq!(stats.added, 18);
+        assert_eq!(stats.added, 21);
         assert_eq!(stats.errors, 1);
         assert_eq!(count(&index, "daily"), 7);
         assert_eq!(count(&index, "workout"), 4);
         assert_eq!(count(&index, "plan"), 1);
         assert_eq!(count(&index, "company"), 1);
         assert_eq!(count(&index, "weekly"), 1);
-        assert_eq!(count(&index, "project"), 1);
-        assert_eq!(count(&index, "project_steps"), 3);
+        assert_eq!(count(&index, "project"), 4);
+        assert_eq!(count(&index, "project_steps"), 9);
+        assert_eq!(count(&index, "project_log"), 4);
     }
 
     #[test]
@@ -361,7 +385,7 @@ mod tests {
         let mut index = Index::open_in_memory().expect("open");
         index.sync(&fixture()).expect("sync");
         let again = index.sync(&fixture()).expect("sync");
-        assert_eq!(again.unchanged, 18);
+        assert_eq!(again.unchanged, 21);
         assert_eq!(again.added + again.updated + again.removed, 0);
     }
 
@@ -398,7 +422,7 @@ mod tests {
         let db = dir.path().join("index.db");
         fs::write(&db, b"this is not sqlite").expect("write");
         let mut index = Index::open(&db).expect("rebuilt");
-        assert_eq!(index.sync(&fixture()).expect("sync").added, 18);
+        assert_eq!(index.sync(&fixture()).expect("sync").added, 21);
     }
 
     #[test]
@@ -411,7 +435,7 @@ mod tests {
                 .expect("old schema");
         }
         let mut index = Index::open(&db).expect("open");
-        assert_eq!(index.sync(&fixture()).expect("sync").added, 18);
+        assert_eq!(index.sync(&fixture()).expect("sync").added, 21);
     }
 
     #[test]

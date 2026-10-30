@@ -261,3 +261,41 @@ export type FitnessResponse = { status: "noVault" } | { status: "ready"; fitness
 export function getFitness(date: string): Promise<FitnessResponse> {
   return invoke<FitnessResponse>("get_fitness", { date });
 }
+
+export interface ProjectStep {
+  text: string;
+  done: boolean;
+}
+
+export interface ProjectLogEntry {
+  date: string | null;
+  text: string;
+}
+
+export interface Project {
+  path: string;
+  name: string;
+  status: string | null;
+  active: boolean;
+  updated: string | null;
+  steps: ProjectStep[];
+  done: number;
+  total: number;
+  /** Index of the first unchecked step. */
+  current: number | null;
+  nextStep: string | null;
+  lastLog: ProjectLogEntry | null;
+  /** Newest first. */
+  log: ProjectLogEntry[];
+}
+
+export interface Projects {
+  projects: Project[];
+  parseErrors: number;
+}
+
+export type ProjectsResponse = { status: "noVault" } | { status: "ready"; projects: Projects };
+
+export function getProjects(): Promise<ProjectsResponse> {
+  return invoke<ProjectsResponse>("get_projects");
+}

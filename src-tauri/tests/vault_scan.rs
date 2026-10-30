@@ -30,7 +30,10 @@ fn reads_every_note_and_skips_hidden_archived_and_non_markdown() {
             "Jobs/Companies/Example Security Ltd.md",
             "Jobs/Companies/Sample Bank.md",
             "Jobs/Outreach.md",
+            "Projects/garden-planner.md",
             "Projects/home-lab.md",
+            "Projects/notes-only.md",
+            "Projects/reading-list.md",
             "Weekly/2026-W02.md",
         ]
     );
