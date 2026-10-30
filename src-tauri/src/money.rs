@@ -75,6 +75,74 @@ pub struct Money {
     pub has_ledger: bool,
     pub has_budgets: bool,
     pub parse_errors: i64,
+    /// The six months ending with `month`, oldest first, for the charts.
+    pub trend: Vec<MonthTotals>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthTotals {
+    pub month: String,
+    /// Pence in and out (both positive).
+    pub income: i64,
+    pub spent: i64,
+    /// Spending by category, largest first.
+    pub spending: Vec<CategoryLine>,
+    /// Income by source (its category), largest first.
+    pub income_by_source: Vec<CategoryLine>,
+}
+
+/// Months shown in the trend charts.
+pub const TREND_MONTHS: i32 = 6;
+
+/// `YYYY-MM` moved by `by` months.
+pub fn shift_month(month: &str, by: i32) -> String {
+    let y: i32 = month[..4].parse().unwrap_or(1970);
+    let m: i32 = month[5..7].parse().unwrap_or(1);
+    let total = y * 12 + (m - 1) + by;
+    format!(
+        "{:04}-{:02}",
+        total.div_euclid(12),
+        total.rem_euclid(12) + 1
+    )
+}
+
+/// Sums by category for one month: money out (`sign` -1) or in (`sign` 1).
+fn by_category(
+    conn: &rusqlite::Connection,
+    like: &str,
+    sign: i64,
+) -> rusqlite::Result<Vec<CategoryLine>> {
+    conn.prepare(
+        "SELECT MIN(COALESCE(category, ?2)) AS c, SUM(amount) * ?3 AS s FROM ledger
+         WHERE date LIKE ?1 AND amount * ?3 > 0
+         GROUP BY lower(COALESCE(category, ?2)) ORDER BY s DESC, c",
+    )?
+    .query_map(params![like, UNCATEGORISED, sign], |r| {
+        Ok(CategoryLine {
+            category: r.get(0)?,
+            spent: r.get(1)?,
+        })
+    })?
+    .collect()
+}
+
+fn trend(conn: &rusqlite::Connection, month: &str) -> rusqlite::Result<Vec<MonthTotals>> {
+    (1 - TREND_MONTHS..=0)
+        .map(|by| {
+            let m = shift_month(month, by);
+            let like = format!("{m}-%");
+            let spending = by_category(conn, &like, -1)?;
+            let income_by_source = by_category(conn, &like, 1)?;
+            Ok(MonthTotals {
+                income: income_by_source.iter().map(|c| c.spent).sum(),
+                spent: spending.iter().map(|c| c.spent).sum(),
+                month: m,
+                spending,
+                income_by_source,
+            })
+        })
+        .collect()
 }
 
 pub fn is_month(s: &str) -> bool {
@@ -112,19 +180,7 @@ pub fn money(index: &Index, month: &str) -> rusqlite::Result<Money> {
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
 
-    let categories: Vec<CategoryLine> = conn
-        .prepare(
-            "SELECT COALESCE(category, ?2) AS c, -SUM(amount) AS s FROM ledger
-             WHERE date LIKE ?1 AND amount < 0
-             GROUP BY lower(c) ORDER BY s DESC, c",
-        )?
-        .query_map(params![like, UNCATEGORISED], |r| {
-            Ok(CategoryLine {
-                category: r.get(0)?,
-                spent: r.get(1)?,
-            })
-        })?
-        .collect::<Result<_, _>>()?;
+    let categories = by_category(conn, &like, -1)?;
 
     let mut budgets: Vec<BudgetLine> = Vec::new();
     let rows = conn
@@ -204,6 +260,7 @@ pub fn money(index: &Index, month: &str) -> rusqlite::Result<Money> {
         has_ledger: count("ledger")?,
         has_budgets: count("budgets")?,
         parse_errors,
+        trend: trend(conn, month)?,
     })
 }
 
@@ -360,6 +417,20 @@ mod tests {
         assert!(m.known_categories.contains(&"Salary".to_owned()));
         assert!(m.has_ledger && m.has_budgets);
         assert_eq!(m.parse_errors, 0);
+
+        let months: Vec<&str> = m.trend.iter().map(|t| t.month.as_str()).collect();
+        assert_eq!(
+            months,
+            [
+                "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"
+            ]
+        );
+        let (sep, oct) = (&m.trend[4], &m.trend[5]);
+        assert_eq!((sep.income, sep.spent), (0, 99_900));
+        assert_eq!((oct.income, oct.spent), (240_000, 48_500));
+        assert_eq!(oct.income_by_source[0].category, "Salary");
+        assert_eq!(oct.spending, m.categories);
+        assert!(m.trend[0].spending.is_empty());
     }
 
     #[test]
@@ -429,6 +500,14 @@ mod tests {
             "later rows replace, zero and negative limits are dropped"
         );
         assert_eq!((rows[0].category.as_str(), rows[0].limit), ("Food", 25_000));
+    }
+
+    #[test]
+    fn months_shift_across_years() {
+        assert_eq!(shift_month("2026-01", -1), "2025-12");
+        assert_eq!(shift_month("2026-12", 1), "2027-01");
+        assert_eq!(shift_month("2026-10", -5), "2026-05");
+        assert_eq!(shift_month("2026-03", -15), "2024-12");
     }
 
     #[test]

@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { EmptyHint } from "../components/EmptyHint";
 import { MoneyImport } from "../components/MoneyImport";
+import { MoneyTrends } from "../components/MoneyTrends";
 import { NotConnected } from "../components/NotConnected";
 import { useMode } from "../mode";
 import { pounds, toPence } from "../money";
@@ -314,6 +315,8 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
           </table>
         )}
       </section>
+
+      <MoneyTrends trend={money.trend} />
 
       {!sample && <MoneyImport onImported={onAdded} />}
 
