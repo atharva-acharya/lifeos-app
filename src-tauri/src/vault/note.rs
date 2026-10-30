@@ -50,6 +50,7 @@ pub enum Note {
     Company(Company),
     Weekly(Weekly),
     Project(Project),
+    Plan(Plan),
     /// `Jobs/Outreach.md`: one table of contacts.
     Outreach(Vec<OutreachEntry>),
     /// A note with no front matter or a `type` the app does not model.
@@ -118,6 +119,91 @@ pub struct Project {
     pub steps: Vec<(bool, String)>,
     /// Last entry of the `## Log` section, if any.
     pub last_log: Option<String>,
+}
+
+/// `Fitness/Plan.md`: the training plan's span and goals. Every field is optional.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct Plan {
+    pub name: Option<String>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+    pub start_weight: Option<f64>,
+    pub target_weight: Option<f64>,
+    pub steps_goal: Option<i64>,
+    pub protein_goal: Option<i64>,
+}
+
+/// One line of a workout's `exercises` list, read as `Name S x R @ KG`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExerciseSet {
+    pub name: String,
+    pub sets: Option<i64>,
+    pub reps: Option<i64>,
+    pub kg: Option<f64>,
+    pub raw: String,
+}
+
+const MAX_SETS: i64 = 100;
+const MAX_REPS: i64 = 1000;
+const MAX_KG: f64 = 1000.0;
+
+/// Reads an exercise line such as `Deadlift 3 x 5 @ 120`. The separator may be
+/// `x`, `X` or `×`, spaces are flexible, `kg` is optional and the decimal may
+/// be `.` or `,`. A line that does not fit keeps its whole text as the name
+/// with no numbers; it never fails. Absurd values become `None`.
+pub fn parse_exercise(line: &str) -> ExerciseSet {
+    let garbage = || ExerciseSet {
+        name: line.trim().to_owned(),
+        sets: None,
+        reps: None,
+        kg: None,
+        raw: line.to_owned(),
+    };
+    let Some((left, right)) = line.rsplit_once('@') else {
+        return garbage();
+    };
+    let Some((name, sets, reps)) = split_sets_reps(left) else {
+        return garbage();
+    };
+    let right = right.trim();
+    let number = right
+        .get(right.len().saturating_sub(2)..)
+        .filter(|unit| right.len() >= 2 && unit.eq_ignore_ascii_case("kg"))
+        .map_or(right, |_| right[..right.len() - 2].trim_end());
+    let kg = number
+        .replace(',', ".")
+        .parse::<f64>()
+        .ok()
+        .filter(|k| k.is_finite() && (0.0..=MAX_KG).contains(k));
+    ExerciseSet {
+        name,
+        sets: sets.filter(|n| (0..=MAX_SETS).contains(n)),
+        reps: reps.filter(|n| (0..=MAX_REPS).contains(n)),
+        kg,
+        raw: line.to_owned(),
+    }
+}
+
+/// Splits `Name S x R` from the right. A count too large for an integer is
+/// returned as `None` rather than failing the line.
+fn split_sets_reps(left: &str) -> Option<(String, Option<i64>, Option<i64>)> {
+    let rest = left.trim_end();
+    let digits = rest.chars().rev().take_while(char::is_ascii_digit).count();
+    if digits == 0 {
+        return None;
+    }
+    let (rest, reps) = rest.split_at(rest.len() - digits);
+    let rest = rest.trim_end().strip_suffix(['x', 'X', '×'])?.trim_end();
+    let digits_s = rest.chars().rev().take_while(char::is_ascii_digit).count();
+    if digits_s == 0 {
+        return None;
+    }
+    let (name, sets) = rest.split_at(rest.len() - digits_s);
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    Some((name.to_owned(), sets.parse().ok(), reps.parse().ok()))
 }
 
 pub const STAGES: &[&str] = &[
@@ -213,6 +299,15 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
             updated: f.date("updated")?,
             steps: checklist(body),
             last_log: last_log(body),
+        }),
+        Some("plan") => Note::Plan(Plan {
+            name: f.string("name")?,
+            start: f.date("start")?,
+            end: f.date("end")?,
+            start_weight: f.float("start_weight")?,
+            target_weight: f.float("target_weight")?,
+            steps_goal: f.int("steps_goal")?,
+            protein_goal: f.int("protein_goal")?,
         }),
         Some("outreach-log") => Note::Outreach(outreach_table(body)),
         _ => Note::Other,
@@ -601,6 +696,93 @@ After the table.
         assert_eq!(rows[0].status.as_deref(), Some("accepted"));
         assert_eq!(rows[0].sent, None);
         assert!(outreach_table("no table here").is_empty());
+    }
+
+    #[test]
+    fn parses_plan_with_optional_fields() {
+        let text = "---\ntype: plan\nname: Winter Arc\nstart: 2026-01-05\nend: 2026-03-30\nstart_weight: 85\ntarget_weight: 80.5\nsteps_goal: 9000\nprotein_goal: 160\n---\n";
+        let Ok(Note::Plan(p)) = parse(text) else {
+            panic!("expected plan");
+        };
+        assert_eq!(p.name.as_deref(), Some("Winter Arc"));
+        assert_eq!(p.start.as_deref(), Some("2026-01-05"));
+        assert_eq!(p.start_weight, Some(85.0));
+        assert_eq!(p.target_weight, Some(80.5));
+        assert_eq!((p.steps_goal, p.protein_goal), (Some(9000), Some(160)));
+        let Ok(Note::Plan(bare)) = parse("---\ntype: plan\n---\n") else {
+            panic!("expected plan");
+        };
+        assert_eq!(bare, Plan::default());
+        assert_eq!(
+            parse("---\ntype: plan\nstart: soon\n---\n"),
+            Err(ParseError::BadDate("start"))
+        );
+    }
+
+    fn ex(line: &str) -> (String, Option<i64>, Option<i64>, Option<f64>) {
+        let e = parse_exercise(line);
+        (e.name, e.sets, e.reps, e.kg)
+    }
+
+    #[test]
+    fn parses_a_good_exercise_line() {
+        assert_eq!(
+            ex("Deadlift 3 x 5 @ 120"),
+            ("Deadlift".to_owned(), Some(3), Some(5), Some(120.0))
+        );
+        assert_eq!(parse_exercise("Row 3 x 8 @ 70").raw, "Row 3 x 8 @ 70");
+    }
+
+    #[test]
+    fn exercise_spacing_separator_unit_and_decimals_are_flexible() {
+        let want = ("Bench press".to_owned(), Some(3), Some(8), Some(62.5));
+        assert_eq!(ex("Bench press 3x8@62.5"), want);
+        assert_eq!(ex("  Bench press   3  X  8   @   62,5 kg  "), want);
+        assert_eq!(ex("Bench press 3 × 8 @ 62.5kg"), want);
+        assert_eq!(ex("Bench press 3 x 8 @ 62.5 KG"), want);
+    }
+
+    #[test]
+    fn unparseable_exercise_lines_keep_their_text() {
+        for line in [
+            "Farmers walk for time",
+            "",
+            "   ",
+            "@",
+            "3 x 5 @ 100",
+            "Squat @ 100",
+        ] {
+            let e = parse_exercise(line);
+            assert_eq!(e.name, line.trim());
+            assert_eq!((e.sets, e.reps, e.kg), (None, None, None));
+            assert_eq!(e.raw, line);
+        }
+    }
+
+    #[test]
+    fn absurd_exercise_numbers_are_dropped() {
+        let squat = |kg: Option<f64>| ("Squat".to_owned(), Some(3), Some(5), kg);
+        assert_eq!(ex("Squat 3 x 5 @ 5000"), squat(None));
+        assert_eq!(ex("Squat 3 x 5 @ inf"), squat(None));
+        assert_eq!(ex("Squat 3 x 5 @ NaN"), squat(None));
+        assert_eq!(ex("Squat 3 x 5 @ -20"), squat(None));
+        assert_eq!(
+            ex("Squat 101 x 1001 @ 100"),
+            ("Squat".to_owned(), None, None, Some(100.0))
+        );
+        let huge = parse_exercise("Squat 99999999999999999999 x 5 @ 100");
+        assert_eq!(
+            (huge.sets, huge.reps, huge.kg),
+            (None, Some(5), Some(100.0))
+        );
+    }
+
+    #[test]
+    fn exercise_parser_survives_odd_unicode() {
+        assert_eq!(parse_exercise("Pressé 3 x 5 @ 4é").kg, None);
+        assert_eq!(parse_exercise("Press 3 x 5 @ é").kg, None);
+        let _ = parse_exercise("日本語 @ ×");
+        let _ = parse_exercise("日本語 3 × 5 @ 日本");
     }
 
     #[test]
