@@ -15,6 +15,10 @@ pub struct Settings {
     pub vault_path: Option<PathBuf>,
     #[serde(default)]
     pub google: Option<crate::google::GoogleConfig>,
+    /// Check GitHub for signed updates at start-up (default on; owner can
+    /// switch it off in Settings).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_update: Option<bool>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -97,6 +101,7 @@ mod tests {
         let settings = Settings {
             vault_path: Some(PathBuf::from(r"D:\Notes\Life OS")),
             google: None,
+            auto_update: Some(false),
         };
         save(dir.path(), &settings).expect("save");
         assert_eq!(load(dir.path()).expect("load"), settings);

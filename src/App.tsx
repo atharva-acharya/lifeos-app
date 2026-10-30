@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { JobsPage } from "./pages/JobsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -42,6 +43,7 @@ export default function App() {
     <div className="shell">
       <Sidebar current={current} onNavigate={navigate} />
       <main className="main" ref={mainRef} tabIndex={-1} aria-label={route.label}>
+        <UpdateBanner />
         <ErrorBoundary resetKey={route.id}>
           {route.id === "today" ? (
             <TodayPage onNavigate={navigate} />

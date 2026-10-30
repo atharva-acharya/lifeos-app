@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 export interface AppSettings {
   vaultPath: string | null;
   google: GoogleView;
+  /** Check GitHub for signed updates at start-up. */
+  autoUpdate: boolean;
 }
 
 export function getSettings(): Promise<AppSettings> {
@@ -175,4 +177,23 @@ export function logError(message: string): Promise<undefined> {
 
 export function getDiagnostics(): Promise<Diagnostics> {
   return invoke<Diagnostics>("get_diagnostics");
+}
+
+export interface UpdateInfo {
+  version: string;
+  notes: string;
+}
+
+export function setAutoUpdate(enabled: boolean): Promise<AppSettings> {
+  return invoke<AppSettings>("set_auto_update", { enabled });
+}
+
+/** Resolves with the newer version, or null when this is the latest. */
+export function checkForUpdate(): Promise<UpdateInfo | null> {
+  return invoke<UpdateInfo | null>("check_for_update");
+}
+
+/** Downloads, verifies and installs `version` (the one shown); the app then restarts. */
+export function installUpdate(version: string): Promise<undefined> {
+  return invoke<undefined>("install_update", { version });
 }

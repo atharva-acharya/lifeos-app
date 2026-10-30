@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { chooseVaultFolder, getSettings, type AppSettings } from "../api";
 import { DiagnosticsSettings } from "../components/DiagnosticsSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
+import { UpdateSettings } from "../components/UpdateSettings";
 
 type Status = "loading" | "ready" | "choosing";
 
@@ -86,6 +87,8 @@ export function SettingsPage() {
       </section>
 
       {settings && <GoogleSettings google={settings.google} onChange={setSettings} />}
+
+      {settings && <UpdateSettings autoUpdate={settings.autoUpdate} onChange={setSettings} />}
 
       <DiagnosticsSettings />
     </>

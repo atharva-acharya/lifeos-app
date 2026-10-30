@@ -13,12 +13,14 @@ use crate::jobs::{self, Jobs};
 use crate::live::LiveState;
 use crate::settings::{self, Settings};
 use crate::today::{self, Today};
+use crate::updates::{self, Pending, UpdateInfo};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsView {
     pub vault_path: Option<String>,
     pub google: GoogleView,
+    pub auto_update: bool,
 }
 
 /// What the UI may know about the Google setup. The client secret and
@@ -45,6 +47,7 @@ impl From<Settings> for SettingsView {
         Self {
             vault_path: s.vault_path.map(|p| p.to_string_lossy().into_owned()),
             google,
+            auto_update: s.auto_update.unwrap_or(true),
         }
     }
 }
@@ -299,4 +302,33 @@ pub fn get_diagnostics(app: AppHandle) -> Result<Diagnostics, String> {
         os: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
         log: diagnostics::tail(&cache_dir(&app)?, 50),
     })
+}
+
+/// Turns the start-up update check on or off.
+#[tauri::command]
+pub fn set_auto_update(app: AppHandle, enabled: bool) -> Result<SettingsView, String> {
+    let dir = config_dir(&app)?;
+    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+    current.auto_update = Some(enabled);
+    settings::save(&dir, &current).map_err(|e| e.to_string())?;
+    Ok(current.into())
+}
+
+/// Asks GitHub Releases whether a newer signed version exists.
+#[tauri::command]
+pub async fn check_for_update(
+    app: AppHandle,
+    pending: tauri::State<'_, Pending>,
+) -> Result<Option<UpdateInfo>, String> {
+    updates::check(&app, &pending).await
+}
+
+/// Installs the update the owner was shown (`version`) and restarts the app.
+#[tauri::command]
+pub async fn install_update(
+    app: AppHandle,
+    pending: tauri::State<'_, Pending>,
+    version: String,
+) -> Result<(), String> {
+    updates::install(&app, &pending, &version).await
 }
