@@ -19,6 +19,9 @@ pub struct Settings {
     /// switch it off in Settings).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_update: Option<bool>,
+    /// Folder Health Auto Export writes to (read-only for the app).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health_path: Option<PathBuf>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -31,6 +34,8 @@ pub enum SettingsError {
     NotAFolder,
     #[error("the chosen vault is a link or junction; pick the real folder")]
     Reparse,
+    #[error("the chosen Health folder is a link or junction; pick the real folder")]
+    HealthReparse,
 }
 
 /// Reads settings from `dir`. A missing file means defaults.
@@ -56,6 +61,21 @@ pub fn validate_vault(path: &Path) -> Result<PathBuf, SettingsError> {
     let meta = fs::symlink_metadata(path)?;
     if meta.file_type().is_symlink() || is_reparse_point(&meta) {
         return Err(SettingsError::Reparse);
+    }
+    if !meta.is_dir() {
+        return Err(SettingsError::NotAFolder);
+    }
+    Ok(readable_canonical(path)?)
+}
+
+/// Checks a folder chosen as the Health export folder and returns its
+/// canonical path. Same rules as the vault, except that iCloud for Windows
+/// marks its synced files and folders as Cloud Files reparse points, so only
+/// links and junctions (name-surrogate reparse points) are refused (T16).
+pub fn validate_health_folder(path: &Path) -> Result<PathBuf, SettingsError> {
+    let meta = fs::symlink_metadata(path)?;
+    if meta.file_type().is_symlink() {
+        return Err(SettingsError::HealthReparse);
     }
     if !meta.is_dir() {
         return Err(SettingsError::NotAFolder);
@@ -102,6 +122,7 @@ mod tests {
             vault_path: Some(PathBuf::from(r"D:\Notes\Life OS")),
             google: None,
             auto_update: Some(false),
+            health_path: Some(PathBuf::from(r"D:\iCloud\Health")),
         };
         save(dir.path(), &settings).expect("save");
         assert_eq!(load(dir.path()).expect("load"), settings);
@@ -161,5 +182,56 @@ mod tests {
             .expect("run mklink");
         assert!(out.status.success(), "mklink failed");
         assert!(matches!(validate_vault(&link), Err(SettingsError::Reparse)));
+    }
+
+    #[test]
+    fn health_folder_is_accepted_and_canonicalised() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let folder = dir.path().join("Health");
+        fs::create_dir(&folder).expect("mkdir");
+        let got = validate_health_folder(&folder.join("..").join("Health")).expect("valid");
+        assert!(got.ends_with("Health"));
+        assert!(!got.to_string_lossy().contains(".."));
+    }
+
+    #[test]
+    fn health_file_and_missing_folder_are_rejected() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let file = dir.path().join("a.json");
+        fs::write(&file, "{}").expect("write");
+        assert!(matches!(
+            validate_health_folder(&file),
+            Err(SettingsError::NotAFolder)
+        ));
+        assert!(matches!(
+            validate_health_folder(&dir.path().join("nope")),
+            Err(SettingsError::Io(_))
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn health_junction_is_rejected() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let real = dir.path().join("real");
+        let link = dir.path().join("link");
+        fs::create_dir(&real).expect("mkdir");
+        let out = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&real)
+            .output()
+            .expect("run mklink");
+        assert!(out.status.success(), "mklink failed");
+        assert!(matches!(
+            validate_health_folder(&link),
+            Err(SettingsError::HealthReparse)
+        ));
+    }
+
+    #[test]
+    fn health_path_is_omitted_when_unset() {
+        let json = serde_json::to_string(&Settings::default()).expect("json");
+        assert!(!json.contains("healthPath"));
     }
 }

@@ -1,6 +1,8 @@
 const COMMANDS: &[&str] = &[
     "get_settings",
     "choose_vault_folder",
+    "choose_health_folder",
+    "clear_health_folder",
     "get_today",
     "save_google_config",
     "connect_google",
@@ -10,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "get_jobs",
     "get_fitness",
     "get_projects",
+    "get_health",
     "log_error",
     "get_diagnostics",
     "set_auto_update",

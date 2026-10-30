@@ -3,6 +3,7 @@ mod commands;
 pub mod diagnostics;
 pub mod fitness;
 pub mod google;
+pub mod health;
 pub mod index;
 pub mod jobs;
 mod live;
@@ -18,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(live::LiveState::default())
         .manage(updates::Pending::default())
+        .manage(health::HealthState::default())
         .setup(|app| {
             // Panics go to the local error log as well as stderr.
             if let Ok(dir) = commands::cache_dir(app.handle()) {
@@ -49,6 +51,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::choose_vault_folder,
+            commands::choose_health_folder,
+            commands::clear_health_folder,
             commands::get_today,
             commands::save_google_config,
             commands::connect_google,
@@ -58,6 +62,7 @@ pub fn run() {
             commands::get_jobs,
             commands::get_fitness,
             commands::get_projects,
+            commands::get_health,
             commands::log_error,
             commands::get_diagnostics,
             commands::set_auto_update,

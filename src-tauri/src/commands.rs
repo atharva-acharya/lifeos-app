@@ -10,6 +10,7 @@ use crate::applications::{self, Cache};
 use crate::diagnostics::{self, Diagnostics};
 use crate::fitness::{self, Fitness};
 use crate::google::{self, GoogleConfig};
+use crate::health::{self, Health, HealthState};
 use crate::jobs::{self, Jobs};
 use crate::live::LiveState;
 use crate::projects::{self, Projects};
@@ -21,6 +22,7 @@ use crate::updates::{self, Pending, UpdateInfo};
 #[serde(rename_all = "camelCase")]
 pub struct SettingsView {
     pub vault_path: Option<String>,
+    pub health_path: Option<String>,
     pub google: GoogleView,
     pub auto_update: bool,
 }
@@ -48,6 +50,7 @@ impl From<Settings> for SettingsView {
         });
         Self {
             vault_path: s.vault_path.map(|p| p.to_string_lossy().into_owned()),
+            health_path: s.health_path.map(|p| p.to_string_lossy().into_owned()),
             google,
             auto_update: s.auto_update.unwrap_or(true),
         }
@@ -100,6 +103,40 @@ pub async fn choose_vault_folder(app: AppHandle) -> Result<SettingsView, String>
         settings::save(&dir, &current).map_err(|e| e.to_string())?;
         crate::live::start(&app, &vault)?;
     }
+    Ok(current.into())
+}
+
+/// Opens the native folder picker for the Health Auto Export folder.
+/// Returns the new settings, or the current ones if the picker was cancelled.
+#[tauri::command]
+pub async fn choose_health_folder(app: AppHandle) -> Result<SettingsView, String> {
+    let dir = config_dir(&app)?;
+    let picked = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Choose your Health Auto Export folder")
+            .pick_folder()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+    if let Some(folder) = picked {
+        let folder = settings::validate_health_folder(&folder).map_err(|e| e.to_string())?;
+        current.health_path = Some(folder);
+        settings::save(&dir, &current).map_err(|e| e.to_string())?;
+        app.state::<HealthState>().clear();
+    }
+    Ok(current.into())
+}
+
+/// Forgets the Health folder. The folder itself is never touched.
+#[tauri::command]
+pub fn clear_health_folder(app: AppHandle) -> Result<SettingsView, String> {
+    let dir = config_dir(&app)?;
+    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+    current.health_path = None;
+    settings::save(&dir, &current).map_err(|e| e.to_string())?;
+    app.state::<HealthState>().clear();
     Ok(current.into())
 }
 
@@ -335,6 +372,52 @@ pub fn get_projects(state: tauri::State<'_, LiveState>) -> Result<ProjectsRespon
             })
             .map_err(|e| e.to_string()),
     }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum HealthResponse {
+    /// No Health folder chosen yet.
+    NotConfigured,
+    Ready {
+        health: Box<Health>,
+    },
+}
+
+/// Apple Health data from the export folder, with the 90-day window ending
+/// on `date` (the owner's local date, YYYY-MM-DD) and `now_ms` the current
+/// time. The folder comes from settings, never from the UI. Works without a
+/// vault; the vault then adds nothing (default goals, no vault workouts).
+#[tauri::command]
+pub async fn get_health(
+    app: AppHandle,
+    date: String,
+    now_ms: i64,
+) -> Result<HealthResponse, String> {
+    if !crate::vault::note::is_iso_date(&date) {
+        return Err("date must look like 2026-10-29".to_owned());
+    }
+    let dir = config_dir(&app)?;
+    let Some(folder) = settings::load(&dir).map_err(|e| e.to_string())?.health_path else {
+        return Ok(HealthResponse::NotConfigured);
+    };
+    // Opening an iCloud placeholder can download it, so keep this off the UI thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        let imported = app
+            .state::<HealthState>()
+            .load(&folder)
+            .map_err(|e| format!("the Health folder could not be read: {}", e.kind()))?;
+        let view = app
+            .state::<LiveState>()
+            .with_index(|index| health::health(&imported, Some(index), &date, now_ms))
+            .unwrap_or_else(|| health::health(&imported, None, &date, now_ms))
+            .map_err(|e| e.to_string())?;
+        Ok(HealthResponse::Ready {
+            health: Box::new(view),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Records a UI error in the local log; nothing is sent anywhere.

@@ -135,7 +135,7 @@ pub fn fitness(index: &Index, today: &str) -> rusqlite::Result<Fitness> {
     })
 }
 
-fn days(index: &Index, today: &str) -> rusqlite::Result<Vec<Day>> {
+pub(crate) fn days(index: &Index, today: &str) -> rusqlite::Result<Vec<Day>> {
     let start = shift_days(today, 1 - WINDOW_DAYS - WARM_UP_DAYS);
     let rows = index
         .conn()
@@ -182,7 +182,7 @@ fn plan(index: &Index) -> rusqlite::Result<Option<PlanView>> {
         .optional()
 }
 
-fn workouts(index: &Index) -> rusqlite::Result<Vec<WorkoutView>> {
+pub(crate) fn workouts(index: &Index) -> rusqlite::Result<Vec<WorkoutView>> {
     index
         .conn()
         .prepare(
@@ -277,7 +277,7 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
 }
 
 /// `date` (YYYY-MM-DD) moved by `delta` days. An unreadable date comes back as is.
-fn shift_days(date: &str, delta: i64) -> String {
+pub(crate) fn shift_days(date: &str, delta: i64) -> String {
     let part = |range: std::ops::Range<usize>| date.get(range).and_then(|p| p.parse::<i64>().ok());
     let (Some(y), Some(m), Some(d)) = (part(0..4), part(5..7), part(8..10)) else {
         return date.to_owned();

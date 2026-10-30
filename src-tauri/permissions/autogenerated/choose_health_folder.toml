@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-choose-health-folder"
+description = "Enables the choose_health_folder command without any pre-configured scope."
+commands.allow = ["choose_health_folder"]
+
+[[permission]]
+identifier = "deny-choose-health-folder"
+description = "Denies the choose_health_folder command without any pre-configured scope."
+commands.deny = ["choose_health_folder"]
