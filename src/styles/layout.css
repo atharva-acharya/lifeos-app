@@ -818,7 +818,7 @@
 .rings__value {
   justify-self: end;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
