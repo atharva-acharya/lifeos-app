@@ -1,13 +1,14 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { localDate, type Today } from "../api";
-import { invoke, listen } from "../test/tauri-mocks";
+import { invoke, listen, mockCommands } from "../test/tauri-mocks";
 import { TodayPage } from "./TodayPage";
 
 const DATE = localDate();
 
 const TODAY: Today = {
   date: DATE,
+  hasDailyNote: true,
   weight: 83.9,
   weightChange: -0.2,
   applications: 4,
@@ -36,7 +37,7 @@ const TODAY: Today = {
 
 describe("TodayPage", () => {
   it("asks to connect a vault and links to settings", async () => {
-    invoke.mockResolvedValue({ status: "noVault" });
+    mockCommands({ get_today: { status: "noVault" } });
     const onNavigate = vi.fn();
     render(<TodayPage onNavigate={onNavigate} />);
     fireEvent.click(await screen.findByRole("button", { name: "Open settings" }));
@@ -45,7 +46,7 @@ describe("TodayPage", () => {
   });
 
   it("shows the day's numbers", async () => {
-    invoke.mockResolvedValue({ status: "ready", today: TODAY });
+    mockCommands({ get_today: { status: "ready", today: TODAY } });
     render(<TodayPage onNavigate={vi.fn()} />);
     expect(await screen.findByText("83.9 kg")).toBeInTheDocument();
     expect(screen.getByText("−0.2 kg since last")).toBeInTheDocument();
@@ -55,7 +56,7 @@ describe("TodayPage", () => {
   });
 
   it("lists overdue follow-ups and where to resume", async () => {
-    invoke.mockResolvedValue({ status: "ready", today: TODAY });
+    mockCommands({ get_today: { status: "ready", today: TODAY } });
     render(<TodayPage onNavigate={vi.fn()} />);
     expect(await screen.findByText("Example Security Ltd")).toBeInTheDocument();
     expect(screen.getByText("Overdue · 2000-01-01")).toBeInTheDocument();
@@ -65,7 +66,7 @@ describe("TodayPage", () => {
   });
 
   it("refreshes when the index changes", async () => {
-    invoke.mockResolvedValue({ status: "noVault" });
+    mockCommands({ get_today: { status: "noVault" } });
     render(<TodayPage onNavigate={vi.fn()} />);
     await screen.findByText("Not connected");
     expect(listen).toHaveBeenCalledWith("index-updated", expect.any(Function));

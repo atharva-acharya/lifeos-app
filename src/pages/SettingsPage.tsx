@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { chooseVaultFolder, getSettings, type AppSettings } from "../api";
 import { DiagnosticsSettings } from "../components/DiagnosticsSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
+import { SetupChecklist } from "../components/SetupChecklist";
 import { UpdateSettings } from "../components/UpdateSettings";
+import type { GuideId } from "../guides";
+import { useMode } from "../mode";
 
 type Status = "loading" | "ready" | "choosing";
 
@@ -10,7 +13,8 @@ function message(err: unknown): string {
   return typeof err === "string" ? err : "Something went wrong. Please try again.";
 }
 
-export function SettingsPage() {
+export function SettingsPage({ openGuide = null }: { openGuide?: GuideId | null }) {
+  const sample = useMode() === "sample";
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -54,41 +58,55 @@ export function SettingsPage() {
         <h1 className="page-title">Settings</h1>
       </header>
 
-      <section className="card setting" aria-labelledby="vault-heading">
-        <div className="setting__text">
-          <h2 id="vault-heading" className="setting__title">
-            Vault folder
-          </h2>
-          <p className="setting__help">
-            The Life OS folder with your notes. The app only reads and writes inside it.
-          </p>
-          {status === "loading" ? (
-            <p className="setting__value">Loading…</p>
-          ) : vault ? (
-            <p className="setting__value">
-              <span className="pill pill--done">Connected</span>
-              <code className="path">{vault}</code>
-            </p>
-          ) : (
-            <p className="setting__value">
-              <span className="pill pill--pending">Not set</span>
-              Choose your vault to see your dashboards.
-            </p>
-          )}
-          {error && (
-            <p className="setting__error" role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-        <button type="button" className="button" onClick={choose} disabled={status !== "ready"}>
-          {status === "choosing" ? "Choosing…" : vault ? "Change folder" : "Choose folder"}
-        </button>
-      </section>
+      {sample ? (
+        <p className="notice" role="status">
+          Leave sample data to change settings.
+        </p>
+      ) : (
+        <SetupChecklist
+          openGuide={openGuide}
+          onChooseVault={choose}
+          refreshKey={settings?.vaultPath ?? null}
+        />
+      )}
 
-      {settings && <GoogleSettings google={settings.google} onChange={setSettings} />}
+      <fieldset className="settings-group" disabled={sample}>
+        <section className="card setting" aria-labelledby="vault-heading">
+          <div className="setting__text">
+            <h2 id="vault-heading" className="setting__title">
+              Vault folder
+            </h2>
+            <p className="setting__help">
+              The Life OS folder with your notes. The app only reads and writes inside it.
+            </p>
+            {status === "loading" ? (
+              <p className="setting__value">Loading…</p>
+            ) : vault ? (
+              <p className="setting__value">
+                <span className="pill pill--done">Connected</span>
+                <code className="path">{vault}</code>
+              </p>
+            ) : (
+              <p className="setting__value">
+                <span className="pill pill--pending">Not set</span>
+                Choose your vault to see your dashboards.
+              </p>
+            )}
+            {error && (
+              <p className="setting__error" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+          <button type="button" className="button" onClick={choose} disabled={status !== "ready"}>
+            {status === "choosing" ? "Choosing…" : vault ? "Change folder" : "Choose folder"}
+          </button>
+        </section>
 
-      {settings && <UpdateSettings autoUpdate={settings.autoUpdate} onChange={setSettings} />}
+        {settings && <GoogleSettings google={settings.google} onChange={setSettings} />}
+
+        {settings && <UpdateSettings autoUpdate={settings.autoUpdate} onChange={setSettings} />}
+      </fieldset>
 
       <DiagnosticsSettings />
     </>

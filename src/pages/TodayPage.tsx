@@ -7,7 +7,10 @@ import {
   type Today,
   type TodayResponse,
 } from "../api";
-import type { RouteId } from "../routes";
+import { EmptyHint } from "../components/EmptyHint";
+import { NotConnected } from "../components/NotConnected";
+import { SetupCard } from "../components/SetupCard";
+import type { Navigate } from "../routes";
 
 function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -22,6 +25,11 @@ function longDate(iso: string): string {
     day: "numeric",
     month: "long",
   });
+}
+
+function dayMonth(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function signed(n: number): string {
@@ -77,7 +85,7 @@ function FollowUpRow({ item, today }: { item: FollowUp; today: string }) {
   );
 }
 
-function Dashboard({ today }: { today: Today }) {
+function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }) {
   const h = today.habits;
   const habitsDone = [
     h.weighIn,
@@ -89,8 +97,21 @@ function Dashboard({ today }: { today: Today }) {
   const p = today.project;
   const pct = p && p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
 
+  const noNote = !today.hasDailyNote;
+
   return (
     <>
+      {noNote && (
+        <section className="card" aria-label="Daily note">
+          <EmptyHint
+            lead={`No daily note for ${dayMonth(today.date)}.`}
+            guide="daily"
+            onNavigate={onNavigate}
+          >
+            Add a note with <code>type: daily</code> and <code>date: {today.date}</code>.
+          </EmptyHint>
+        </section>
+      )}
       <div className="stats">
         <Stat
           label="Follow-ups due"
@@ -110,9 +131,9 @@ function Dashboard({ today }: { today: Today }) {
         />
         <Stat
           label="Applications today"
-          value={today.applications !== null ? String(today.applications) : "0"}
+          value={today.applications !== null ? String(today.applications) : noNote ? "—" : "0"}
         />
-        <Stat label="Gym session" value={today.gym ?? "Rest day"} />
+        <Stat label="Gym session" value={today.gym ?? (noNote ? "—" : "Rest day")} />
       </div>
 
       <section className="card" aria-labelledby="habits-heading">
@@ -147,7 +168,9 @@ function Dashboard({ today }: { today: Today }) {
             Follow-ups
           </h2>
           {today.followUps.length === 0 ? (
-            <p className="muted">Nothing due. Nice.</p>
+            <EmptyHint lead="Nothing due. Nice.">
+              Follow-ups come from <code>type: company</code> notes with a <code>next_date</code>.
+            </EmptyHint>
           ) : (
             <ul className="rows">
               {today.followUps.map((f) => (
@@ -185,7 +208,10 @@ function Dashboard({ today }: { today: Today }) {
               {p.lastLog && <p className="muted">Last: {p.lastLog}</p>}
             </div>
           ) : (
-            <p className="muted">No active project.</p>
+            <EmptyHint lead="No active project." guide="projects" onNavigate={onNavigate}>
+              Add a <code>type: project</code> note with <code>status: active</code> and a{" "}
+              <code>## Steps</code> checklist.
+            </EmptyHint>
           )}
         </section>
       </div>
@@ -200,7 +226,7 @@ function Dashboard({ today }: { today: Today }) {
   );
 }
 
-export function TodayPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function TodayPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<TodayResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const date = localDate();
@@ -244,21 +270,16 @@ export function TodayPage({ onNavigate }: { onNavigate: (id: RouteId) => void })
         </p>
       )}
       {response?.status === "noVault" && (
-        <section className="card placeholder">
-          <span className="pill pill--pending">Not connected</span>
-          <p>Choose your Life OS vault folder to see today's dashboard.</p>
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              onNavigate("settings");
-            }}
-          >
-            Open settings
-          </button>
-        </section>
+        <NotConnected onNavigate={onNavigate}>
+          Choose your Life OS vault folder to see today's dashboard.
+        </NotConnected>
       )}
-      {response?.status === "ready" && <Dashboard today={response.today} />}
+      {response?.status === "ready" && (
+        <>
+          <SetupCard onNavigate={onNavigate} />
+          <Dashboard today={response.today} onNavigate={onNavigate} />
+        </>
+      )}
     </>
   );
 }

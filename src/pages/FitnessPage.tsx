@@ -6,20 +6,38 @@ import { FitnessLifts } from "../components/FitnessLifts";
 import { FitnessWeek } from "../components/FitnessWeek";
 import { FitnessWeight } from "../components/FitnessWeight";
 import { DEFAULT_PROTEIN_GOAL, weekSummary } from "../fitnessStats";
-import type { RouteId } from "../routes";
+import { NotConnected } from "../components/NotConnected";
+import type { Navigate } from "../routes";
 
-function Dashboard({ fitness, today }: { fitness: Fitness; today: string }) {
+function Dashboard({
+  fitness,
+  today,
+  onNavigate,
+}: {
+  fitness: Fitness;
+  today: string;
+  onNavigate: Navigate;
+}) {
   const summary = weekSummary(fitness.days, fitness.plan, today, fitness.workouts);
+  const defaults = {
+    steps: fitness.plan === null || fitness.plan.stepsGoalDefault === true,
+    protein: fitness.plan === null || fitness.plan.proteinGoalDefault === true,
+  };
   return (
     <div className="fitness">
-      <FitnessWeek summary={summary} />
-      <FitnessWeight days={fitness.days} plan={fitness.plan} today={today} />
+      <FitnessWeek summary={summary} defaults={defaults} />
+      <FitnessWeight
+        days={fitness.days}
+        plan={fitness.plan}
+        today={today}
+        onNavigate={onNavigate}
+      />
       <FitnessActivity
         days={fitness.days}
         proteinGoal={fitness.plan?.proteinGoal ?? DEFAULT_PROTEIN_GOAL}
         today={today}
       />
-      <FitnessHistory workouts={fitness.workouts} />
+      <FitnessHistory workouts={fitness.workouts} onNavigate={onNavigate} />
       <FitnessLifts lifts={fitness.lifts} />
       {fitness.parseErrors > 0 && (
         <p className="notice" role="status">
@@ -31,7 +49,7 @@ function Dashboard({ fitness, today }: { fitness: Fitness; today: string }) {
   );
 }
 
-export function FitnessPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function FitnessPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<FitnessResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const date = localDate();
@@ -75,21 +93,13 @@ export function FitnessPage({ onNavigate }: { onNavigate: (id: RouteId) => void 
         </p>
       )}
       {response?.status === "noVault" && (
-        <section className="card placeholder">
-          <span className="pill pill--pending">Not connected</span>
-          <p>Choose your Life OS vault folder to see your weight, workouts and lifts.</p>
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              onNavigate("settings");
-            }}
-          >
-            Open settings
-          </button>
-        </section>
+        <NotConnected onNavigate={onNavigate}>
+          Choose your Life OS vault folder to see your weight, workouts and lifts.
+        </NotConnected>
       )}
-      {response?.status === "ready" && <Dashboard fitness={response.fitness} today={date} />}
+      {response?.status === "ready" && (
+        <Dashboard fitness={response.fitness} today={date} onNavigate={onNavigate} />
+      )}
     </>
   );
 }
