@@ -77,6 +77,10 @@ pub struct Money {
     pub parse_errors: i64,
     /// The six months ending with `month`, oldest first, for the charts.
     pub trend: Vec<MonthTotals>,
+    /// What each friend owes (or is owed), from `Money/Splits.md`.
+    pub friends: Vec<crate::money_splits::FriendBalance>,
+    /// The latest split and settle-up rows.
+    pub splits: Vec<crate::vault::note::SplitRow>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -242,6 +246,7 @@ pub fn money(index: &Index, month: &str) -> rusqlite::Result<Money> {
             |r| r.get(0),
         )
     };
+    let (friends, splits) = crate::money_splits::balances(index)?;
     let parse_errors: i64 = conn.query_row(
         "SELECT COUNT(*) FROM notes WHERE error IS NOT NULL AND path LIKE 'Money/%'",
         [],
@@ -261,6 +266,8 @@ pub fn money(index: &Index, month: &str) -> rusqlite::Result<Money> {
         has_budgets: count("budgets")?,
         parse_errors,
         trend: trend(conn, month)?,
+        friends,
+        splits,
     })
 }
 

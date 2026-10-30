@@ -58,6 +58,8 @@ pub enum Note {
     Ledger(Vec<Transaction>),
     /// `type: budgets` (`Money/Budgets.md`): a monthly limit per category.
     Budgets(Vec<Budget>),
+    /// `type: splits` (`Money/Splits.md`): what each friend owes, row by row.
+    Splits(Vec<SplitRow>),
     /// A note with no front matter or a `type` the app does not model.
     Other,
 }
@@ -343,6 +345,7 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
         Some("outreach-log") => Note::Outreach(outreach_table(body)),
         Some("ledger") => Note::Ledger(ledger_table(body)),
         Some("budgets") => Note::Budgets(budget_table(body)),
+        Some("splits") => Note::Splits(split_table(body)),
         _ => Note::Other,
     })
 }
@@ -754,6 +757,45 @@ pub fn ledger_table(body: &str) -> Vec<Transaction> {
                 category: cell(r, cat),
                 amount: a,
                 account: cell(r, account),
+            })
+        })
+        .collect()
+}
+
+/// One row of `Money/Splits.md`. `amount` is pence the friend owes the
+/// owner: negative when the owner owes the friend. A settle-up is a row of
+/// the opposite sign.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SplitRow {
+    pub date: String,
+    pub description: String,
+    pub friend: String,
+    pub amount: i64,
+}
+
+/// Splits columns, in the order a new splits note gets them.
+pub const SPLIT_COLUMNS: &[&str] = &["Date", "Description", "Friend", "Amount"];
+pub const FRIEND_HEADERS: &[&str] = &["friend", "who"];
+
+/// Reads a splits table. Rows without a valid date, friend and amount are skipped.
+pub fn split_table(body: &str) -> Vec<SplitRow> {
+    let Some((headers, rows)) = first_table(body) else {
+        return Vec::new();
+    };
+    let (date, desc, friend, amount) = (
+        column(&headers, DATE_HEADERS),
+        column(&headers, DESCRIPTION_HEADERS),
+        column(&headers, FRIEND_HEADERS),
+        column(&headers, AMOUNT_HEADERS),
+    );
+    rows.iter()
+        .filter_map(|r| {
+            Some(SplitRow {
+                date: cell(r, date).filter(|d| is_iso_date(d))?,
+                description: cell(r, desc).unwrap_or_default(),
+                friend: cell(r, friend)?,
+                amount: cell(r, amount).and_then(|a| parse_pence(&a))?,
             })
         })
         .collect()

@@ -54,6 +54,7 @@ fn types_each_note() {
             Some(Note::Outreach(_)) => "outreach",
             Some(Note::Ledger(_)) => "ledger",
             Some(Note::Budgets(_)) => "budgets",
+            Some(Note::Splits(_)) => "splits",
             Some(Note::Other) => "other",
             None => "error",
         }

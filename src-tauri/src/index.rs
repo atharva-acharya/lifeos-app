@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::vault::{self, FileInfo, note::Note};
 
 /// Bump when the schema changes; a mismatch drops and rebuilds the index.
-pub const SCHEMA_VERSION: i32 = 6;
+pub const SCHEMA_VERSION: i32 = 7;
 
 /// Most log entries kept per project note (the newest).
 const MAX_LOG_ENTRIES: usize = 1000;
@@ -87,6 +87,15 @@ CREATE TABLE budget (
     position INTEGER NOT NULL,
     category TEXT NOT NULL,
     monthly_limit INTEGER NOT NULL,
+    PRIMARY KEY (path, position)
+);
+CREATE TABLE split (
+    path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    date TEXT NOT NULL, description TEXT NOT NULL, friend TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    -- Lower-cased in Rust (any script), so balances group as the UI matches.
+    friend_key TEXT NOT NULL,
     PRIMARY KEY (path, position)
 );
 CREATE TABLE project_log (
@@ -219,6 +228,7 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
         Some(Note::Outreach(_)) => "outreach",
         Some(Note::Ledger(_)) => "ledger",
         Some(Note::Budgets(_)) => "budgets",
+        Some(Note::Splits(_)) => "splits",
         Some(Note::Other) => "other",
         None => "error",
     };
@@ -385,6 +395,22 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
                 tx.execute(
                     "INSERT INTO budget VALUES (?1, ?2, ?3, ?4)",
                     params![p, i64::try_from(i).unwrap_or(i64::MAX), b.category, b.limit],
+                )?;
+            }
+        }
+        Some(Note::Splits(rows)) => {
+            for (i, s) in rows.iter().take(MAX_LEDGER_ROWS).enumerate() {
+                tx.execute(
+                    "INSERT INTO split VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        p,
+                        i64::try_from(i).unwrap_or(i64::MAX),
+                        s.date,
+                        s.description,
+                        s.friend,
+                        s.amount,
+                        s.friend.to_lowercase()
+                    ],
                 )?;
             }
         }

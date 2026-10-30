@@ -10,6 +10,7 @@ import {
 } from "../api";
 import { EmptyHint } from "../components/EmptyHint";
 import { MoneyImport } from "../components/MoneyImport";
+import { MoneySplits } from "../components/MoneySplits";
 import { MoneyTrends } from "../components/MoneyTrends";
 import { NotConnected } from "../components/NotConnected";
 import { useMode } from "../mode";
@@ -315,6 +316,13 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
           </table>
         )}
       </section>
+
+      <MoneySplits
+        friends={money.friends}
+        recent={money.splits}
+        readOnly={sample}
+        onChanged={onAdded}
+      />
 
       <MoneyTrends trend={money.trend} />
 

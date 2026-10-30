@@ -15,6 +15,7 @@ use crate::jobs::{self, Jobs};
 use crate::live::{self, LiveState, Mode};
 use crate::money::{self, Money, NewTransaction};
 use crate::money_import::{self, ImportResult, Mapping, Preview};
+use crate::money_splits::{self, NewSplit};
 use crate::onboarding::{self, Setup};
 use crate::projects::{self, Projects};
 use crate::sample;
@@ -572,6 +573,48 @@ pub fn import_csv(
     money_import::remember(&mut current.bank_mappings, &bank, &preview.mapping);
     settings::save(&dir, &current).map_err(|e| e.to_string())?;
     Ok(result)
+}
+
+fn log_split(app: &AppHandle, record: &crate::vault::write::WriteRecord) {
+    if let Ok(dir) = live::data_dir(app) {
+        crate::vault::write::log_write(&dir, "append-row", money_splits::SPLITS_NOTE, record);
+    }
+    live::resync(app);
+}
+
+/// Splits a bill with friends: one row per friend in `Money/Splits.md`.
+#[tauri::command]
+pub fn add_split(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+    split: NewSplit,
+) -> Result<(), String> {
+    state.require_real()?;
+    let vault = state
+        .vault()
+        .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
+    let record = money_splits::add(&vault, &split)?;
+    log_split(&app, &record);
+    Ok(())
+}
+
+/// Records a settle-up with one friend (`amount` in pence, signed as a
+/// splits row: negative when the friend paid the owner back).
+#[tauri::command]
+pub fn settle_up(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+    friend: String,
+    amount: i64,
+    date: String,
+) -> Result<(), String> {
+    state.require_real()?;
+    let vault = state
+        .vault()
+        .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
+    let record = money_splits::settle(&vault, &friend, amount, &date)?;
+    log_split(&app, &record);
+    Ok(())
 }
 
 #[derive(Debug, Serialize)]

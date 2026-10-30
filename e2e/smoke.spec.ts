@@ -170,6 +170,24 @@ test("Money imports a bank CSV once and skips it the second time", async () => {
   await expect(page.getByRole("button", { name: "Import 0 new rows" })).toBeDisabled();
 });
 
+test("Money splits a bill and settles up", async () => {
+  const { page, vault } = running();
+  await page.getByRole("button", { name: "Money", exact: true }).click();
+  await page.getByLabel("What for").fill("E2E dinner");
+  await page.getByLabel("Total (£)").fill("30");
+  await page.getByLabel("Friends (comma-separated)").fill("Sam, Alex");
+  await page.getByRole("button", { name: "Save split" }).click();
+  await expect(page.getByText("Sam owes you £10.00")).toBeVisible();
+  await expect(page.getByText("Alex owes you £10.00")).toBeVisible();
+
+  await page.getByRole("button", { name: "Settle up with Sam" }).click();
+  await page.getByRole("button", { name: "Confirm £10.00 paid by Sam" }).click();
+  await expect(page.getByText("Settled up with Sam")).toBeVisible();
+  const text = readFileSync(join(vault, "Money", "Splits.md"), "utf8");
+  expect(text).toContain("| E2E dinner | Sam | 10.00 |");
+  expect(text).toContain("| Settle-up | Sam | -10.00 |");
+});
+
 test("Projects shows progress and where to resume", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Projects" }).click();

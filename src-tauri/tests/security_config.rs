@@ -112,6 +112,8 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-get-banks",
             "allow-preview-import",
             "allow-import-csv",
+            "allow-add-split",
+            "allow-settle-up",
             "allow-log-error",
             "allow-get-diagnostics",
             "allow-set-auto-update",

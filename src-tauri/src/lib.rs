@@ -9,6 +9,7 @@ pub mod jobs;
 mod live;
 pub mod money;
 pub mod money_import;
+pub mod money_splits;
 pub mod onboarding;
 pub mod projects;
 pub mod sample;
@@ -84,6 +85,8 @@ pub fn run() {
             commands::get_banks,
             commands::preview_import,
             commands::import_csv,
+            commands::add_split,
+            commands::settle_up,
             commands::log_error,
             commands::get_diagnostics,
             commands::set_auto_update,
