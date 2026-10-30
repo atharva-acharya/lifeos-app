@@ -197,3 +197,67 @@ export function checkForUpdate(): Promise<UpdateInfo | null> {
 export function installUpdate(version: string): Promise<undefined> {
   return invoke<undefined>("install_update", { version });
 }
+
+export interface FitnessDay {
+  date: string;
+  weight: number | null;
+  steps: number | null;
+  proteinG: number | null;
+}
+
+export interface FitnessPlan {
+  name: string | null;
+  start: string | null;
+  end: string | null;
+  startWeight: number | null;
+  targetWeight: number | null;
+  stepsGoal: number;
+  proteinGoal: number;
+}
+
+export interface ExerciseSet {
+  name: string;
+  sets: number | null;
+  reps: number | null;
+  kg: number | null;
+  /** The line as written in the note. */
+  raw: string;
+}
+
+export interface FitnessWorkout {
+  path: string;
+  date: string | null;
+  day: string | null;
+  week: number | null;
+  deload: boolean;
+  durationMin: number | null;
+  exercises: ExerciseSet[];
+}
+
+export interface LiftSession {
+  date: string;
+  kg: number;
+  reps: number | null;
+}
+
+export interface Lift {
+  name: string;
+  /** Oldest first; deload sessions are left out. */
+  sessions: LiftSession[];
+}
+
+export interface Fitness {
+  /** The last 90 days with a daily note, oldest first. */
+  days: FitnessDay[];
+  plan: FitnessPlan | null;
+  /** Newest first. */
+  workouts: FitnessWorkout[];
+  lifts: Lift[];
+  parseErrors: number;
+}
+
+export type FitnessResponse = { status: "noVault" } | { status: "ready"; fitness: Fitness };
+
+export function getFitness(date: string): Promise<FitnessResponse> {
+  return invoke<FitnessResponse>("get_fitness", { date });
+}
