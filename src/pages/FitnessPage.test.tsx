@@ -154,6 +154,19 @@ describe("FitnessPage", () => {
     expect(within(table).getByText("62.5")).toBeInTheDocument();
   });
 
+  it("averages the first plotted days over the warm-up days before them", async () => {
+    ready({
+      days: [recent(93, { weight: 90 }), recent(89, { weight: 88 }), recent(97, { weight: 99 })],
+    });
+    render(<FitnessPage onNavigate={vi.fn()} />);
+    const table = await screen.findByRole("table", { name: "Weight over the last 90 days" });
+    // Only the last 90 days are listed; 93 and 97 days back are not.
+    const rows = within(table).getAllByRole("row");
+    expect(rows).toHaveLength(2);
+    // The oldest plotted day averages 88 with the 90 from 93 days back.
+    expect(within(rows[1]).getAllByRole("cell")[1]).toHaveTextContent("89");
+  });
+
   it("explains empty data and a missing target", async () => {
     ready({ days: [], workouts: [], lifts: [], plan: null });
     render(<FitnessPage onNavigate={vi.fn()} />);

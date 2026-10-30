@@ -6,10 +6,15 @@ use rusqlite::{OptionalExtension, params};
 use serde::Serialize;
 
 use crate::index::Index;
-use crate::vault::note::{ExerciseSet, parse_exercise};
+use crate::vault::note::parse_exercise;
 
 /// Days of daily notes shown, counting today.
 const WINDOW_DAYS: i64 = 90;
+/// Extra days before the window so the first day's 7-day average is complete.
+const WARM_UP_DAYS: i64 = 6;
+/// Caps on what one workout note can send to the UI (threat model T6).
+const MAX_LINES: usize = 100;
+const MAX_LINE_CHARS: usize = 200;
 const MAX_WORKOUTS: i64 = 500;
 const DEFAULT_STEPS_GOAL: i64 = 8000;
 const DEFAULT_PROTEIN_GOAL: i64 = 170;
@@ -58,7 +63,41 @@ pub struct WorkoutView {
     pub week: Option<i64>,
     pub deload: bool,
     pub duration_min: Option<i64>,
-    pub exercises: Vec<ExerciseSet>,
+    pub exercises: Vec<ExerciseView>,
+}
+
+/// One exercise line. `raw` is sent only when the line did not fully parse.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExerciseView {
+    pub name: String,
+    pub sets: Option<i64>,
+    pub reps: Option<i64>,
+    pub kg: Option<f64>,
+    pub raw: Option<String>,
+}
+
+/// Reads at most `MAX_LINES` lines of `MAX_LINE_CHARS` characters each.
+fn exercise_views(lines: &[String]) -> Vec<ExerciseView> {
+    lines
+        .iter()
+        .take(MAX_LINES)
+        .map(|line| {
+            let cut = line
+                .char_indices()
+                .nth(MAX_LINE_CHARS)
+                .map_or(line.as_str(), |(i, _)| &line[..i]);
+            let e = parse_exercise(cut);
+            let complete = e.sets.is_some() && e.reps.is_some() && e.kg.is_some();
+            ExerciseView {
+                name: e.name,
+                sets: e.sets,
+                reps: e.reps,
+                kg: e.kg,
+                raw: (!complete).then_some(e.raw),
+            }
+        })
+        .collect()
 }
 
 /// One exercise across sessions; deload sessions are left out.
@@ -97,7 +136,7 @@ pub fn fitness(index: &Index, today: &str) -> rusqlite::Result<Fitness> {
 }
 
 fn days(index: &Index, today: &str) -> rusqlite::Result<Vec<Day>> {
-    let start = shift_days(today, 1 - WINDOW_DAYS);
+    let start = shift_days(today, 1 - WINDOW_DAYS - WARM_UP_DAYS);
     let rows = index
         .conn()
         .prepare(
@@ -160,7 +199,7 @@ fn workouts(index: &Index) -> rusqlite::Result<Vec<WorkoutView>> {
                 week: r.get(3)?,
                 deload: r.get::<_, Option<bool>>(4)?.unwrap_or(false),
                 duration_min: r.get(5)?,
-                exercises: lines.iter().map(|l| parse_exercise(l)).collect(),
+                exercises: exercise_views(&lines),
             })
         })?
         .collect()
@@ -187,7 +226,7 @@ fn lifts(workouts: &[WorkoutView]) -> Vec<Lift> {
     let mut by_key: BTreeMap<String, Lift> = BTreeMap::new();
     for w in sessions {
         let Some(date) = &w.date else { continue };
-        let mut tops: BTreeMap<String, (&ExerciseSet, f64)> = BTreeMap::new();
+        let mut tops: BTreeMap<String, (&ExerciseView, f64)> = BTreeMap::new();
         for e in &w.exercises {
             let Some(kg) = e.kg else { continue };
             let better = tops.get(&lift_key(&e.name)).is_none_or(|(best, best_kg)| {
@@ -312,10 +351,11 @@ mod tests {
                 "---\ntype: daily\ndate: 2025-12-31\nsteps: 3\n---\n",
             ),
         ]);
-        // 2026-03-31 minus 89 days is 2026-01-01.
+        // The window starts 89 days back, plus 6 days of warm-up for the
+        // 7-day average: 2026-03-31 minus 95 days is 2025-12-26.
         let f = fitness(&index, "2026-03-31").expect("fitness");
         let dates: Vec<&str> = f.days.iter().map(|d| d.date.as_str()).collect();
-        assert_eq!(dates, ["2026-01-01", "2026-03-31"]);
+        assert_eq!(dates, ["2025-12-31", "2026-01-01", "2026-03-31"]);
     }
 
     #[test]
@@ -610,8 +650,8 @@ mod edge_tests {
         }
         // Today itself is included, and so is the last day of the window.
         assert_eq!(fitness(&index, "2026-01-10").expect("f").days.len(), 1);
-        assert_eq!(fitness(&index, "2026-04-09").expect("f").days.len(), 1);
-        assert!(fitness(&index, "2026-04-10").expect("f").days.is_empty());
+        assert_eq!(fitness(&index, "2026-04-15").expect("f").days.len(), 1);
+        assert!(fitness(&index, "2026-04-16").expect("f").days.is_empty());
     }
 
     #[test]
@@ -626,9 +666,9 @@ mod edge_tests {
                 "---\ntype: daily\ndate: 2023-12-30\nsteps: 2\n---\n",
             ),
         ]);
-        // 2024 is a leap year: 2024-03-28 minus 89 days is 2023-12-30.
-        assert_eq!(fitness(&index, "2024-03-28").expect("f").days.len(), 2);
-        assert_eq!(fitness(&index, "2024-03-29").expect("f").days.len(), 1);
+        // 2024 is a leap year: 2024-04-03 minus 95 days is 2023-12-30.
+        assert_eq!(fitness(&index, "2024-04-03").expect("f").days.len(), 2);
+        assert_eq!(fitness(&index, "2024-04-04").expect("f").days.len(), 1);
     }
 
     #[test]
@@ -871,7 +911,7 @@ mod edge_tests {
     }
 
     #[test]
-    fn plan_spans_in_any_order_are_passed_through() {
+    fn plan_spans_in_any_order_are_passed_through_and_bad_goals_default() {
         let f = run(&[(
             "Fitness/Plan.md",
             "---\ntype: plan\nstart: 2026-03-01\nend: 2026-01-01\nsteps_goal: 0\nprotein_goal: -1\n---\n",
@@ -879,7 +919,7 @@ mod edge_tests {
         let plan = f.plan.expect("plan");
         assert_eq!(plan.start.as_deref(), Some("2026-03-01"));
         assert_eq!(plan.end.as_deref(), Some("2026-01-01"));
-        assert_eq!((plan.steps_goal, plan.protein_goal), (0, -1));
+        assert_eq!((plan.steps_goal, plan.protein_goal), (8000, 170));
     }
 
     #[test]
@@ -924,7 +964,24 @@ mod edge_tests {
         lines.push(format!("{} 3 x 5 @ 10", "n".repeat(200_000)));
         let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
         let f = run(&[("a.md", &workout("2026-01-01", "", &refs))]);
-        assert_eq!(f.workouts[0].exercises.len(), 2001);
-        assert_eq!(f.lifts.len(), 2001);
+        // Only the first 100 lines are kept, so the long last line is dropped.
+        assert_eq!(f.workouts[0].exercises.len(), 100);
+        assert_eq!(f.lifts.len(), 100);
+    }
+
+    #[test]
+    fn long_lines_are_cut_on_a_char_boundary_and_raw_is_only_for_unparsed() {
+        let long = format!("{} 3 x 5 @ 10", "é".repeat(500));
+        let f = run(&[(
+            "a.md",
+            &workout("2026-01-01", "", &["Squat 3 x 5 @ 100", "Plank", &long]),
+        )]);
+        let ex = &f.workouts[0].exercises;
+        assert_eq!(ex[0].raw, None);
+        assert_eq!(ex[1].raw.as_deref(), Some("Plank"));
+        // Cut before the numbers, so it no longer parses and keeps 200 chars.
+        let raw = ex[2].raw.as_deref().expect("raw");
+        assert_eq!(raw.chars().count(), 200);
+        assert_eq!(ex[2].kg, None);
     }
 }

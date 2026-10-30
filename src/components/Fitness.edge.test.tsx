@@ -310,6 +310,14 @@ describe("FitnessHistory", () => {
     expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", tab.id);
   });
 
+  it("gives a tab with a space an id without spaces and the panel its name", () => {
+    render(<FitnessHistory workouts={[workout({ day: "Push A" })]} />);
+    const tab = screen.getByRole("tab", { name: "Push A" });
+    expect(tab.id).toBe("workout-tab-push-a");
+    expect(tab.id).not.toMatch(/\s/);
+    expect(screen.getByRole("tabpanel", { name: "Push A" })).toBeInTheDocument();
+  });
+
   it("selects a tab by keyboard activation and moves focus with Tab", () => {
     render(<FitnessHistory workouts={[workout()]} />);
     const pull = screen.getByRole("tab", { name: "Pull A" });

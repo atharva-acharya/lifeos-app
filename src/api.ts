@@ -220,8 +220,8 @@ export interface ExerciseSet {
   sets: number | null;
   reps: number | null;
   kg: number | null;
-  /** The line as written in the note. */
-  raw: string;
+  /** The line as written, sent only when it did not fully parse. */
+  raw: string | null;
 }
 
 export interface FitnessWorkout {

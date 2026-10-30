@@ -6,9 +6,11 @@ import { withTransition } from "../motion";
 const DAYS = ["Push A", "Pull A", "Legs", "Push B", "Pull B"];
 const OTHER = "Other";
 
+const slug = (t: string) => t.toLowerCase().replace(/\s+/g, "-");
+
 /** `Deadlift 3 × 5 @ 120 kg` when the line parsed, otherwise the text as written. */
 export function exerciseText(e: ExerciseSet): string {
-  if (e.sets === null || e.reps === null || e.kg === null) return e.raw.trim() || e.name;
+  if (e.sets === null || e.reps === null || e.kg === null) return e.raw?.trim() || e.name;
   return `${e.name} ${String(e.sets)} × ${String(e.reps)} @ ${String(e.kg)} kg`;
 }
 
@@ -58,7 +60,7 @@ export function FitnessHistory({ workouts }: { workouts: FitnessWorkout[] }) {
                 key={t}
                 type="button"
                 role="tab"
-                id={`workout-tab-${t}`}
+                id={`workout-tab-${slug(t)}`}
                 aria-selected={tab === t}
                 aria-controls="workout-panel"
                 className="tabs__tab"
@@ -72,7 +74,7 @@ export function FitnessHistory({ workouts }: { workouts: FitnessWorkout[] }) {
               </button>
             ))}
           </div>
-          <div role="tabpanel" id="workout-panel" aria-labelledby={`workout-tab-${tab}`}>
+          <div role="tabpanel" id="workout-panel" aria-labelledby={`workout-tab-${slug(tab)}`}>
             {shown.length === 0 ? (
               <p className="muted">No {tab} sessions yet.</p>
             ) : (

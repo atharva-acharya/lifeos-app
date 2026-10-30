@@ -4,6 +4,8 @@ import { averageChange, calendar, rollingAverage, shortLabel, targetLine } from 
 import { LineChart, type Line } from "./LineChart";
 
 const DAYS = 90;
+/** Days read before the chart starts, so its first 7-day average is complete. */
+const WARM_UP = 6;
 
 function signed(n: number): string {
   return `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}`;
@@ -20,9 +22,14 @@ export function FitnessWeight({
   today: string;
 }) {
   const view = useMemo(() => {
-    const cal = calendar(days, today, DAYS);
+    // Average over the warm-up days too, then plot only the last 90.
+    const all = calendar(days, today, DAYS + WARM_UP);
+    const average = rollingAverage(
+      all.map((d) => d.weight),
+      7,
+    ).slice(WARM_UP);
+    const cal = all.slice(WARM_UP);
     const weights = cal.map((d) => d.weight);
-    const average = rollingAverage(weights, 7);
     const target = targetLine(
       cal.map((d) => d.date),
       plan,

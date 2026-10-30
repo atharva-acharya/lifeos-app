@@ -206,6 +206,11 @@ fn split_sets_reps(left: &str) -> Option<(String, Option<i64>, Option<i64>)> {
     Some((name.to_owned(), sets.parse().ok(), reps.parse().ok()))
 }
 
+/// A body weight in kg the page can draw: finite, above 0 and at most 1000.
+fn plausible_weight(w: f64) -> bool {
+    w.is_finite() && w > 0.0 && w <= 1000.0
+}
+
 pub const STAGES: &[&str] = &[
     "applied",
     "replied",
@@ -304,10 +309,10 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
             name: f.string("name")?,
             start: f.date("start")?,
             end: f.date("end")?,
-            start_weight: f.float("start_weight")?,
-            target_weight: f.float("target_weight")?,
-            steps_goal: f.int("steps_goal")?,
-            protein_goal: f.int("protein_goal")?,
+            start_weight: f.float("start_weight")?.filter(|w| plausible_weight(*w)),
+            target_weight: f.float("target_weight")?.filter(|w| plausible_weight(*w)),
+            steps_goal: f.int("steps_goal")?.filter(|n| (1..=100_000).contains(n)),
+            protein_goal: f.int("protein_goal")?.filter(|n| (1..=1000).contains(n)),
         }),
         Some("outreach-log") => Note::Outreach(outreach_table(body)),
         _ => Note::Other,
@@ -953,7 +958,35 @@ mod fitness_edge_tests {
         };
         assert_eq!(p.name.as_deref(), Some("2026"));
         assert_eq!(p.target_weight, Some(80.0));
-        assert_eq!(p.steps_goal, Some(-5));
+        // Out-of-range goals are dropped so the defaults apply.
+        assert_eq!(p.steps_goal, None);
+    }
+
+    #[test]
+    fn plan_numbers_outside_their_range_are_dropped() {
+        let plan = |fm: &str| {
+            let Ok(Note::Plan(p)) = parse(&format!(
+                "---
+type: plan
+{fm}
+---
+"
+            )) else {
+                panic!("expected plan");
+            };
+            p
+        };
+        assert_eq!(plan("steps_goal: 0").steps_goal, None);
+        assert_eq!(plan("steps_goal: 100001").steps_goal, None);
+        assert_eq!(plan("steps_goal: 100000").steps_goal, Some(100_000));
+        assert_eq!(plan("protein_goal: 1001").protein_goal, None);
+        assert_eq!(plan("protein_goal: 1").protein_goal, Some(1));
+        assert_eq!(plan("target_weight: 0").target_weight, None);
+        assert_eq!(plan("target_weight: -80").target_weight, None);
+        assert_eq!(plan("start_weight: 1000.5").start_weight, None);
+        assert_eq!(plan("start_weight: 1000").start_weight, Some(1000.0));
+        assert_eq!(plan("target_weight: .inf").target_weight, None);
+        assert_eq!(plan("target_weight: .nan").target_weight, None);
     }
 
     #[test]
