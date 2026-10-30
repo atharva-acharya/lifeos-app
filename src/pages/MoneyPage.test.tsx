@@ -40,6 +40,8 @@ const MONEY: Money = {
   hasBudgets: true,
   parseErrors: 0,
   trend: [],
+  friends: [],
+  splits: [],
 };
 
 afterEach(() => {

@@ -18,6 +18,8 @@ const COMMANDS: &[&str] = &[
     "get_banks",
     "preview_import",
     "import_csv",
+    "add_split",
+    "settle_up",
     "log_error",
     "get_diagnostics",
     "set_auto_update",

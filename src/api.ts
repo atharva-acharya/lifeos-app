@@ -153,6 +153,41 @@ export interface Money {
   parseErrors: number;
   /** Six months ending with `month`, oldest first. */
   trend: MonthTotals[];
+  friends: FriendBalance[];
+  splits: SplitRow[];
+}
+
+/** `balance` is pence the friend owes the owner (negative: the owner owes). */
+export interface FriendBalance {
+  friend: string;
+  balance: number;
+  lastDate: string;
+}
+
+export interface SplitRow {
+  date: string;
+  description: string;
+  friend: string;
+  amount: number;
+}
+
+export interface NewSplit {
+  date: string;
+  description: string;
+  total: number;
+  /** null when the owner paid. */
+  paidBy: string | null;
+  method: "equal" | "amounts" | "shares";
+  /** `name` null is the owner; `value` is pence (amounts) or a share (shares). */
+  people: { name: string | null; value: number }[];
+}
+
+export function addSplit(split: NewSplit): Promise<undefined> {
+  return invoke<undefined>("add_split", { split });
+}
+
+export function settleUp(friend: string, amount: number, date: string): Promise<undefined> {
+  return invoke<undefined>("settle_up", { friend, amount, date });
 }
 
 export interface CategoryAmount {
