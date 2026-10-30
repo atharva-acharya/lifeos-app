@@ -1,24 +1,31 @@
-/* Design A, "studio dark" (requirements §4). */
+/* "Apple dark", in the style of Apple Fitness and Health (requirements §4). */
 :root {
   color-scheme: dark;
 
-  --bg-page: #141414;
-  --bg-sidebar: #1b1b1b;
-  --bg-card: #232323;
-  --bg-hover: #2b2b2b;
-  --border: #333333;
+  --bg-page: #000000;
+  --bg-sidebar: #111113;
+  --bg-card: #1c1c1e;
+  --bg-hover: #2c2c2e; /* also raised controls: buttons, inputs, selected tab */
+  --border: #38383a; /* separators */
 
-  --text: #ececec;
-  --text-muted: #a3a3a3;
+  --text: #f5f5f7;
+  --text-muted: #98989f; /* AA on page, card and raised surfaces */
 
-  /* Colour meaning, used consistently. */
-  --c-read: #a78bfa; /* purple: read / viewed */
-  --c-progress: #fb923c; /* orange: in progress / editing / due */
-  --c-done: #4ade80; /* green: done / positive */
-  --c-pending: #facc15; /* yellow: pending */
-  --c-danger: #f87171; /* red: destructive */
+  /* Colour meaning, used consistently (Apple system colours, dark). */
+  --c-read: #bf5af2; /* purple: read / viewed */
+  --c-progress: #ff9f0a; /* orange: in progress / editing / due */
+  --c-done: #30d158; /* green: done / positive */
+  --c-pending: #ffd60a; /* yellow: pending */
+  --c-danger: #ff453a; /* red: destructive */
+  --accent: #0a84ff; /* blue: current page, links, checkboxes, focus */
 
-  --radius: 12px;
+  /* Activity rings. */
+  --ring-move: #fa114f;
+  --ring-exercise: #a6ff00;
+  --ring-stand: #00e5ff;
+
+  --radius: 16px;
+  --radius-control: 10px;
   --radius-pill: 999px;
   --space-1: 4px;
   --space-2: 8px;
@@ -32,9 +39,10 @@
     "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --fs-kicker: 12px;
   --fs-body: 14px;
-  --fs-title: 26px;
+  --fs-title: 34px;
+  --fs-number: 34px;
 
-  --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--c-read);
+  --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
 
   /* Motion (phase 3). Use these, never raw values, so the app moves as one.
      fast: hovers, presses. base: tabs, small enters. slow: pages, charts. */

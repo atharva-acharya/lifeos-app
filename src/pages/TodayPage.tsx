@@ -9,8 +9,11 @@ import {
 } from "../api";
 import { EmptyHint } from "../components/EmptyHint";
 import { NotConnected } from "../components/NotConnected";
+import { Rings } from "../components/Rings";
 import { SetupCard } from "../components/SetupCard";
 import type { Navigate } from "../routes";
+
+const HABITS = 5;
 
 function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -112,6 +115,41 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
           </EmptyHint>
         </section>
       )}
+      <section className="card today-hero" aria-labelledby="habits-heading">
+        <Rings
+          size={132}
+          rings={[
+            {
+              key: "habits",
+              name: "Habits",
+              value: habitsDone,
+              goal: HABITS,
+              color: habitsDone === HABITS ? "var(--ring-exercise)" : "var(--ring-move)",
+            },
+          ]}
+        />
+        <div className="today-hero__habits">
+          <h2 id="habits-heading" className="kicker">
+            Habits
+          </h2>
+          <ul className="habits">
+            <Habit label="Weigh-in" done={h.weighIn} />
+            <Habit
+              label="Steps"
+              done={h.steps !== null}
+              value={h.steps !== null ? h.steps.toLocaleString("en-GB") : undefined}
+            />
+            <Habit
+              label="Protein"
+              done={h.proteinG !== null}
+              value={h.proteinG !== null ? `${String(h.proteinG)} g` : undefined}
+            />
+            <Habit label="Meals tracked" done={h.mealsTracked} />
+            <Habit label="Mobility" done={h.mobility} />
+          </ul>
+        </div>
+      </section>
+
       <div className="stats">
         <Stat
           label="Follow-ups due"
@@ -135,32 +173,6 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
         />
         <Stat label="Gym session" value={today.gym ?? (noNote ? "—" : "Rest day")} />
       </div>
-
-      <section className="card" aria-labelledby="habits-heading">
-        <div className="section-head">
-          <h2 id="habits-heading" className="kicker">
-            Habits
-          </h2>
-          <span className={`pill ${habitsDone === 5 ? "pill--done" : "pill--pending"}`}>
-            {habitsDone} / 5
-          </span>
-        </div>
-        <ul className="habits">
-          <Habit label="Weigh-in" done={h.weighIn} />
-          <Habit
-            label="Steps"
-            done={h.steps !== null}
-            value={h.steps !== null ? h.steps.toLocaleString("en-GB") : undefined}
-          />
-          <Habit
-            label="Protein"
-            done={h.proteinG !== null}
-            value={h.proteinG !== null ? `${String(h.proteinG)} g` : undefined}
-          />
-          <Habit label="Meals tracked" done={h.mealsTracked} />
-          <Habit label="Mobility" done={h.mobility} />
-        </ul>
-      </section>
 
       <div className="columns">
         <section className="card" aria-labelledby="followups-heading">

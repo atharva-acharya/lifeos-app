@@ -16,21 +16,21 @@ export function FitnessWeek({
       name: "Steps, 7-day average",
       value: summary.avgSteps ?? 0,
       goal: summary.stepsGoal,
-      color: "var(--c-progress)",
+      color: "var(--ring-move)",
     },
     {
       key: "protein",
       name: "Protein goal days",
       value: summary.proteinDays,
       goal: 7,
-      color: "var(--c-done)",
+      color: "var(--ring-exercise)",
     },
     {
       key: "sessions",
       name: "Sessions this week",
       value: summary.sessions,
       goal: SESSIONS_GOAL,
-      color: "var(--c-read)",
+      color: "var(--ring-stand)",
     },
   ];
   return (
