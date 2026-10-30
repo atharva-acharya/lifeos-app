@@ -16,6 +16,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Docs-only pull requests skip the build and test jobs. A job skipped by
+  # `if:` reports as passed, so required checks never hang (workflow-level
+  # `paths:` filters would leave them pending forever).
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        name: Code or docs only?
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          code=true
+          if [ "$EVENT" = "pull_request" ] &&
+            ! git diff --name-only "$BASE" HEAD | grep -qvE '^(docs/|README\.md$|CONTRIBUTING\.md$|SECURITY\.md$|LICENSE$)'; then
+            code=false
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   pr-title:
     name: PR title (Conventional Commits)
     if: github.event_name == 'pull_request'
@@ -32,6 +59,10 @@ jobs:
 
   web:
     name: Web (format, lint, types, tests)
+    needs: changes
+    # Run unless detection positively said docs-only, so a failed detection
+    # job can never turn required checks into passing skips.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -51,6 +82,10 @@ jobs:
 
   rust:
     name: Rust (fmt, clippy, tests)
+    needs: changes
+    # Run unless detection positively said docs-only, so a failed detection
+    # job can never turn required checks into passing skips.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -72,6 +107,10 @@ jobs:
 
   build:
     name: Build app
+    needs: changes
+    # Run unless detection positively said docs-only, so a failed detection
+    # job can never turn required checks into passing skips.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
