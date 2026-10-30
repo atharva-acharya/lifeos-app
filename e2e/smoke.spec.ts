@@ -121,6 +121,27 @@ test("Fitness shows weight, workout history and lift progress", async () => {
   await expect(page.getByText(/daily or fitness note/)).toHaveCount(0);
 });
 
+test("Money quick add writes a ledger row to the vault", async () => {
+  const { page, vault } = running();
+  await page.getByRole("button", { name: "Money", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Money" })).toBeVisible();
+  await expect(page.getByText("No money notes yet.")).toBeVisible();
+
+  await page.getByLabel("Description").fill("E2E coffee | test");
+  await page.getByLabel("Amount (£)").fill("3.20");
+  await page.getByLabel("Category").fill("Eating out");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByText(/Saved to Money\/Ledger\//)).toBeVisible();
+  await expect(page.getByRole("cell", { name: "E2E coffee / test" })).toBeVisible();
+
+  // The form defaults to the local date, so the note is this local month.
+  const now = new Date();
+  const month = `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const text = readFileSync(join(vault, "Money", "Ledger", `${month}.md`), "utf8");
+  expect(text).toMatch(/^---\ntype: ledger\nmonth: \d{4}-\d{2}\n---\n/);
+  expect(text).toContain("| E2E coffee / test | Eating out | -3.20 |  |");
+});
+
 test("Projects shows progress and where to resume", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Projects" }).click();

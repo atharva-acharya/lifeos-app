@@ -67,6 +67,11 @@ impl LiveState {
         self.lock().live.as_ref().map(|live| f(&live.index))
     }
 
+    /// The open vault's folder (canonical), if any.
+    pub fn vault(&self) -> Option<PathBuf> {
+        self.lock().live.as_ref().map(|live| live.vault.clone())
+    }
+
     pub fn mode(&self) -> Mode {
         self.lock().mode
     }
@@ -167,7 +172,9 @@ pub fn start(app: &AppHandle, vault: &Path) -> Result<SyncStats, String> {
     Ok(stats)
 }
 
-fn resync(app: &AppHandle) {
+/// Syncs the index now (after the app writes a note) instead of waiting for
+/// the watcher, and tells the UI if anything changed.
+pub fn resync(app: &AppHandle) {
     let state = app.state::<LiveState>();
     let mut inner = state.lock();
     if inner.mode == Mode::Sample {

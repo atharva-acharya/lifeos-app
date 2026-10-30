@@ -150,6 +150,8 @@ pub const TEMPLATES: &[(&str, &str)] = &[
         include_str!("../demo/company-6.md"),
     ),
     ("Jobs/Outreach.md", include_str!("../demo/outreach.md")),
+    ("Money/Ledger/Sample.md", include_str!("../demo/money-ledger.md")),
+    ("Money/Budgets.md", include_str!("../demo/money-budgets.md")),
     ("Projects/home-lab.md", include_str!("../demo/project-1.md")),
     (
         "Projects/reading-list.md",

@@ -476,6 +476,8 @@ mod tests {
         assert_eq!(count("plan"), 1);
         assert_eq!(count("weekly"), 1);
         assert!(count("outreach") >= 5);
+        assert_eq!(count("ledger"), 20);
+        assert_eq!(count("budget"), 6);
         let errors: i64 = index
             .conn()
             .query_row(

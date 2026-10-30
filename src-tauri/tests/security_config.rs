@@ -107,6 +107,8 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-get-fitness",
             "allow-get-projects",
             "allow-get-health",
+            "allow-get-money",
+            "allow-add-transaction",
             "allow-log-error",
             "allow-get-diagnostics",
             "allow-set-auto-update",

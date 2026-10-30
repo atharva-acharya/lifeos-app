@@ -27,7 +27,15 @@ describe("App shell", () => {
     render(<App />);
     const main = await screen.findByRole("navigation", { name: "Main" });
     const labels = Array.from(main.querySelectorAll("button")).map((b) => b.textContent);
-    expect(labels).toEqual(["Today", "Jobs", "Fitness", "Health", "Projects", "SearchCtrl K"]);
+    expect(labels).toEqual([
+      "Today",
+      "Jobs",
+      "Fitness",
+      "Health",
+      "Money",
+      "Projects",
+      "SearchCtrl K",
+    ]);
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
   });
 

@@ -65,6 +65,12 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   await expect(page.getByText("Outdoor Run").first()).toBeVisible();
   await expect(page.locator("section.placeholder")).toHaveCount(0);
 
+  // Money: the sample ledger and budgets; quick add is off.
+  await goTo("Money");
+  await expect(page.getByRole("heading", { name: "Budgets" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Bookshop" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+
   // Projects
   await goTo("Projects");
   await expect(page.getByRole("heading", { name: "home-lab" })).toBeVisible();
