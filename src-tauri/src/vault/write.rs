@@ -75,13 +75,25 @@ pub fn append_row(
     columns: &[&str],
     values: &[Value<'_>],
 ) -> Result<WriteRecord, WriteError> {
+    append_rows(root, rel, front_matter, columns, &[values.to_vec()])
+}
+
+/// Like `append_row`, for several rows in one write: all of them land, or
+/// none do.
+pub fn append_rows(
+    root: &Path,
+    rel: &str,
+    front_matter: &str,
+    columns: &[&str],
+    rows: &[Vec<Value<'_>>],
+) -> Result<WriteRecord, WriteError> {
     guard::check_relative(rel)?;
     let parent = ensure_parent(root, rel)?;
     sweep_temps(&parent);
     match guard::resolve(root, rel) {
         Ok(path) => {
             let original = read(&path)?;
-            let updated = insert_row(&original, columns, values)?;
+            let updated = insert_rows(&original, columns, rows)?;
             check_inside(root, &parent)?;
             replace(&parent, &path, &original, &updated)?;
             Ok(WriteRecord {
@@ -90,7 +102,7 @@ pub fn append_row(
             })
         }
         Err(GuardError::NotFound) => {
-            let text = new_note(front_matter, columns, values);
+            let text = new_note(front_matter, columns, rows);
             check_inside(root, &parent)?;
             let name = Path::new(rel).file_name().ok_or(GuardError::Empty)?;
             create(&parent, &parent.join(name), &text)?;
@@ -265,21 +277,25 @@ fn row(cells: &[String]) -> String {
     format!("| {} |", cells.join(" | "))
 }
 
-fn table_block(columns: &[&str], values: &[Value<'_>], nl: &str) -> String {
-    let cells: Vec<String> = values.iter().map(|(_, v)| cell(v)).collect();
-    format!(
-        "{}{nl}| {} |{nl}{}{nl}",
+fn table_block(columns: &[&str], rows: &[Vec<Value<'_>>], nl: &str) -> String {
+    let mut out = format!(
+        "{}{nl}| {} |{nl}",
         row(&columns.iter().map(|c| (*c).to_owned()).collect::<Vec<_>>()),
         vec!["---"; columns.len()].join(" | "),
-        row(&cells)
-    )
+    );
+    for values in rows {
+        let cells: Vec<String> = values.iter().map(|(_, v)| cell(v)).collect();
+        out.push_str(&row(&cells));
+        out.push_str(nl);
+    }
+    out
 }
 
-fn new_note(front_matter: &str, columns: &[&str], values: &[Value<'_>]) -> String {
+fn new_note(front_matter: &str, columns: &[&str], rows: &[Vec<Value<'_>>]) -> String {
     format!(
         "---\n{}\n---\n\n{}",
         front_matter.trim_end(),
-        table_block(columns, values, "\n")
+        table_block(columns, rows, "\n")
     )
 }
 
@@ -317,6 +333,15 @@ pub fn insert_row(
     columns: &[&str],
     values: &[Value<'_>],
 ) -> Result<String, WriteError> {
+    insert_rows(text, columns, &[values.to_vec()])
+}
+
+/// Like `insert_row`, for several rows in order.
+pub fn insert_rows(
+    text: &str,
+    columns: &[&str],
+    rows: &[Vec<Value<'_>>],
+) -> Result<String, WriteError> {
     let nl = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let (front, _) = super::note::split_front_matter(text);
     let body_start = front.map_or(0, |f| {
@@ -353,14 +378,17 @@ pub fn insert_row(
                 .split('|')
                 .map(|h| h.trim().to_owned())
                 .collect();
-            let line = fill(&headers, columns, values)?;
-            let mut out = String::with_capacity(text.len() + line.len() + 2);
+            let mut lines = String::new();
+            for values in rows {
+                lines.push_str(&fill(&headers, columns, values)?);
+                lines.push_str(nl);
+            }
+            let mut out = String::with_capacity(text.len() + lines.len() + 2);
             out.push_str(&text[..end]);
             if !out.ends_with('\n') {
                 out.push_str(nl);
             }
-            out.push_str(&line);
-            out.push_str(nl);
+            out.push_str(&lines);
             out.push_str(&text[end..]);
             Ok(out)
         }
@@ -372,7 +400,7 @@ pub fn insert_row(
             if !out.is_empty() {
                 out.push_str(nl);
             }
-            out.push_str(&table_block(columns, values, nl));
+            out.push_str(&table_block(columns, rows, nl));
             Ok(out)
         }
     }

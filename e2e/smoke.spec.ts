@@ -142,6 +142,34 @@ test("Money quick add writes a ledger row to the vault", async () => {
   expect(text).toContain("| E2E coffee / test | Eating out | -3.20 |  |");
 });
 
+test("Money imports a bank CSV once and skips it the second time", async () => {
+  const { page, vault } = running();
+  await page.getByRole("button", { name: "Money", exact: true }).click();
+  const csv = {
+    name: "statement.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      'Date,Description,Paid out,Paid in\r\n15/01/2026,"Corner Grocer, Leeds",12.50,\r\n16/01/2026,Example payroll,,2400.00\r\n',
+    ),
+  };
+  await page.getByLabel("Bank").fill("Example Bank");
+  await page.getByLabel("CSV file").setInputFiles(csv);
+  await expect(page.getByRole("list", { name: "Import summary" })).toContainText("2 new");
+  await page.getByRole("button", { name: "Import 2 new rows" }).click();
+  await expect(page.getByText("Imported 2 rows;")).toBeVisible();
+
+  const text = readFileSync(join(vault, "Money", "Ledger", "2026-01.md"), "utf8");
+  expect(text).toContain("| 2026-01-15 | Corner Grocer, Leeds |  | -12.50 | Example Bank |");
+  expect(text).toContain("| 2026-01-16 | Example payroll |  | 2400.00 | Example Bank |");
+
+  // The same statement again: both rows are already in the ledger.
+  await page.getByLabel("CSV file").setInputFiles(csv);
+  await expect(page.getByRole("list", { name: "Import summary" })).toContainText(
+    "2 already in ledger",
+  );
+  await expect(page.getByRole("button", { name: "Import 0 new rows" })).toBeDisabled();
+});
+
 test("Projects shows progress and where to resume", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Projects" }).click();

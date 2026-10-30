@@ -1314,3 +1314,26 @@ a.button {
 .money .tabs {
   margin: var(--space-3) 0 0;
 }
+
+.money .money__import,
+.money .money__mapping {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.money select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.money .counts {
+  margin: var(--space-4) 0;
+}
+
+.money .setting__check {
+  align-self: end;
+}

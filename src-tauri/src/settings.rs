@@ -25,6 +25,9 @@ pub struct Settings {
     /// Which setup steps the owner skipped and whether the Today card was dismissed.
     #[serde(default, skip_serializing_if = "Onboarding::is_default")]
     pub onboarding: Onboarding,
+    /// CSV column mapping per bank name, saved after an import.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub bank_mappings: std::collections::BTreeMap<String, crate::money_import::Mapping>,
 }
 
 /// First-run checklist choices kept in `settings.json`.
@@ -146,6 +149,11 @@ mod tests {
                 skipped: vec!["plan".to_owned()],
                 dismissed: true,
             },
+            bank_mappings: [(
+                "Example Bank".to_owned(),
+                crate::money_import::guess(&["Date".to_owned(), "Amount".to_owned()], &[]),
+            )]
+            .into(),
         };
         save(dir.path(), &settings).expect("save");
         assert_eq!(load(dir.path()).expect("load"), settings);

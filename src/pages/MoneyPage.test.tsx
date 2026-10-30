@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { localDate, type Money } from "../api";
 import { setMode } from "../mode";
 import { invoke, mockCommands, rejected } from "../test/tauri-mocks";
-import { MoneyPage, pounds, toPence } from "./MoneyPage";
+import { pounds, toPence } from "../money";
+import { MoneyPage } from "./MoneyPage";
 
 const MONTH = localDate().slice(0, 7);
 

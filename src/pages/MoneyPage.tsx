@@ -9,24 +9,11 @@ import {
   type MoneyResponse,
 } from "../api";
 import { EmptyHint } from "../components/EmptyHint";
+import { MoneyImport } from "../components/MoneyImport";
 import { NotConnected } from "../components/NotConnected";
 import { useMode } from "../mode";
+import { pounds, toPence } from "../money";
 import type { Navigate } from "../routes";
-
-const GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
-
-/** Formats pence as pounds, e.g. 123456 → "£1,234.56". */
-export function pounds(pence: number): string {
-  return GBP.format(pence / 100);
-}
-
-/** Reads a pounds amount typed by the owner ("12.5", "£1,200") into pence. */
-export function toPence(text: string): number | null {
-  const clean = text.replace(/[£,\s]/g, "");
-  if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
-  const [whole, frac = ""] = clean.split(".");
-  return Number(whole) * 100 + Number(frac.padEnd(2, "0"));
-}
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -255,6 +242,7 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
 }
 
 function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
+  const sample = useMode() === "sample";
   const net = money.income - money.spent;
   const rate = money.income > 0 ? Math.round((net / money.income) * 100) : null;
   return (
@@ -326,6 +314,8 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
           </table>
         )}
       </section>
+
+      {!sample && <MoneyImport onImported={onAdded} />}
 
       {money.parseErrors > 0 && (
         <p className="notice" role="status">
