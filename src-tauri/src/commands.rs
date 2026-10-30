@@ -13,6 +13,7 @@ use crate::google::{self, GoogleConfig};
 use crate::health::{self, Health, HealthState};
 use crate::jobs::{self, Jobs};
 use crate::live::{self, LiveState, Mode};
+use crate::money::{self, Money, NewTransaction};
 use crate::onboarding::{self, Setup};
 use crate::projects::{self, Projects};
 use crate::sample;
@@ -431,6 +432,52 @@ pub fn get_projects(state: tauri::State<'_, LiveState>) -> Result<ProjectsRespon
             })
             .map_err(|e| e.to_string()),
     }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum MoneyResponse {
+    NoVault,
+    Ready { money: Box<Money> },
+}
+
+/// Spending, income and budgets for `month` (YYYY-MM).
+#[tauri::command]
+pub fn get_money(
+    state: tauri::State<'_, LiveState>,
+    month: String,
+) -> Result<MoneyResponse, String> {
+    if !money::is_month(&month) {
+        return Err("month must look like 2026-10".to_owned());
+    }
+    match state.with_index(|index| money::money(index, &month)) {
+        None => Ok(MoneyResponse::NoVault),
+        Some(result) => result
+            .map(|money| MoneyResponse::Ready {
+                money: Box::new(money),
+            })
+            .map_err(|e| e.to_string()),
+    }
+}
+
+/// Quick add: appends one row to `Money/Ledger/YYYY-MM.md` in the owner's
+/// vault. The UI never chooses the path; it follows from the date.
+#[tauri::command]
+pub fn add_transaction(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+    transaction: NewTransaction,
+) -> Result<(), String> {
+    state.require_real()?;
+    let vault = state
+        .vault()
+        .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
+    let record = money::add(&vault, &transaction)?;
+    if let Ok(dir) = live::data_dir(&app) {
+        crate::vault::write::log_write(&dir, "append-row", &transaction.ledger_path(), &record);
+    }
+    live::resync(&app);
+    Ok(())
 }
 
 #[derive(Debug, Serialize)]

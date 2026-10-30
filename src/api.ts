@@ -123,6 +123,54 @@ export function getJobs(): Promise<JobsResponse> {
   return invoke<JobsResponse>("get_jobs");
 }
 
+/** Amounts are in pence; budgets and categories carry spending as positive pence. */
+export interface MoneyRow {
+  date: string;
+  description: string;
+  category: string | null;
+  amount: number;
+  account: string | null;
+}
+
+export interface BudgetLine {
+  category: string;
+  limit: number;
+  spent: number;
+  status: "under" | "near" | "over";
+}
+
+export interface Money {
+  month: string;
+  months: string[];
+  income: number;
+  spent: number;
+  budgets: BudgetLine[];
+  categories: { category: string; spent: number }[];
+  transactions: MoneyRow[];
+  knownCategories: string[];
+  hasLedger: boolean;
+  hasBudgets: boolean;
+  parseErrors: number;
+}
+
+export type MoneyResponse = { status: "noVault" } | { status: "ready"; money: Money };
+
+export function getMoney(month: string): Promise<MoneyResponse> {
+  return invoke<MoneyResponse>("get_money", { month });
+}
+
+export interface NewTransaction {
+  date: string;
+  description: string;
+  category: string | null;
+  amount: number;
+  account: string | null;
+}
+
+export function addTransaction(transaction: NewTransaction): Promise<undefined> {
+  return invoke<undefined>("add_transaction", { transaction });
+}
+
 export interface GoogleView {
   clientId: string;
   sheetId: string;

@@ -1,8 +1,9 @@
-//! Read-only access to the vault (ADR 0003). The index (task 9) and the
-//! Today page build on `scan`.
+//! Access to the vault (ADR 0003): reading here, safe writing in `write`. The index
+//! and the Today page build on `scan`.
 
 pub mod guard;
 pub mod note;
+pub mod write;
 
 use std::fs;
 use std::path::{Path, PathBuf};

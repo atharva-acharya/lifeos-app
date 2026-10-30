@@ -11,11 +11,13 @@ use serde::Serialize;
 use crate::vault::{self, FileInfo, note::Note};
 
 /// Bump when the schema changes; a mismatch drops and rebuilds the index.
-pub const SCHEMA_VERSION: i32 = 5;
+pub const SCHEMA_VERSION: i32 = 6;
 
 /// Most log entries kept per project note (the newest).
 const MAX_LOG_ENTRIES: usize = 1000;
 const MAX_STEPS: usize = 200;
+/// Most rows kept per ledger note (a note is capped at 2 MB anyway).
+const MAX_LEDGER_ROWS: usize = 20_000;
 
 const SCHEMA: &str = "
 CREATE TABLE notes (
@@ -70,6 +72,21 @@ CREATE TABLE project_steps (
     position INTEGER NOT NULL,
     done INTEGER NOT NULL,
     text TEXT NOT NULL,
+    PRIMARY KEY (path, position)
+);
+CREATE TABLE ledger (
+    path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    date TEXT NOT NULL, description TEXT NOT NULL, category TEXT,
+    amount INTEGER NOT NULL, account TEXT,
+    PRIMARY KEY (path, position)
+);
+CREATE INDEX ledger_date ON ledger(date);
+CREATE TABLE budget (
+    path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    monthly_limit INTEGER NOT NULL,
     PRIMARY KEY (path, position)
 );
 CREATE TABLE project_log (
@@ -200,6 +217,8 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
         Some(Note::Project(_)) => "project",
         Some(Note::Plan(_)) => "plan",
         Some(Note::Outreach(_)) => "outreach",
+        Some(Note::Ledger(_)) => "ledger",
+        Some(Note::Budgets(_)) => "budgets",
         Some(Note::Other) => "other",
         None => "error",
     };
@@ -342,6 +361,30 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
                         r.status,
                         r.last_update
                     ],
+                )?;
+            }
+        }
+        Some(Note::Ledger(rows)) => {
+            for (i, t) in rows.iter().take(MAX_LEDGER_ROWS).enumerate() {
+                tx.execute(
+                    "INSERT INTO ledger VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        p,
+                        i64::try_from(i).unwrap_or(i64::MAX),
+                        t.date,
+                        t.description,
+                        t.category,
+                        t.amount,
+                        t.account
+                    ],
+                )?;
+            }
+        }
+        Some(Note::Budgets(rows)) => {
+            for (i, b) in rows.iter().take(MAX_STEPS).enumerate() {
+                tx.execute(
+                    "INSERT INTO budget VALUES (?1, ?2, ?3, ?4)",
+                    params![p, i64::try_from(i).unwrap_or(i64::MAX), b.category, b.limit],
                 )?;
             }
         }

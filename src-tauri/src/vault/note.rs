@@ -53,6 +53,11 @@ pub enum Note {
     Plan(Plan),
     /// `Jobs/Outreach.md`: one table of contacts.
     Outreach(Vec<OutreachEntry>),
+    /// `type: ledger` (usually `Money/Ledger/2026-10.md`): one table of
+    /// transactions. A row's month comes from its date, not the file name.
+    Ledger(Vec<Transaction>),
+    /// `type: budgets` (`Money/Budgets.md`): a monthly limit per category.
+    Budgets(Vec<Budget>),
     /// A note with no front matter or a `type` the app does not model.
     Other,
 }
@@ -336,6 +341,8 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
                 .filter(|h| h.is_finite() && (1.0..=16.0).contains(h)),
         }),
         Some("outreach-log") => Note::Outreach(outreach_table(body)),
+        Some("ledger") => Note::Ledger(ledger_table(body)),
+        Some("budgets") => Note::Budgets(budget_table(body)),
         _ => Note::Other,
     })
 }
@@ -610,6 +617,176 @@ impl Fields<'_> {
             Some(_) => Err(ParseError::WrongType(key)),
         }
     }
+}
+
+/// One ledger row. Amounts are in pence: negative is money out, positive is
+/// money in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Transaction {
+    pub date: String,
+    pub description: String,
+    pub category: Option<String>,
+    pub amount: i64,
+    pub account: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Budget {
+    pub category: String,
+    /// Monthly limit in pence.
+    pub limit: i64,
+}
+
+/// Ledger columns, in the order a new ledger note gets them.
+pub const LEDGER_COLUMNS: &[&str] = &["Date", "Description", "Category", "Amount", "Account"];
+
+/// Header names (lower case) read as each ledger column; the writer uses the
+/// same lists, so a row always lands in the column the parser reads.
+pub const DATE_HEADERS: &[&str] = &["date"];
+pub const DESCRIPTION_HEADERS: &[&str] = &["description", "payee", "details"];
+pub const CATEGORY_HEADERS: &[&str] = &["category"];
+pub const AMOUNT_HEADERS: &[&str] = &["amount"];
+pub const ACCOUNT_HEADERS: &[&str] = &["account"];
+
+/// Largest amount accepted in one row: £10 million, in pence.
+pub const MAX_AMOUNT_PENCE: i64 = 1_000_000_000;
+
+/// Reads the first Markdown table in the body as a header row and data rows.
+/// Headers are lower-cased; cells are trimmed and stripped of backticks.
+fn first_table(body: &str) -> Option<(Vec<String>, Vec<Vec<String>>)> {
+    let mut rows = body
+        .lines()
+        .map(str::trim)
+        .skip_while(|l| !l.starts_with('|'))
+        .take_while(|l| l.starts_with('|'));
+    let headers = cells(rows.next()?)
+        .iter()
+        .map(|h| h.to_lowercase())
+        .collect();
+    let data = rows
+        .filter(|r| !is_separator(r))
+        .map(|r| {
+            cells(r)
+                .into_iter()
+                .map(|c| c.trim_matches('`').trim().to_owned())
+                .collect()
+        })
+        .collect();
+    Some((headers, data))
+}
+
+fn column(headers: &[String], names: &[&str]) -> Option<usize> {
+    headers.iter().position(|h| names.contains(&h.as_str()))
+}
+
+fn cell(row: &[String], i: Option<usize>) -> Option<String> {
+    i.and_then(|i| row.get(i))
+        .filter(|v| !v.is_empty())
+        .map(|v| clip(v))
+}
+
+/// Parses a money amount such as `-12.50`, `£1,234`, `−£3.20` or `+40` into
+/// pence. At most two decimal places; anything else is `None`.
+pub fn parse_pence(text: &str) -> Option<i64> {
+    let s: String = text
+        .trim()
+        .replace('\u{2212}', "-")
+        .chars()
+        .filter(|c| !matches!(c, '£' | ',' | ' '))
+        .collect();
+    let (negative, digits) = match s.strip_prefix('-') {
+        Some(rest) => (true, rest.trim_start_matches('£')),
+        None => (false, s.strip_prefix('+').unwrap_or(&s)),
+    };
+    let (whole, frac) = digits.split_once('.').unwrap_or((digits, ""));
+    if (whole.is_empty() && frac.is_empty())
+        || whole.len() > 12
+        || frac.len() > 2
+        || !whole
+            .bytes()
+            .chain(frac.bytes())
+            .all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    let whole: i64 = if whole.is_empty() {
+        0
+    } else {
+        whole.parse().ok()?
+    };
+    let frac: i64 = match frac.len() {
+        0 => 0,
+        1 => frac.parse::<i64>().ok()? * 10,
+        _ => frac.parse().ok()?,
+    };
+    let pence = whole.checked_mul(100)?.checked_add(frac)?;
+    (pence <= MAX_AMOUNT_PENCE).then_some(if negative { -pence } else { pence })
+}
+
+/// Formats pence as the ledger writes it: `-12.50`, `2400.00`.
+pub fn format_pence(pence: i64) -> String {
+    let sign = if pence < 0 { "-" } else { "" };
+    let abs = pence.unsigned_abs();
+    format!("{sign}{}.{:02}", abs / 100, abs % 100)
+}
+
+/// Reads a ledger table. Rows without a valid date and amount are skipped.
+pub fn ledger_table(body: &str) -> Vec<Transaction> {
+    let Some((headers, rows)) = first_table(body) else {
+        return Vec::new();
+    };
+    let (date, desc, cat, amount, account) = (
+        column(&headers, DATE_HEADERS),
+        column(&headers, DESCRIPTION_HEADERS),
+        column(&headers, CATEGORY_HEADERS),
+        column(&headers, AMOUNT_HEADERS),
+        column(&headers, ACCOUNT_HEADERS),
+    );
+    rows.iter()
+        .filter_map(|r| {
+            let d = cell(r, date).filter(|d| is_iso_date(d))?;
+            let a = cell(r, amount).and_then(|a| parse_pence(&a))?;
+            Some(Transaction {
+                date: d,
+                description: cell(r, desc).unwrap_or_default(),
+                category: cell(r, cat),
+                amount: a,
+                account: cell(r, account),
+            })
+        })
+        .collect()
+}
+
+/// Reads a budgets table: `| Category | Monthly limit |`. Limits must be
+/// positive; later rows for the same category replace earlier ones.
+pub fn budget_table(body: &str) -> Vec<Budget> {
+    let Some((headers, rows)) = first_table(body) else {
+        return Vec::new();
+    };
+    let (cat, limit) = (
+        column(&headers, &["category"]),
+        column(&headers, &["monthly limit", "limit", "budget"]),
+    );
+    let mut out: Vec<Budget> = Vec::new();
+    for r in &rows {
+        let (Some(c), Some(l)) = (cell(r, cat), cell(r, limit).and_then(|l| parse_pence(&l)))
+        else {
+            continue;
+        };
+        if l <= 0 {
+            continue;
+        }
+        match out.iter_mut().find(|b| b.category.eq_ignore_ascii_case(&c)) {
+            Some(b) => b.limit = l,
+            None => out.push(Budget {
+                category: c,
+                limit: l,
+            }),
+        }
+    }
+    out
 }
 
 pub fn is_iso_date(s: &str) -> bool {

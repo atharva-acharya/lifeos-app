@@ -9,6 +9,7 @@ import { loadMode, useMode } from "./mode";
 import { FitnessPage } from "./pages/FitnessPage";
 import { HealthPage } from "./pages/HealthPage";
 import { JobsPage } from "./pages/JobsPage";
+import { MoneyPage } from "./pages/MoneyPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -111,6 +112,8 @@ export default function App() {
               <FitnessPage onNavigate={navigate} />
             ) : route.id === "health" ? (
               <HealthPage onNavigate={navigate} />
+            ) : route.id === "money" ? (
+              <MoneyPage onNavigate={navigate} />
             ) : route.id === "projects" ? (
               <ProjectsPage onNavigate={navigate} />
             ) : route.id === "settings" ? (

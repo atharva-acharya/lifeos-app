@@ -13,6 +13,8 @@ const COMMANDS: &[&str] = &[
     "get_fitness",
     "get_projects",
     "get_health",
+    "get_money",
+    "add_transaction",
     "log_error",
     "get_diagnostics",
     "set_auto_update",

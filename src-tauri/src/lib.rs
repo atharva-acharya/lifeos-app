@@ -7,6 +7,7 @@ pub mod health;
 pub mod index;
 pub mod jobs;
 mod live;
+pub mod money;
 pub mod onboarding;
 pub mod projects;
 pub mod sample;
@@ -77,6 +78,8 @@ pub fn run() {
             commands::get_fitness,
             commands::get_projects,
             commands::get_health,
+            commands::get_money,
+            commands::add_transaction,
             commands::log_error,
             commands::get_diagnostics,
             commands::set_auto_update,
