@@ -194,15 +194,15 @@ fn enter_then_leave_leaves_the_real_profile_byte_for_byte() {
     sample::cleanup(data.path()).expect("leave");
 
     assert_eq!(
-        fs::read(data.path().join("settings.json")).unwrap(),
+        fs::read(data.path().join("settings.json")).expect("settings"),
         SETTINGS_BYTES
     );
     assert_eq!(
-        fs::read(data.path().join("index.db")).unwrap(),
+        fs::read(data.path().join("index.db")).expect("index"),
         b"real index bytes"
     );
     assert_eq!(
-        fs::read(data.path().join("applications.json")).unwrap(),
+        fs::read(data.path().join("applications.json")).expect("cache"),
         b"{\"rows\":[]}"
     );
     assert_eq!(names_in(data.path()), before);
