@@ -61,7 +61,8 @@ a {
   border-radius: var(--radius-pill);
   font-size: var(--fs-kicker);
   font-weight: 600;
-  background: color-mix(in srgb, currentColor 18%, transparent);
+  /* Opaque, so text contrast is the same on every surface (AA). */
+  background: color-mix(in srgb, currentColor 18%, var(--bg-page));
   white-space: nowrap;
 }
 

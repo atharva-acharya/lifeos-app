@@ -65,7 +65,7 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 
 - Dark only. Pure black page `#000000`, sidebar `#111113`, cards `#1c1c1e` with no outline, raised controls `#2c2c2e`, 16px card radius; separators `#38383a`.
 - Font: Segoe UI Variable (fallback Segoe UI); nothing below 12px; large bold page titles (34px) and big bold numbers on stat tiles and ring legends; small uppercase labels for sections.
-- Apple system colours adapted to dark. Colour meaning, used consistently: purple `#bf5af2` = read/viewed, orange `#ff9f0a` = in progress/editing/due, green `#30d158` = done/positive, yellow `#ffd60a` = pending, red `#ff453a` = destructive. Apple blue `#0a84ff` for the current page, links, checkboxes and focus rings.
+- Apple system colours adapted to dark. Colour meaning, used consistently: purple `#da8fff` = read/viewed, orange `#ff9f0a` = in progress/editing/due, green `#30d158` = done/positive, yellow `#ffd60a` = pending, red `#ff6961` = destructive (purple and red are Apple's increased-contrast variants, for AA). Apple blue `#0a84ff` for the current page, links, checkboxes and focus rings.
 - Activity rings use the Activity colours: red `#fa114f`, green `#a6ff00`, cyan `#00e5ff`, thick strokes with a soft glow.
 - File-type and category badges; rounded status pills filled with a tint of their colour.
 - Today opens with a habits ring next to the day's habits; Fitness and Health lead with their rings.

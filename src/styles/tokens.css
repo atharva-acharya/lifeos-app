@@ -12,11 +12,13 @@
   --text-muted: #98989f; /* AA on page, card and raised surfaces */
 
   /* Colour meaning, used consistently (Apple system colours, dark). */
-  --c-read: #bf5af2; /* purple: read / viewed */
+  /* Purple and red use Apple's increased-contrast variants so pill text on
+     its tint stays AA. */
+  --c-read: #da8fff; /* purple: read / viewed */
   --c-progress: #ff9f0a; /* orange: in progress / editing / due */
   --c-done: #30d158; /* green: done / positive */
   --c-pending: #ffd60a; /* yellow: pending */
-  --c-danger: #ff453a; /* red: destructive */
+  --c-danger: #ff6961; /* red: destructive */
   --accent: #0a84ff; /* blue: current page, links, checkboxes, focus */
 
   /* Activity rings. */
