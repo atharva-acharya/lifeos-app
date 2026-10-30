@@ -15,11 +15,16 @@ test.beforeAll(async () => {
   app = await launchApp();
 });
 
-test.afterEach(() => {
+/** Thrown on purpose by the diagnostics test; every other error fails. */
+const PROBE = "e2e-probe";
+
+test.afterEach(async () => {
   // Uncaught errors (for example from the frozen Object.prototype) blank the page.
-  const { errors } = running();
-  const seen = errors.splice(0);
+  const { errors, page } = running();
+  const seen = errors.splice(0).filter((e) => !e.includes(PROBE));
   expect(seen).toEqual([]);
+  // A page caught by the error boundary is a failure too, even if nothing was uncaught.
+  expect(await page.locator("[data-error-boundary]").count()).toBe(0);
 });
 
 test.afterAll(async () => {
@@ -88,6 +93,20 @@ test("Settings shows the connected vault", async () => {
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.getByText("Connected")).toBeVisible();
   await expect(page.getByText(vault)).toBeVisible();
+});
+
+test("an uncaught error is logged locally and shown in Diagnostics", async () => {
+  const { page } = running();
+  await page.evaluate((probe) => {
+    setTimeout(() => {
+      throw new Error(probe);
+    });
+  }, PROBE);
+  await page.getByRole("button", { name: "Today" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
+  await expect(page.getByText("Version 0.2.0")).toBeVisible();
+  await expect(page.getByText("1 recent error logged")).toBeVisible();
 });
 
 test("the page cannot reach the network or load remote scripts", async () => {

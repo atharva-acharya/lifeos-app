@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { invoke } from "../test/tauri-mocks";
 import { SettingsPage } from "./SettingsPage";
+
+// Diagnostics has its own tests; stubbed so these tests control every invoke.
+vi.mock("../components/DiagnosticsSettings", () => ({ DiagnosticsSettings: () => null }));
 
 const VAULT = "D:\\Notes\\Life OS";
 const SHEET = "1AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789-ab";

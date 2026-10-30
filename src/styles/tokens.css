@@ -35,4 +35,44 @@
   --fs-title: 26px;
 
   --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--c-read);
+
+  /* Motion (phase 3). Use these, never raw values, so the app moves as one.
+     fast: hovers, presses. base: tabs, small enters. slow: pages, charts. */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  /* Damped spring (damping 0.7, about 5% overshoot), sampled for linear(). */
+  --ease-spring: linear(
+    0,
+    0.098,
+    0.306,
+    0.531,
+    0.726,
+    0.871,
+    0.965,
+    1.018,
+    1.042,
+    1.046,
+    1.04,
+    1.03,
+    1.02,
+    1.011,
+    1.005,
+    1.001,
+    0.999,
+    0.998,
+    0.999,
+    1
+  );
+}
+
+/* "Reduce motion": every token-driven animation becomes instant. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
 }
