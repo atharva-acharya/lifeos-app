@@ -96,6 +96,31 @@ test("Charts are drawn from the saved copy", async () => {
   await expect(page.getByText(/1 reply not matched/)).toBeVisible();
 });
 
+test("Fitness shows weight, workout history and lift progress", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Fitness" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Fitness" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Weight trend" })).toBeVisible();
+  // Today's synthetic weigh-in is the latest reading.
+  await expect(page.getByText("Latest 82.0 kg")).toBeVisible();
+  await expect(page.locator(".line-chart__dot").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Steps and protein" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Pull A" }).click();
+  await expect(page.getByText("Deadlift 3 × 5 @ 130 kg")).toBeVisible();
+  await expect(page.getByText("Barbell row 3 × 8 @ 70 kg")).toBeVisible();
+
+  await expect(page.getByRole("combobox", { name: "Exercise" })).toHaveValue("Deadlift");
+  await expect(
+    page.getByRole("table", { name: "Deadlift: top set per session" }).getByRole("row"),
+  ).toHaveCount(5);
+  await expect(page.getByText(/Deload weeks are left out/)).toBeVisible();
+  await expect(page.locator(".line-chart__dot").last()).toBeVisible();
+  // Every note in the synthetic vault reads cleanly in Daily and Fitness.
+  await expect(page.getByText(/daily or fitness note/)).toHaveCount(0);
+});
+
 test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings" }).click();
