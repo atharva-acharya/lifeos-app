@@ -507,3 +507,424 @@ mod tests {
         assert_eq!(f, Fitness::default());
     }
 }
+
+#[cfg(test)]
+mod edge_tests {
+    use super::*;
+    use std::fs;
+
+    fn vault_with(files: &[(&str, &str)]) -> Index {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for (path, text) in files {
+            let full = dir.path().join(path);
+            fs::create_dir_all(full.parent().expect("parent")).expect("mkdir");
+            fs::write(full, text).expect("write");
+        }
+        let mut index = Index::open_in_memory().expect("open");
+        index.sync(dir.path()).expect("sync");
+        index
+    }
+
+    fn workout(date: &str, extra: &str, lines: &[&str]) -> String {
+        let list: String = lines.iter().map(|l| format!("  - {l}\n")).collect();
+        format!("---\ntype: workout\ndate: {date}\n{extra}exercises:\n{list}---\n")
+    }
+
+    fn run(files: &[(&str, &str)]) -> Fitness {
+        fitness(&vault_with(files), "2026-01-13").expect("fitness")
+    }
+
+    #[test]
+    fn daily_notes_without_a_date_or_with_bad_fields_are_skipped() {
+        let f = run(&[
+            ("Daily/nodate.md", "---\ntype: daily\nsteps: 5\n---\n"),
+            (
+                "Daily/baddate.md",
+                "---\ntype: daily\ndate: yesterday\nsteps: 5\n---\n",
+            ),
+            (
+                "Daily/string.md",
+                "---\ntype: daily\ndate: 2026-01-12\nweight: heavy\n---\n",
+            ),
+            (
+                "Daily/ok.md",
+                "---\ntype: daily\ndate: 2026-01-11\nweight: 80\n---\n",
+            ),
+            ("Daily/body.md", "no front matter at all\n"),
+        ]);
+        let dates: Vec<&str> = f.days.iter().map(|d| d.date.as_str()).collect();
+        assert_eq!(dates, ["2026-01-11"]);
+        assert_eq!(f.days[0].weight, Some(80.0));
+        assert_eq!((f.days[0].steps, f.days[0].protein_g), (None, None));
+        // The two broken notes are counted; the plain one is not an error.
+        assert_eq!(f.parse_errors, 2);
+    }
+
+    #[test]
+    fn daily_wrong_typed_numbers_make_the_note_an_error() {
+        let f = run(&[
+            (
+                "Daily/a.md",
+                "---\ntype: daily\ndate: 2026-01-10\nsteps: 8000.5\n---\n",
+            ),
+            (
+                "Daily/b.md",
+                "---\ntype: daily\ndate: 2026-01-11\nprotein_g: [1]\n---\n",
+            ),
+            (
+                "Daily/c.md",
+                "---\ntype: daily\ndate: 2026-01-12\nweight: ~\n---\n",
+            ),
+        ]);
+        assert_eq!(f.parse_errors, 2);
+        assert_eq!(f.days.len(), 1);
+        assert_eq!(f.days[0].weight, None);
+    }
+
+    #[test]
+    fn duplicate_dates_pick_the_first_path_without_merging() {
+        let f = run(&[
+            (
+                "Daily/b.md",
+                "---\ntype: daily\ndate: 2026-01-10\nweight: 70\n---\n",
+            ),
+            (
+                "Daily/a.md",
+                "---\ntype: daily\ndate: 2026-01-10\nsteps: 1\n---\n",
+            ),
+        ]);
+        assert_eq!(f.days.len(), 1);
+        assert_eq!(f.days[0].weight, None);
+        assert_eq!(f.days[0].steps, Some(1));
+    }
+
+    #[test]
+    fn today_outside_the_data_or_unreadable_gives_empty_days() {
+        let index = vault_with(&[(
+            "Daily/a.md",
+            "---\ntype: daily\ndate: 2026-01-10\nsteps: 1\n---\n",
+        )]);
+        for today in ["2030-01-01", "2020-01-01", "garbage", "", "2026-1-10"] {
+            let f = fitness(&index, today).expect("fitness");
+            assert!(f.days.is_empty(), "{today:?}");
+        }
+        // Today itself is included, and so is the last day of the window.
+        assert_eq!(fitness(&index, "2026-01-10").expect("f").days.len(), 1);
+        assert_eq!(fitness(&index, "2026-04-09").expect("f").days.len(), 1);
+        assert!(fitness(&index, "2026-04-10").expect("f").days.is_empty());
+    }
+
+    #[test]
+    fn window_crosses_a_leap_day_and_year_end() {
+        let index = vault_with(&[
+            (
+                "Daily/a.md",
+                "---\ntype: daily\ndate: 2023-12-31\nsteps: 1\n---\n",
+            ),
+            (
+                "Daily/b.md",
+                "---\ntype: daily\ndate: 2023-12-30\nsteps: 2\n---\n",
+            ),
+        ]);
+        // 2024 is a leap year: 2024-03-28 minus 89 days is 2023-12-30.
+        assert_eq!(fitness(&index, "2024-03-28").expect("f").days.len(), 2);
+        assert_eq!(fitness(&index, "2024-03-29").expect("f").days.len(), 1);
+    }
+
+    #[test]
+    fn workout_without_day_or_exercises_is_kept() {
+        let f = run(&[
+            ("a.md", "---\ntype: workout\ndate: 2026-01-05\n---\n"),
+            ("b.md", &workout("2026-01-06", "day: Legs\n", &[])),
+        ]);
+        assert_eq!(f.workouts.len(), 2);
+        assert_eq!(f.workouts[1].day, None);
+        assert!(f.workouts[1].exercises.is_empty());
+        assert_eq!(f.workouts[0].day.as_deref(), Some("Legs"));
+        assert!(f.lifts.is_empty());
+    }
+
+    #[test]
+    fn workouts_with_bad_fields_become_errors_not_rows() {
+        let f = run(&[
+            (
+                "Fitness/a.md",
+                "---\ntype: workout\ndate: 2026-01-05\nexercises: Squat 3 x 5 @ 100\n---\n",
+            ),
+            (
+                "Fitness/b.md",
+                "---\ntype: workout\ndate: 2026-01-05\nexercises:\n  - 100\n---\n",
+            ),
+            (
+                "Fitness/c.md",
+                "---\ntype: workout\ndate: 2026-01-05\ndeload: 1\n---\n",
+            ),
+            ("Fitness/d.md", "---\ntype: workout\ndate: 5 Jan\n---\n"),
+            (
+                "Fitness/e.md",
+                "---\ntype: workout\ndate: 2026-01-05\nday: push a\n---\n",
+            ),
+        ]);
+        assert!(f.workouts.is_empty());
+        assert_eq!(f.parse_errors, 5);
+    }
+
+    #[test]
+    fn non_list_exercises_do_not_reach_lifts() {
+        let f = run(&[
+            (
+                "a.md",
+                "---\ntype: workout\ndate: 2026-01-05\nexercises: Squat 3 x 5 @ 100\n---\n",
+            ),
+            ("b.md", &workout("2026-01-06", "", &["Squat 3 x 5 @ 100"])),
+        ]);
+        assert_eq!(f.lifts.len(), 1);
+        assert_eq!(f.lifts[0].sessions.len(), 1);
+    }
+
+    #[test]
+    fn same_date_workouts_are_both_kept_in_path_order() {
+        let a = workout("2026-01-05", "day: Legs\n", &["Squat 3 x 5 @ 100"]);
+        let b = workout("2026-01-05", "day: Legs\n", &["Squat 3 x 5 @ 110"]);
+        let f = run(&[("x/a.md", &a), ("x/b.md", &b)]);
+        // Newest first; path descending within one date.
+        assert_eq!(f.workouts[0].path, "x/b.md");
+        assert_eq!(f.workouts[1].path, "x/a.md");
+        // Both count as sessions of the lift, lowest path first.
+        let kgs: Vec<f64> = f.lifts[0].sessions.iter().map(|s| s.kg).collect();
+        assert_eq!(kgs, [100.0, 110.0]);
+    }
+
+    #[test]
+    fn top_set_ties_prefer_more_reps_then_the_first_listed() {
+        let w = workout(
+            "2026-01-05",
+            "",
+            &[
+                "Bench 3 x 5 @ 80",
+                "Bench 3 x 8 @ 80",
+                "Bench 3 x 6 @ 80",
+                "Bench 1 x 1 @ 79",
+                "Row 3 x 5 @ 60",
+                "Row 4 x 5 @ 60",
+                "Curl 3 x 5 @ 20",
+            ],
+        );
+        let f = run(&[("a.md", &w)]);
+        let get = |n: &str| f.lifts.iter().find(|l| l.name == n).expect("lift");
+        assert_eq!(
+            get("Bench").sessions,
+            [LiftSession {
+                date: "2026-01-05".into(),
+                kg: 80.0,
+                reps: Some(8)
+            }]
+        );
+        // Equal weight and reps: one entry only.
+        assert_eq!(get("Row").sessions.len(), 1);
+        assert_eq!(get("Row").sessions[0].reps, Some(5));
+    }
+
+    #[test]
+    fn a_heavier_set_with_unknown_reps_still_wins() {
+        let w = workout(
+            "2026-01-05",
+            "",
+            &["Squat 3 x 5 @ 100", "Squat 3 x 1001 @ 110"],
+        );
+        let f = run(&[("a.md", &w)]);
+        assert_eq!(f.lifts[0].sessions[0].kg, 110.0);
+        assert_eq!(f.lifts[0].sessions[0].reps, None);
+        // With equal weight, known reps beat unknown reps.
+        let w = workout(
+            "2026-01-05",
+            "",
+            &["Squat 3 x 1001 @ 100", "Squat 3 x 1 @ 100"],
+        );
+        let f = run(&[("a.md", &w)]);
+        assert_eq!(f.lifts[0].sessions[0].reps, Some(1));
+    }
+
+    #[test]
+    fn deload_only_lifts_and_undated_sessions_are_excluded() {
+        let f = run(&[
+            (
+                "a.md",
+                &workout(
+                    "2026-01-05",
+                    "deload: true\n",
+                    &["Squat 2 x 5 @ 60", "Press 2 x 5 @ 30"],
+                ),
+            ),
+            (
+                "b.md",
+                &workout("2026-01-06", "deload: false\n", &["Press 3 x 5 @ 40"]),
+            ),
+            (
+                "c.md",
+                "---\ntype: workout\nexercises:\n  - Curl 3 x 5 @ 20\n---\n",
+            ),
+        ]);
+        let names: Vec<&str> = f.lifts.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, ["Press"]);
+        assert_eq!(f.lifts[0].sessions.len(), 1);
+        assert_eq!(f.lifts[0].sessions[0].kg, 40.0);
+        // The deload and the undated session still show in the history.
+        assert_eq!(f.workouts.len(), 3);
+    }
+
+    #[test]
+    fn names_group_by_case_and_inner_spacing_only() {
+        let f = run(&[
+            (
+                "a.md",
+                &workout("2026-01-01", "", &["bench press 3 x 5 @ 50"]),
+            ),
+            (
+                "b.md",
+                &workout("2026-01-02", "", &["BENCH   PRESS 3 x 5 @ 51"]),
+            ),
+            (
+                "c.md",
+                &workout(
+                    "2026-01-03",
+                    "",
+                    &["Bench\u{a0}Press 3 x 5 @ 52", "Benchpress 3 x 5 @ 99"],
+                ),
+            ),
+            (
+                "d.md",
+                &workout("2026-01-04", "", &["Bench Press 3 x 5 @ 53"]),
+            ),
+            ("e.md", &workout("2026-01-05", "", &["Éccart 3 x 5 @ 10"])),
+            ("f.md", &workout("2026-01-06", "", &["éCCART 3 x 5 @ 11"])),
+        ]);
+        let bench = f
+            .lifts
+            .iter()
+            .find(|l| l.name == "Bench Press")
+            .expect("bench");
+        assert_eq!(bench.sessions.len(), 4);
+        assert!(f.lifts.iter().any(|l| l.name == "Benchpress"));
+        let ecc = f.lifts.iter().find(|l| l.name == "éCCART").expect("accent");
+        assert_eq!(ecc.sessions.len(), 2);
+        assert_eq!(f.lifts.len(), 3);
+    }
+
+    #[test]
+    fn lifts_sort_by_session_count_then_name() {
+        let f = run(&[
+            (
+                "a.md",
+                &workout(
+                    "2026-01-01",
+                    "",
+                    &["Zed 3 x 5 @ 10", "Alpha 3 x 5 @ 10", "Mid 3 x 5 @ 10"],
+                ),
+            ),
+            (
+                "b.md",
+                &workout("2026-01-02", "", &["Zed 3 x 5 @ 11", "Beta 3 x 5 @ 10"]),
+            ),
+        ]);
+        let names: Vec<&str> = f.lifts.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, ["Zed", "Alpha", "Beta", "Mid"]);
+    }
+
+    #[test]
+    fn lines_without_a_weight_are_not_lifts() {
+        let f = run(&[(
+            "a.md",
+            &workout(
+                "2026-01-01",
+                "",
+                &[
+                    "Plank 3 x 60",
+                    "Run for time",
+                    "Squat 500 x 5 @ 100",
+                    "Zero 3 x 5 @ 0",
+                ],
+            ),
+        )]);
+        let names: Vec<&str> = f.lifts.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, ["Squat", "Zero"]);
+        assert_eq!(f.workouts[0].exercises.len(), 4);
+    }
+
+    #[test]
+    fn plan_with_wrong_types_is_an_error_not_a_plan() {
+        let f = run(&[
+            (
+                "Fitness/Plan.md",
+                "---\ntype: plan\nsteps_goal: lots\n---\n",
+            ),
+            ("Other/plan.md", "---\ntype: plan\nname: fallback\n---\n"),
+        ]);
+        // The broken standard plan is skipped; the other plan is used.
+        assert_eq!(f.plan.expect("plan").name.as_deref(), Some("fallback"));
+        assert_eq!(f.parse_errors, 1);
+        let f = run(&[(
+            "Fitness/Plan.md",
+            "---\ntype: plan\ntarget_weight: heavy\n---\n",
+        )]);
+        assert_eq!(f.plan, None);
+    }
+
+    #[test]
+    fn plan_spans_in_any_order_are_passed_through() {
+        let f = run(&[(
+            "Fitness/Plan.md",
+            "---\ntype: plan\nstart: 2026-03-01\nend: 2026-01-01\nsteps_goal: 0\nprotein_goal: -1\n---\n",
+        )]);
+        let plan = f.plan.expect("plan");
+        assert_eq!(plan.start.as_deref(), Some("2026-03-01"));
+        assert_eq!(plan.end.as_deref(), Some("2026-01-01"));
+        assert_eq!((plan.steps_goal, plan.protein_goal), (0, -1));
+    }
+
+    #[test]
+    fn non_finite_weights_still_serialise_to_json() {
+        let f = run(&[
+            (
+                "Fitness/Plan.md",
+                "---\ntype: plan\ntarget_weight: .inf\nstart_weight: .nan\n---\n",
+            ),
+            (
+                "Daily/a.md",
+                "---\ntype: daily\ndate: 2026-01-10\nweight: .nan\n---\n",
+            ),
+        ]);
+        let json = serde_json::to_string(&f).expect("serialises");
+        assert!(!json.contains("inf") && !json.contains("NaN"), "{json}");
+    }
+
+    #[test]
+    fn error_notes_outside_daily_and_fitness_are_not_counted() {
+        let f = run(&[
+            ("Daily/x/bad.md", "---\ntype: daily\nsteps: lots\n---\n"),
+            (
+                "Fitness/Log/bad.md",
+                "---\ntype: workout\ndeload: no thanks\n---\n",
+            ),
+            ("DailyNotes/bad.md", "---\ntype: daily\nsteps: lots\n---\n"),
+            (
+                "Archive/Daily/bad.md",
+                "---\ntype: daily\nsteps: lots\n---\n",
+            ),
+            ("Weekly/bad.md", "---\ntype: weekly\nweek: x\n---\n"),
+        ]);
+        assert_eq!(f.parse_errors, 2);
+    }
+
+    #[test]
+    fn huge_exercise_lists_and_lines_are_handled() {
+        let mut lines: Vec<String> = (0..2000)
+            .map(|i| format!("Lift{i} 3 x 5 @ {}", i % 900))
+            .collect();
+        lines.push(format!("{} 3 x 5 @ 10", "n".repeat(200_000)));
+        let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
+        let f = run(&[("a.md", &workout("2026-01-01", "", &refs))]);
+        assert_eq!(f.workouts[0].exercises.len(), 2001);
+        assert_eq!(f.lifts.len(), 2001);
+    }
+}
