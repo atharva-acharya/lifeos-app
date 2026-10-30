@@ -6,7 +6,10 @@ pub mod google;
 pub mod index;
 pub mod jobs;
 mod live;
+pub mod onboarding;
 pub mod projects;
+pub mod sample;
+mod sample_templates;
 pub mod settings;
 pub mod today;
 mod updates;
@@ -62,7 +65,14 @@ pub fn run() {
             commands::get_diagnostics,
             commands::set_auto_update,
             commands::check_for_update,
-            commands::install_update
+            commands::install_update,
+            commands::get_setup,
+            commands::skip_setup_item,
+            commands::unskip_setup_item,
+            commands::dismiss_setup,
+            commands::get_mode,
+            commands::enter_sample_mode,
+            commands::exit_sample_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while running Life OS");

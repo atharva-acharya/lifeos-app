@@ -19,6 +19,25 @@ pub struct Settings {
     /// switch it off in Settings).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_update: Option<bool>,
+    /// Which setup steps the owner skipped and whether the Today card was dismissed.
+    #[serde(default, skip_serializing_if = "Onboarding::is_default")]
+    pub onboarding: Onboarding,
+}
+
+/// First-run checklist choices kept in `settings.json`.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Onboarding {
+    #[serde(default)]
+    pub skipped: Vec<String>,
+    #[serde(default)]
+    pub dismissed: bool,
+}
+
+impl Onboarding {
+    fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -102,6 +121,10 @@ mod tests {
             vault_path: Some(PathBuf::from(r"D:\Notes\Life OS")),
             google: None,
             auto_update: Some(false),
+            onboarding: Onboarding {
+                skipped: vec!["plan".to_owned()],
+                dismissed: true,
+            },
         };
         save(dir.path(), &settings).expect("save");
         assert_eq!(load(dir.path()).expect("load"), settings);
