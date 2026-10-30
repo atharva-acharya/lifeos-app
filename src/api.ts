@@ -220,8 +220,9 @@ export function previewImport(
   csv: string,
   bank: string,
   mapping: ImportMapping | null,
+  account: string | null,
 ): Promise<ImportPreview> {
-  return invoke<ImportPreview>("preview_import", { csv, bank, mapping });
+  return invoke<ImportPreview>("preview_import", { csv, bank, mapping, account });
 }
 
 export function importCsv(

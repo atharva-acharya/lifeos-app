@@ -114,6 +114,7 @@ pub fn parse_csv(text: &str) -> Result<Vec<Vec<String>>, String> {
     let mut field = String::new();
     let mut quoted = false;
     let mut chars = text.chars().peekable();
+    let mut field_chars = 0usize;
     let push_field = |row: &mut Vec<String>, field: &mut String| -> Result<(), String> {
         if row.len() >= MAX_COLUMNS {
             return Err(format!("A row has more than {MAX_COLUMNS} columns."));
@@ -153,7 +154,9 @@ pub fn parse_csv(text: &str) -> Result<Vec<Vec<String>>, String> {
                 c => field.push(c),
             }
         }
-        if field.chars().count() > MAX_FIELD_CHARS {
+        // A running count: re-counting the field each time would be quadratic.
+        field_chars = if field.is_empty() { 0 } else { field_chars + 1 };
+        if field_chars > MAX_FIELD_CHARS {
             return Err("A field is longer than 1,000 characters.".into());
         }
     }
@@ -251,7 +254,8 @@ pub fn parse_date(text: &str, format: DateFormat) -> Option<String> {
     is_iso_date(&iso).then_some(iso)
 }
 
-/// Reads an unsigned or signed bank amount; brackets mean negative.
+/// Reads an unsigned or signed bank amount. Brackets and a `DR` suffix mean
+/// money out; a `CR` suffix means money in (any case, space optional).
 fn amount(text: &str) -> Option<i64> {
     let t = text.trim();
     if t.is_empty() {
@@ -260,11 +264,19 @@ fn amount(text: &str) -> Option<i64> {
     if let Some(inner) = t.strip_prefix('(').and_then(|r| r.strip_suffix(')')) {
         return parse_pence(inner).map(|p| -p.abs());
     }
-    let t = t.trim_end_matches(" CR").trim_end_matches(" DR");
+    let upper = t.to_ascii_uppercase();
+    if let Some(rest) = upper.strip_suffix("DR") {
+        return parse_pence(rest.trim_end()).map(|p| -p.abs());
+    }
+    if let Some(rest) = upper.strip_suffix("CR") {
+        return parse_pence(rest.trim_end()).map(i64::abs);
+    }
     parse_pence(t)
 }
 
-fn validate(mapping: &Mapping, headers: &[String]) -> Result<(), String> {
+/// Checks a mapping against the file's headers. A valid mapping only names
+/// real headers, so what is saved to settings is bounded by the file's caps.
+pub fn validate(mapping: &Mapping, headers: &[String]) -> Result<(), String> {
     let has = |h: &str| headers.iter().any(|x| x == h);
     if !has(&mapping.date) {
         return Err("Choose the date column.".into());
@@ -294,21 +306,30 @@ fn validate(mapping: &Mapping, headers: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn key(date: &str, amount: i64, description: &str) -> (String, i64, String) {
-    (date.to_owned(), amount, cell(description).to_lowercase())
+type Key = (String, i64, String, String);
+
+fn key(date: &str, amount: i64, description: &str, account: &str) -> Key {
+    (
+        date.to_owned(),
+        amount,
+        cell(description).to_lowercase(),
+        cell(account).to_lowercase(),
+    )
 }
 
-/// How many times each (date, amount, description) is already in the ledger.
-fn existing(index: &Index) -> rusqlite::Result<HashMap<(String, i64, String), usize>> {
+/// How many times each (date, amount, description, account) is already in
+/// the ledger. The account keeps the same purchase at two banks apart.
+fn existing(index: &Index) -> rusqlite::Result<HashMap<Key, usize>> {
     let mut seen = HashMap::new();
     let mut stmt = index
         .conn()
-        .prepare("SELECT date, amount, description FROM ledger")?;
+        .prepare("SELECT date, amount, description, COALESCE(account, '') FROM ledger")?;
     let rows = stmt.query_map(params![], |r| {
         Ok(key(
             &r.get::<_, String>(0)?,
             r.get(1)?,
             &r.get::<_, String>(2)?,
+            &r.get::<_, String>(3)?,
         ))
     })?;
     for k in rows {
@@ -318,18 +339,30 @@ fn existing(index: &Index) -> rusqlite::Result<HashMap<(String, i64, String), us
 }
 
 /// Parses `csv` with `mapping` (or the bank's saved one, or a guess) and
-/// marks each row new, duplicate or error.
+/// marks each row new, duplicate or error. `account` is what the rows will
+/// be saved under; duplicates are matched within that account.
 pub fn preview(
     index: &Index,
     csv: &str,
     mapping: Option<Mapping>,
     saved: Option<&Mapping>,
+    account: &str,
 ) -> Result<Preview, String> {
     let mut rows = parse_csv(csv)?;
     if rows.is_empty() {
         return Err("The file is empty.".into());
     }
     let headers = rows.remove(0);
+    if headers.iter().any(String::is_empty) {
+        return Err("Every column needs a heading in the first row.".into());
+    }
+    if let Some(h) = headers
+        .iter()
+        .enumerate()
+        .find_map(|(i, h)| headers[..i].contains(h).then_some(h))
+    {
+        return Err(format!("Two columns are called \"{h}\"; rename one."));
+    }
     let (mapping, from_settings) = match (mapping, saved) {
         (Some(m), _) => (m, false),
         (None, Some(s)) if validate(s, &headers).is_ok() => (s.clone(), true),
@@ -385,7 +418,7 @@ pub fn preview(
             };
             let status = match (&error, &date, value) {
                 (Some(_), _, _) => RowStatus::Error,
-                (None, Some(d), Some(v)) => match seen.get_mut(&key(d, v, &description)) {
+                (None, Some(d), Some(v)) => match seen.get_mut(&key(d, v, &description, account)) {
                     Some(n) if *n > 0 => {
                         *n -= 1;
                         RowStatus::Duplicate
@@ -419,13 +452,14 @@ pub fn preview(
 }
 
 /// Writes every new row of `preview` to its month's ledger note, one write
-/// per month. Returns the result and each write's record for the log.
+/// per month, under `account`. Returns each write made for the log, even
+/// when a later month fails, so the caller can log and re-index them.
 pub fn import(
     vault: &Path,
     preview: &Preview,
-    account: Option<&str>,
-) -> Result<(ImportResult, Vec<(String, WriteRecord)>), String> {
-    let account = account.map(cell).unwrap_or_default();
+    account: &str,
+) -> (Vec<(String, WriteRecord)>, Result<ImportResult, String>) {
+    let account = cell(account);
     let mut by_month: BTreeMap<String, Vec<Vec<Value<'static>>>> = BTreeMap::new();
     for c in preview.rows.iter().filter(|c| c.status == RowStatus::New) {
         let (Some(date), Some(amount)) = (&c.date, c.amount) else {
@@ -444,27 +478,31 @@ pub fn import(
     for (month, rows) in &by_month {
         let rel = format!("Money/Ledger/{month}.md");
         let front = format!("type: ledger\nmonth: {month}");
-        let record =
-            write::append_rows(vault, &rel, &front, LEDGER_COLUMNS, rows).map_err(|e| {
+        match write::append_rows(vault, &rel, &front, LEDGER_COLUMNS, rows) {
+            Ok(record) => {
+                imported += rows.len();
+                records.push((rel, record));
+            }
+            Err(e) => {
                 let done = if imported > 0 {
                     format!(" {imported} rows were saved before this; importing again skips them.")
                 } else {
                     String::new()
                 };
-                format!("Could not save {rel}: {e}.{done}")
-            })?;
-        imported += rows.len();
-        records.push((rel, record));
+                return (records, Err(format!("Could not save {rel}: {e}.{done}")));
+            }
+        }
     }
-    Ok((
-        ImportResult {
+    let files = records.iter().map(|(r, _)| r.clone()).collect();
+    (
+        records,
+        Ok(ImportResult {
             imported,
             duplicates: preview.duplicates,
             errors: preview.errors,
-            files: records.iter().map(|(r, _)| r.clone()).collect(),
-        },
-        records,
-    ))
+            files,
+        }),
+    )
 }
 
 /// Cleans a bank name for use as a settings key.
@@ -536,7 +574,31 @@ mod tests {
         }
         assert_eq!(amount("(12.50)"), Some(-1250));
         assert_eq!(amount("£1,200.00"), Some(120_000));
+        assert_eq!(amount("12.50 DR"), Some(-1250));
+        assert_eq!(amount("12.50dr"), Some(-1250));
+        assert_eq!(amount("40.00 CR"), Some(4000));
         assert_eq!(amount(""), None);
+    }
+
+    #[test]
+    fn headers_must_be_named_and_unique() {
+        let index = Index::open_in_memory().expect("index");
+        for (csv, expected) in [
+            ("Date,,Amount\n", "Every column needs a heading"),
+            ("Date,Amount,Amount\n", "Two columns are called \"Amount\""),
+            ("", "The file is empty."),
+        ] {
+            let err = preview(&index, csv, None, None, "").expect_err(csv);
+            assert!(err.starts_with(expected), "{err}");
+        }
+    }
+
+    #[test]
+    fn a_huge_field_is_refused_quickly() {
+        let csv = format!("a\n\"{}\"\n", "x".repeat(MAX_CSV_BYTES - 10));
+        let start = std::time::Instant::now();
+        assert!(parse_csv(&csv).is_err());
+        assert!(start.elapsed() < std::time::Duration::from_secs(1));
     }
 
     #[test]
@@ -568,7 +630,7 @@ mod tests {
     #[test]
     fn preview_then_import_then_reimport_adds_nothing() {
         let (_dir, root, mut index) = vault();
-        let p = preview(&index, STATEMENT, None, None).expect("preview");
+        let p = preview(&index, STATEMENT, None, None, "Current").expect("preview");
         assert_eq!((p.new, p.duplicates, p.errors), (4, 0, 2));
         assert_eq!(p.rows[0].amount, Some(-1250));
         assert_eq!(p.rows[1].amount, Some(240_000));
@@ -577,7 +639,8 @@ mod tests {
         assert_eq!(p.rows[5].error.as_deref(), Some("Date not recognised"));
         assert_eq!(p.rows[5].line, 7, "rows are numbered without blank lines");
 
-        let (result, records) = import(&root, &p, Some("Current")).expect("import");
+        let (records, result) = import(&root, &p, "Current");
+        let result = result.expect("import");
         assert_eq!(result.imported, 4);
         assert_eq!(result.files, vec!["Money/Ledger/2026-10.md"]);
         assert_eq!(records.len(), 1);
@@ -590,10 +653,30 @@ mod tests {
         );
 
         index.sync(&root).expect("sync");
-        let again = preview(&index, STATEMENT, Some(p.mapping.clone()), None).expect("again");
+        let again =
+            preview(&index, STATEMENT, Some(p.mapping.clone()), None, "current").expect("again");
         assert_eq!((again.new, again.duplicates), (0, 4));
-        let (result, _) = import(&root, &again, None).expect("noop");
-        assert_eq!(result.imported, 0);
+        let (records, result) = import(&root, &again, "Current");
+        assert_eq!(result.expect("noop").imported, 0);
+        assert!(records.is_empty());
+
+        let other = preview(&index, STATEMENT, Some(p.mapping), None, "Savings").expect("other");
+        assert_eq!(
+            other.new, 4,
+            "the same rows at another account are not duplicates"
+        );
+    }
+
+    #[test]
+    fn a_failed_month_still_reports_the_months_written() {
+        let (_dir, root, index) = vault();
+        let csv = "Date,Description,Amount\n01/09/2026,A,-1\n01/10/2026,B,-2\n";
+        let p = preview(&index, csv, None, None, "").expect("preview");
+        fs::create_dir_all(root.join("Money/Ledger/2026-10.md")).expect("block October");
+        let (records, result) = import(&root, &p, "");
+        assert_eq!(records.len(), 1, "September was written");
+        let err = result.expect_err("October fails");
+        assert!(err.contains("1 rows were saved before this"), "{err}");
     }
 
     #[test]
@@ -611,7 +694,7 @@ mod tests {
             category: Some("Type".into()),
             flip_sign: true,
         };
-        let p = preview(&index, csv, None, Some(&mapping)).expect("preview");
+        let p = preview(&index, csv, None, Some(&mapping), "").expect("preview");
         assert!(p.saved);
         assert_eq!(p.rows[0].amount, Some(-1200));
         assert_eq!(p.rows[1].amount, Some(500));
@@ -619,7 +702,7 @@ mod tests {
 
         let mut wrong = mapping.clone();
         wrong.description = "Missing".into();
-        let p = preview(&index, csv, Some(wrong), None).expect("preview");
+        let p = preview(&index, csv, Some(wrong), None, "").expect("preview");
         assert_eq!(p.errors, 2, "a bad mapping marks every row");
         assert_eq!(
             p.rows[0].error.as_deref(),
@@ -633,6 +716,7 @@ mod tests {
                 date: "Nope".into(),
                 ..mapping
             }),
+            "",
         )
         .expect("p");
         assert!(

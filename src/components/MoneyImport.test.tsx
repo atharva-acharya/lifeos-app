@@ -97,6 +97,7 @@ describe("MoneyImport", () => {
       csv: CSV,
       bank: "Example Bank",
       mapping: null,
+      account: null,
     });
 
     fireEvent.change(screen.getByLabelText("Date format"), { target: { value: "mdy" } });
@@ -104,6 +105,7 @@ describe("MoneyImport", () => {
       csv: CSV,
       bank: "Example Bank",
       mapping: { ...PREVIEW.mapping, dateFormat: "mdy" },
+      account: null,
     });
 
     const importButton = await screen.findByRole("button", { name: "Import 1 new row" });

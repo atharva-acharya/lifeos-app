@@ -152,7 +152,7 @@ test("Money imports a bank CSV once and skips it the second time", async () => {
       'Date,Description,Paid out,Paid in\r\n15/01/2026,"Corner Grocer, Leeds",12.50,\r\n16/01/2026,Example payroll,,2400.00\r\n',
     ),
   };
-  await page.getByLabel("Bank").fill("Example Bank");
+  await page.getByLabel("Bank", { exact: true }).fill("Example Bank");
   await page.getByLabel("CSV file").setInputFiles(csv);
   await expect(page.getByRole("list", { name: "Import summary" })).toContainText("2 new");
   await page.getByRole("button", { name: "Import 2 new rows" }).click();

@@ -80,7 +80,7 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
     }
     setBusy(true);
     setMessage(null);
-    previewImport(text, bank, mapping)
+    previewImport(text, bank, mapping, account.trim() || null)
       .then(setPreview)
       .catch((err: unknown) => {
         setPreview(null);
@@ -171,6 +171,10 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
             value={account}
             onChange={(e) => {
               setAccount(e.target.value);
+            }}
+            onBlur={() => {
+              // Duplicates are matched within the account, so check again.
+              if (file && preview) runPreview(file.text, preview.mapping);
             }}
           />
         </label>
@@ -271,7 +275,7 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
             </label>
           </div>
 
-          <ul className="counts" aria-label="Import summary">
+          <ul className="counts" aria-label="Import summary" aria-live="polite">
             <li>
               <strong>{preview.new}</strong> new
             </li>
@@ -284,6 +288,7 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
           </ul>
 
           <table className="table">
+            <caption className="sr-only">Preview of {file?.name}</caption>
             <thead>
               <tr>
                 <th scope="col">Row</th>
