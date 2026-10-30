@@ -34,6 +34,8 @@ pub enum SampleError {
     Guard(#[from] GuardError),
     #[error("could not write the sample data: {0}")]
     Io(String),
+    #[error("the sample folder goes through a link or junction")]
+    Link,
     #[error("sample index error: {0}")]
     Index(String),
 }
@@ -207,15 +209,46 @@ pub fn write_vault(data_dir: &Path, today: &str) -> Result<PathBuf, SampleError>
     cleanup(data_dir)?;
     let root = vault_dir(data_dir);
     fs::create_dir_all(&root)?;
+    refuse_link(&sample_dir(data_dir))?;
+    write_notes(&root, &notes)?;
+    Ok(root)
+}
+
+/// Refuses a link, junction or other reparse point at `path`.
+fn refuse_link(path: &Path) -> Result<(), SampleError> {
+    let meta = fs::symlink_metadata(path)?;
+    if meta.file_type().is_symlink() || guard::is_reparse_point(&meta) {
+        return Err(SampleError::Link);
+    }
+    Ok(())
+}
+
+/// Writes each note under `root`, creating folders as needed. Every folder on
+/// the way is checked for links after it is created, and files are created
+/// new, so nothing already there (or planted meanwhile) is followed or
+/// overwritten.
+fn write_notes(root: &Path, notes: &[(String, String)]) -> Result<(), SampleError> {
+    use std::io::Write;
+
+    refuse_link(root)?;
     for (rel, text) in notes {
-        let path = guard::check_relative(&rel)?;
-        let dest = root.join(path);
+        let path = guard::check_relative(rel)?;
+        let dest = root.join(&path);
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
+            let mut current = root.to_path_buf();
+            for part in parent.strip_prefix(root).unwrap_or(parent).components() {
+                current.push(part);
+                refuse_link(&current)?;
+            }
         }
-        fs::write(dest, text)?;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&dest)?;
+        file.write_all(text.as_bytes())?;
     }
-    Ok(root)
+    Ok(())
 }
 
 /// Writes the demo vault and indexes it into the separate sample index.
@@ -365,6 +398,72 @@ mod tests {
         assert!(!real.exists());
         assert!(!vault_dir(dir.path()).starts_with(dir.path().join("Daily")));
         drop(index);
+    }
+
+    #[test]
+    fn existing_files_are_never_overwritten() {
+        let dir = tempfile::tempdir().expect("dir");
+        let notes = vec![("Daily/a.md".to_owned(), "new".to_owned())];
+        fs::create_dir_all(dir.path().join("Daily")).expect("mkdir");
+        fs::write(dir.path().join("Daily/a.md"), "old").expect("seed");
+        assert!(matches!(
+            write_notes(dir.path(), &notes),
+            Err(SampleError::Io(_))
+        ));
+        assert_eq!(
+            fs::read_to_string(dir.path().join("Daily/a.md")).expect("read"),
+            "old"
+        );
+    }
+
+    #[test]
+    fn bad_paths_are_refused_before_writing() {
+        let dir = tempfile::tempdir().expect("dir");
+        let notes = vec![("../escape.md".to_owned(), "x".to_owned())];
+        assert!(matches!(
+            write_notes(dir.path(), &notes),
+            Err(SampleError::Guard(_))
+        ));
+        assert!(!dir.path().join("../escape.md").exists());
+    }
+
+    /// Makes `link` point at `target` (a junction on Windows, else a symlink).
+    fn make_link(target: &Path, link: &Path) {
+        #[cfg(windows)]
+        {
+            let out = std::process::Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(link)
+                .arg(target)
+                .output()
+                .expect("run mklink");
+            assert!(out.status.success(), "mklink failed");
+        }
+        #[cfg(not(windows))]
+        std::os::unix::fs::symlink(target, link).expect("symlink");
+    }
+
+    #[test]
+    fn a_planted_link_inside_the_vault_is_refused() {
+        let dir = tempfile::tempdir().expect("dir");
+        let outside = tempfile::tempdir().expect("outside");
+        let root = dir.path().join("vault");
+        fs::create_dir_all(&root).expect("root");
+        make_link(outside.path(), &root.join("Daily"));
+        let notes = vec![("Daily/a.md".to_owned(), "x".to_owned())];
+        assert_eq!(write_notes(&root, &notes), Err(SampleError::Link));
+        assert!(!outside.path().join("a.md").exists());
+    }
+
+    #[test]
+    fn a_link_as_the_vault_root_is_refused() {
+        let dir = tempfile::tempdir().expect("dir");
+        let outside = tempfile::tempdir().expect("outside");
+        let root = dir.path().join("vault");
+        make_link(outside.path(), &root);
+        let notes = vec![("a.md".to_owned(), "x".to_owned())];
+        assert_eq!(write_notes(&root, &notes), Err(SampleError::Link));
+        assert!(!outside.path().join("a.md").exists());
     }
 
     #[test]

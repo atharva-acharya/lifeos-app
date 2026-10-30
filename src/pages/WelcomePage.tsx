@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { chooseVaultFolder, enterSampleMode, type AppSettings } from "../api";
-import { setMode } from "../mode";
+import { setMode, trackSwitch, useSwitching } from "../mode";
 
 function message(err: unknown, fallback: string): string {
   return typeof err === "string" ? err : fallback;
@@ -14,13 +14,14 @@ export function WelcomePage({
   onChosen: (settings: AppSettings) => void;
   onSkip: () => void;
 }) {
+  const switching = useSwitching();
   const [busy, setBusy] = useState<"choosing" | "sample" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const choose = () => {
     setBusy("choosing");
     setError(null);
-    chooseVaultFolder()
+    trackSwitch(chooseVaultFolder())
       .then((s) => {
         if (s.vaultPath) onChosen(s);
       })
@@ -35,7 +36,7 @@ export function WelcomePage({
   const sample = () => {
     setBusy("sample");
     setError(null);
-    enterSampleMode()
+    trackSwitch(enterSampleMode())
       .then(setMode)
       .catch((err: unknown) => {
         setError(message(err, "Sample data could not be opened."));
@@ -64,19 +65,29 @@ export function WelcomePage({
           </p>
         )}
         <div className="welcome__actions">
-          <button type="button" className="button" disabled={busy !== null} onClick={choose}>
+          <button
+            type="button"
+            className="button"
+            disabled={busy !== null || switching}
+            onClick={choose}
+          >
             {busy === "choosing" ? "Choosing…" : "Choose vault folder"}
           </button>
           <button
             type="button"
             className="button button--quiet"
-            disabled={busy !== null}
+            disabled={busy !== null || switching}
             onClick={sample}
           >
             Try with sample data
           </button>
         </div>
-        <button type="button" className="welcome__skip" disabled={busy !== null} onClick={onSkip}>
+        <button
+          type="button"
+          className="welcome__skip"
+          disabled={busy !== null || switching}
+          onClick={onSkip}
+        >
           Skip for now
         </button>
       </div>

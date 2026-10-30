@@ -49,11 +49,15 @@ struct Inner {
 }
 
 #[derive(Default)]
-pub struct LiveState(Mutex<Inner>);
+pub struct LiveState {
+    inner: Mutex<Inner>,
+    /// Held for the whole of entering, leaving or choosing a vault, so those never interleave.
+    switch: tauri::async_runtime::Mutex<()>,
+}
 
 impl LiveState {
     fn lock(&self) -> MutexGuard<'_, Inner> {
-        self.0
+        self.inner
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
@@ -91,6 +95,22 @@ impl LiveState {
     /// The synthetic applications copy while sample data is on.
     pub fn sample_applications(&self) -> Option<Cache> {
         self.lock().sample_applications.clone()
+    }
+
+    /// Serialises enter, exit and choose-folder; hold the guard for the whole call.
+    pub async fn switching(&self) -> impl Send + '_ {
+        self.switch.lock().await
+    }
+
+    /// Closes the sample index ahead of a rebuild but stays in sample mode,
+    /// so guarded commands keep refusing and the real vault is not reopened
+    /// half-way. Files are not touched.
+    pub fn begin_rebuild(&self) {
+        let mut inner = self.lock();
+        if inner.mode == Mode::Sample {
+            inner.live = None;
+            inner.sample_applications = None;
+        }
     }
 
     /// Closes the open index and returns to real mode. Files are not touched.
@@ -182,6 +202,13 @@ mod tests {
         assert_eq!(state.mode(), Mode::Sample);
         assert_eq!(state.require_real(), Err(SAMPLE_REFUSED.to_owned()));
         assert!(state.with_index(|_| ()).is_some());
+
+        // A rebuild closes the index but keeps refusing like sample mode.
+        state.begin_rebuild();
+        assert_eq!(state.mode(), Mode::Sample);
+        assert!(state.with_index(|_| ()).is_none());
+        assert!(state.sample_applications().is_none());
+        assert_eq!(state.require_real(), Err(SAMPLE_REFUSED.to_owned()));
 
         state.clear();
         assert_eq!(state.mode(), Mode::Real);

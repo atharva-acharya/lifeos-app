@@ -35,6 +35,17 @@ pub fn run() {
                     default(info);
                 }));
             }
+            // Leftovers from a crash or a failed cleanup; the app always starts in real mode.
+            if let Ok(dir) = commands::cache_dir(app.handle())
+                && let Err(e) = sample::cleanup(&dir)
+            {
+                let _ = diagnostics::append(
+                    &dir,
+                    applications::now_ms(),
+                    "sample",
+                    &format!("could not remove old sample data: {e}"),
+                );
+            }
             let handle = app.handle().clone();
             // Index in the background so the window appears at once.
             std::thread::spawn(move || {

@@ -5,7 +5,7 @@ import { GoogleSettings } from "../components/GoogleSettings";
 import { SetupChecklist } from "../components/SetupChecklist";
 import { UpdateSettings } from "../components/UpdateSettings";
 import type { GuideId } from "../guides";
-import { useMode } from "../mode";
+import { trackSwitch, useMode } from "../mode";
 
 type Status = "loading" | "ready" | "choosing";
 
@@ -39,7 +39,7 @@ export function SettingsPage({ openGuide = null }: { openGuide?: GuideId | null 
   const choose = () => {
     setStatus("choosing");
     setError(null);
-    chooseVaultFolder()
+    trackSwitch(chooseVaultFolder())
       .then(setSettings)
       .catch((err: unknown) => {
         setError(message(err));

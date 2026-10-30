@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { enterSampleMode } from "../api";
 import type { GuideId } from "../guides";
-import { setMode } from "../mode";
+import { setMode, trackSwitch, useSwitching } from "../mode";
 import type { Navigate } from "../routes";
 
 /** The "Not connected" card: open settings, or look around with sample data. */
@@ -16,13 +16,14 @@ export function NotConnected({
   guide?: GuideId;
   pill?: string;
 }) {
+  const switching = useSwitching();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const trySample = () => {
     setBusy(true);
     setError(null);
-    enterSampleMode()
+    trackSwitch(enterSampleMode())
       .then(setMode)
       .catch((err: unknown) => {
         setError(typeof err === "string" ? err : "Sample data could not be opened.");
@@ -45,7 +46,12 @@ export function NotConnected({
         >
           Open settings
         </button>
-        <button type="button" className="button button--quiet" disabled={busy} onClick={trySample}>
+        <button
+          type="button"
+          className="button button--quiet"
+          disabled={busy || switching}
+          onClick={trySample}
+        >
           Try with sample data
         </button>
       </div>

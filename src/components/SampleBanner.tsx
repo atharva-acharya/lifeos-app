@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { exitSampleMode, getSettings } from "../api";
-import { setMode } from "../mode";
+import { setMode, trackSwitch, useSwitching } from "../mode";
 
 /** Shown on every page while sample data is on. */
 export function SampleBanner({ onLeft }: { onLeft: (vaultPath: string | null) => void }) {
+  const switching = useSwitching();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const leave = () => {
     setBusy(true);
     setError(null);
-    exitSampleMode()
+    trackSwitch(exitSampleMode())
       .then((m) => getSettings().then((s) => ({ m, s })))
       .then(({ m, s }) => {
         // Both updates land together, so there is no flash of the wrong screen.
@@ -32,7 +33,7 @@ export function SampleBanner({ onLeft }: { onLeft: (vaultPath: string | null) =>
           {error}
         </span>
       )}
-      <button type="button" className="button" disabled={busy} onClick={leave}>
+      <button type="button" className="button" disabled={busy || switching} onClick={leave}>
         Leave sample data
       </button>
     </aside>

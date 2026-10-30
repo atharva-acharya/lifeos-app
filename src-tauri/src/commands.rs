@@ -89,9 +89,10 @@ pub async fn choose_vault_folder(
     app: AppHandle,
     state: tauri::State<'_, LiveState>,
 ) -> Result<SettingsView, String> {
-    // Choosing a real folder leaves sample data first.
+    let _switching = state.switching().await;
+    // Choosing a real folder leaves sample data first. Leaving never fails.
     if state.mode() == Mode::Sample {
-        leave_sample(&app, &state)?;
+        leave_sample(&app, &state);
     }
     let dir = config_dir(&app)?;
     let picked = tauri::async_runtime::spawn_blocking(|| {
@@ -206,6 +207,8 @@ pub async fn connect_google(
     state.require_real()?;
     let config = google_config(&app)?;
     google::connect(&config).await.map_err(|e| e.to_string())?;
+    // Sample data may have been turned on while the browser sign-in was open.
+    state.require_real()?;
     get_settings(app)
 }
 
@@ -262,12 +265,13 @@ pub fn get_applications(
     app: AppHandle,
     state: tauri::State<'_, LiveState>,
 ) -> Result<ApplicationsView, String> {
-    // Sample data brings its own synthetic copy; the real cache and Google are not read.
-    if let Some(cache) = state.sample_applications() {
+    // Sample data brings its own in-memory synthetic copy; the real cache and
+    // Google are never read (the copy is briefly absent while a rebuild runs).
+    if state.mode() == Mode::Sample {
         return Ok(ApplicationsView {
             configured: false,
             connected: false,
-            cache: Some(cache),
+            cache: state.sample_applications(),
             error: None,
         });
     }
@@ -286,7 +290,11 @@ pub async fn refresh_applications(
         Ok(c) => c,
         Err(e) => return applications_view(&app, Some(e)),
     };
-    let error = match google::fetch_sheet(&config).await {
+    let fetched = google::fetch_sheet(&config).await;
+    // Sample data may have been turned on during the fetch: write nothing and
+    // never hand real rows to a UI that is showing sample data.
+    state.require_real()?;
+    let error = match fetched {
         Ok(rows) => {
             let (rows, missing_columns) = applications::from_rows(&rows);
             let cache = Cache {
@@ -427,6 +435,10 @@ fn setup_view(app: &AppHandle, state: &LiveState) -> Result<Setup, String> {
     let dir = config_dir(app)?;
     let current = settings::load(&dir).map_err(|e| e.to_string())?;
     let connected = google::is_connected();
+    // In sample mode the demo index must not colour the owner's checklist.
+    if state.mode() == Mode::Sample {
+        return Ok(onboarding::compute(&current, connected, None));
+    }
     Ok(state
         .with_index(|index| onboarding::compute(&current, connected, Some(index)))
         .unwrap_or_else(|| onboarding::compute(&current, connected, None)))
@@ -493,26 +505,47 @@ pub async fn enter_sample_mode(
     state: tauri::State<'_, LiveState>,
     date: String,
 ) -> Result<Mode, String> {
+    let _switching = state.switching().await;
     sample::parse_date(&date).map_err(|e| e.to_string())?;
     let data = cache_dir(&app)?;
-    if state.mode() == Mode::Sample {
-        // Close the old sample index before its files are rebuilt.
-        state.clear();
+    // Already in sample mode: close the old index but keep refusing like
+    // sample mode while the files are rebuilt (never pass through real mode).
+    state.begin_rebuild();
+    let built = sample::applications(&date)
+        .and_then(|apps| sample::build(&data, &date).map(|(v, i)| (v, i, apps)));
+    match built {
+        Ok((vault, index, applications)) => {
+            state.install_sample(vault, index, applications);
+            let _ = app.emit(live::INDEX_UPDATED, ());
+            Ok(Mode::Sample)
+        }
+        Err(e) => {
+            // Back to the owner's own profile, with the real vault reopened.
+            leave_sample(&app, &state);
+            Err(e.to_string())
+        }
     }
-    let applications = sample::applications(&date).map_err(|e| e.to_string())?;
-    let (vault, index) = sample::build(&data, &date).map_err(|e| e.to_string())?;
-    state.install_sample(vault, index, applications);
-    let _ = app.emit(live::INDEX_UPDATED, ());
-    Ok(Mode::Sample)
 }
 
 /// Closes sample mode: drops the sample index, deletes the sample folder and
 /// reopens the owner's vault if one is set.
-fn leave_sample(app: &AppHandle, state: &LiveState) -> Result<(), String> {
+/// Never fails: a cleanup problem is logged and the real vault is reopened
+/// regardless (leftovers are removed again at the next start).
+fn leave_sample(app: &AppHandle, state: &LiveState) {
     state.clear();
-    sample::cleanup(&cache_dir(app)?).map_err(|e| e.to_string())?;
-    let vault = settings::load(&config_dir(app)?)
+    if let Ok(dir) = cache_dir(app)
+        && let Err(e) = sample::cleanup(&dir)
+    {
+        let _ = diagnostics::append(
+            &dir,
+            applications::now_ms(),
+            "sample",
+            &format!("could not remove the sample data: {e}"),
+        );
+    }
+    let vault = config_dir(app)
         .ok()
+        .and_then(|dir| settings::load(&dir).ok())
         .and_then(|s| s.vault_path)
         .filter(|p| settings::validate_vault(p).is_ok());
     if let Some(vault) = vault {
@@ -520,7 +553,6 @@ fn leave_sample(app: &AppHandle, state: &LiveState) -> Result<(), String> {
         // the owner in sample mode.
         let _ = live::start(app, &vault);
     }
-    Ok(())
 }
 
 #[tauri::command]
@@ -528,6 +560,7 @@ pub async fn exit_sample_mode(
     app: AppHandle,
     state: tauri::State<'_, LiveState>,
 ) -> Result<Mode, String> {
-    leave_sample(&app, &state)?;
+    let _switching = state.switching().await;
+    leave_sample(&app, &state);
     Ok(Mode::Real)
 }
