@@ -347,7 +347,7 @@ pub fn last_log(body: &str) -> Option<String> {
                 .strip_prefix("- ")
                 .or_else(|| trimmed.strip_prefix("* "))
         {
-            last = Some(item.trim().to_owned());
+            last = Some(clip(item.trim()));
         }
     }
     last
