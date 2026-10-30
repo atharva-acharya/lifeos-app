@@ -4,8 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Daily: CodeQL for Rust runs on PRs but is not a required check (it is the
+  # slowest job), so main is rescanned every day and releases wait for it.
   schedule:
-    - cron: "17 6 * * 1"
+    - cron: "17 6 * * *"
 
 permissions:
   contents: read
