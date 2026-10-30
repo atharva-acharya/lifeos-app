@@ -151,6 +151,22 @@ export interface Money {
   hasLedger: boolean;
   hasBudgets: boolean;
   parseErrors: number;
+  /** Six months ending with `month`, oldest first. */
+  trend: MonthTotals[];
+}
+
+export interface CategoryAmount {
+  category: string;
+  /** Positive pence. */
+  spent: number;
+}
+
+export interface MonthTotals {
+  month: string;
+  income: number;
+  spent: number;
+  spending: CategoryAmount[];
+  incomeBySource: CategoryAmount[];
 }
 
 export type MoneyResponse = { status: "noVault" } | { status: "ready"; money: Money };

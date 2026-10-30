@@ -1296,6 +1296,14 @@ a.button {
   color: var(--c-done);
 }
 
+.money__up {
+  color: var(--c-danger);
+}
+
+.money__trends h3 {
+  margin: var(--space-3) 0 0;
+}
+
 /* Darkened from the accent so white text stays AA (about 6:1). */
 .button--primary {
   background: color-mix(in srgb, var(--accent) 75%, #000);

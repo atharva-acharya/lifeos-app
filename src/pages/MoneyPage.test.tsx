@@ -39,6 +39,7 @@ const MONEY: Money = {
   hasLedger: true,
   hasBudgets: true,
   parseErrors: 0,
+  trend: [],
 };
 
 afterEach(() => {
