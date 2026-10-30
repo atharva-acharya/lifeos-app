@@ -1,6 +1,7 @@
 import type { HealthGoals, HealthRingsDay } from "../api";
 import { shortLabel } from "../fitnessStats";
 import { sleepHours } from "../healthStats";
+import { EmptyHint } from "./EmptyHint";
 import { Rings, type Ring } from "./Rings";
 
 /** Today's rings (or the latest day that has data) against the daily goals. */
@@ -36,7 +37,9 @@ export function HealthToday({ day, goals }: { day: HealthRingsDay | null; goals:
         {day === null || day.isToday ? "Today" : `Latest: ${shortLabel(day.date)}`}
       </h2>
       {day === null ? (
-        <p className="muted">No steps, energy or sleep in the exports yet.</p>
+        <EmptyHint lead="No steps, energy or sleep in the exports yet.">
+          Turn on Step Count, Active Energy and Sleep Analysis in Health Auto Export.
+        </EmptyHint>
       ) : (
         <div className="fitness__week">
           <Rings rings={rings} />

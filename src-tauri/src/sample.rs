@@ -20,6 +20,7 @@ use crate::vault::note::is_iso_date;
 const MAX_OFFSET: i64 = 3650;
 const SAMPLE_DIR: &str = "sample";
 const VAULT_DIR: &str = "vault";
+const HEALTH_DIR: &str = "health";
 pub const INDEX_FILE: &str = "index-sample.db";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -251,9 +252,116 @@ fn write_notes(root: &Path, notes: &[(String, String)]) -> Result<(), SampleErro
     Ok(())
 }
 
+/// The synthetic Health export folder, next to the demo vault.
+pub fn health_dir(data_dir: &Path) -> PathBuf {
+    sample_dir(data_dir).join(HEALTH_DIR)
+}
+
+/// One synthetic Health Auto Export file: 90 days of readings ending today,
+/// a weight every week and an outdoor run every fifth day. Pure arithmetic on
+/// the day number, so the same date always gives the same data.
+fn health_export(today: i64) -> serde_json::Value {
+    use serde_json::json;
+
+    let stamp = |age: i64, time: &str| format!("{} {time} +0000", iso(today - age));
+    let ages = || 0..90_i64;
+    let wobble = |age: i64, modulus: i64| (age * 37 + 11).rem_euclid(modulus);
+    let points = |value: &dyn Fn(i64) -> serde_json::Value| -> Vec<serde_json::Value> {
+        ages()
+            .map(|age| {
+                let mut point = value(age);
+                point["date"] = json!(stamp(age, "00:00:00"));
+                point
+            })
+            .collect()
+    };
+    let weights: Vec<serde_json::Value> = ages()
+        .filter(|age| age % 7 == 0)
+        .map(|age| json!({ "date": stamp(age, "06:30:00"), "qty": 82.0 - 0.1 * (90 - age) as f64 / 7.0 }))
+        .collect();
+    let workouts: Vec<serde_json::Value> = ages()
+        .filter(|age| age % 5 == 1)
+        .map(|age| {
+            json!({
+                "id": format!("sample-run-{age}"),
+                "name": "Outdoor Run",
+                "start": stamp(age, "07:00:00"),
+                "end": stamp(age, "07:30:00"),
+                "duration": 1800,
+                "activeEnergyBurned": { "qty": 280 + wobble(age, 60), "units": "kcal" },
+                "distance": { "qty": 4.5 + wobble(age, 20) as f64 / 10.0, "units": "km" },
+            })
+        })
+        .collect();
+    json!({
+        "data": {
+            "metrics": [
+                {
+                    "name": "step_count",
+                    "units": "count",
+                    "data": points(&|age| json!({ "qty": 5500 + wobble(age, 5000) })),
+                },
+                {
+                    "name": "active_energy",
+                    "units": "kcal",
+                    "data": points(&|age| json!({ "qty": 300 + wobble(age, 350) })),
+                },
+                {
+                    "name": "resting_heart_rate",
+                    "units": "count/min",
+                    "data": points(&|age| json!({ "qty": 50 + wobble(age, 6) })),
+                },
+                {
+                    "name": "heart_rate_variability",
+                    "units": "ms",
+                    "data": points(&|age| json!({ "qty": 38 + wobble(age, 14) })),
+                },
+                {
+                    "name": "weight_body_mass",
+                    "units": "kg",
+                    "data": weights,
+                },
+                {
+                    "name": "sleep_analysis",
+                    "units": "hr",
+                    "data": points(&|age| json!({
+                        "totalSleep": 6.5 + wobble(age, 16) as f64 / 10.0,
+                        "core": 4.0,
+                        "deep": 1.1,
+                        "rem": 1.6,
+                        "awake": 0.4,
+                    })),
+                },
+            ],
+            "workouts": workouts,
+        }
+    })
+}
+
+/// Writes the synthetic Health export under `sample/health`. Both folders
+/// are checked for links after they are created, and the file is created new.
+pub fn write_health(data_dir: &Path, today: &str) -> Result<PathBuf, SampleError> {
+    use std::io::Write;
+
+    let today = parse_date(today)?;
+    let dir = health_dir(data_dir);
+    fs::create_dir_all(&dir)?;
+    refuse_link(&sample_dir(data_dir))?;
+    refuse_link(&dir)?;
+    let text =
+        serde_json::to_string(&health_export(today)).map_err(|e| SampleError::Io(e.to_string()))?;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(dir.join("export-sample.json"))?;
+    file.write_all(text.as_bytes())?;
+    Ok(dir)
+}
+
 /// Writes the demo vault and indexes it into the separate sample index.
 pub fn build(data_dir: &Path, today: &str) -> Result<(PathBuf, Index), SampleError> {
     let root = write_vault(data_dir, today)?;
+    write_health(data_dir, today)?;
     let mut index = Index::open(&index_path(data_dir))?;
     index.sync(&root)?;
     Ok((root, index))
@@ -489,6 +597,62 @@ mod tests {
         assert!(dir.path().join("index.db").exists());
         assert!(dir.path().join("settings.json").exists());
         cleanup(dir.path()).expect("cleanup is repeatable");
+    }
+
+    fn sample_health(data: &Path, today: &str) -> crate::health::Health {
+        let folder = write_health(data, today).expect("write health");
+        let state = crate::health::HealthState::default();
+        let imported = state.load(&folder).expect("load");
+        let now = applications::now_ms();
+        crate::health::health(&imported, None, today, now).expect("health")
+    }
+
+    #[test]
+    fn sample_health_is_dated_from_today_and_parses_cleanly() {
+        let dir = tempfile::tempdir().expect("dir");
+        let health = sample_health(dir.path(), TODAY);
+        assert_eq!(health.file_count, 1);
+        assert_eq!(health.bad_file_count, 0);
+        assert!(!health.stale);
+        assert_eq!(health.latest_data.as_deref(), Some(TODAY));
+        assert_eq!(health.days.len(), 90);
+        assert_eq!(health.days[89].date, TODAY);
+        assert!(health.days[89].steps.is_some());
+        assert!(health.days[89].sleep.is_some());
+        assert!(health.days.iter().any(|d| d.weight.is_some()));
+        assert!(!health.workouts.is_empty());
+        assert!(health.workouts.iter().all(|w| w.source == "health"));
+    }
+
+    #[test]
+    fn sample_health_follows_the_given_date_across_a_year_boundary() {
+        let dir = tempfile::tempdir().expect("dir");
+        let health = sample_health(dir.path(), "2027-01-02");
+        assert_eq!(health.latest_data.as_deref(), Some("2027-01-02"));
+        assert_eq!(health.days[0].date, iso(day("2027-01-02") - 89));
+        assert!(health.days[0].date.starts_with("2026-"));
+    }
+
+    #[test]
+    fn sample_health_lives_under_the_sample_folder_and_is_cleaned_up() {
+        let dir = tempfile::tempdir().expect("dir");
+        let folder = write_health(dir.path(), TODAY).expect("write");
+        assert_eq!(folder, health_dir(dir.path()));
+        assert!(folder.starts_with(sample_dir(dir.path())));
+        // Writing again over the same folder is refused, never merged.
+        assert!(write_health(dir.path(), TODAY).is_err());
+        cleanup(dir.path()).expect("cleanup");
+        assert!(!folder.exists());
+    }
+
+    #[test]
+    fn sample_health_refuses_a_bad_date() {
+        let dir = tempfile::tempdir().expect("dir");
+        assert_eq!(
+            write_health(dir.path(), "2026-02-30"),
+            Err(SampleError::BadDate)
+        );
+        assert!(!health_dir(dir.path()).exists());
     }
 
     #[test]

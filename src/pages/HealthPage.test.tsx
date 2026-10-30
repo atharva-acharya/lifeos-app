@@ -168,6 +168,7 @@ describe("HealthPage", () => {
     const onNavigate = vi.fn();
     render(<HealthPage onNavigate={onNavigate} />);
     expect(await screen.findByText("Not set up")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try with sample data" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
     expect(onNavigate).toHaveBeenCalledWith("settings");
     expect(screen.queryByRole("heading", { name: "Trends" })).not.toBeInTheDocument();

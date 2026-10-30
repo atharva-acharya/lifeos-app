@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { shortLabel } from "../fitnessStats";
+import { EmptyHint } from "./EmptyHint";
 import { LineChart } from "./LineChart";
 
 export interface TrendCardProps {
@@ -50,7 +51,9 @@ export function TrendCard({
         )}
       </header>
       {latest === null ? (
-        <p className="muted">No readings in this range.</p>
+        <EmptyHint lead="No readings in this range.">
+          Pick a longer range, or check this metric is on in Health Auto Export.
+        </EmptyHint>
       ) : (
         <>
           <div className="chart__plot" aria-hidden="true">

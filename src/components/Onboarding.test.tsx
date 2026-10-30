@@ -49,10 +49,10 @@ describe("SetupChecklist", () => {
   it("shows progress, states and field detail", async () => {
     mockCommands({ get_setup: PARTIAL });
     render(<SetupChecklist />);
-    expect(await screen.findByText("1 of 5 set up · 1 skipped")).toBeInTheDocument();
+    expect(await screen.findByText("2 of 6 set up · 1 skipped")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute(
       "aria-valuenow",
-      "2",
+      "3",
     );
     expect(screen.getByText("2 of 3 fields")).toBeInTheDocument();
     expect(screen.getAllByText("To do")).toHaveLength(3);
@@ -75,11 +75,22 @@ describe("SetupChecklist", () => {
     });
     render(<SetupChecklist />);
     fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
-    expect(await screen.findByText("4 of 5 set up · 1 skipped")).toBeInTheDocument();
+    expect(await screen.findByText("5 of 6 set up · 1 skipped")).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("skip_setup_item", { id: "projects" });
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    expect(await screen.findByText("4 of 5 set up")).toBeInTheDocument();
+    expect(await screen.findByText("5 of 6 set up")).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("unskip_setup_item", { id: "projects" });
+  });
+
+  it("links the Health item to its settings and lets it be skipped", async () => {
+    mockCommands({ get_setup: setup({ health: { done: false } }) });
+    render(<SetupChecklist />);
+    expect(await screen.findByText("Health export")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Settings › Health" })).toHaveAttribute(
+      "href",
+      "#health-heading",
+    );
+    expect(screen.getByRole("button", { name: "Skip" })).toBeEnabled();
   });
 
   it("shows why a change failed", async () => {
@@ -156,7 +167,7 @@ describe("SetupCard", () => {
     mockCommands({ get_setup: PARTIAL });
     const onNavigate = vi.fn();
     render(<SetupCard onNavigate={onNavigate} />);
-    expect(await screen.findByText("1 of 5 set up · 1 skipped")).toBeInTheDocument();
+    expect(await screen.findByText("2 of 6 set up · 1 skipped")).toBeInTheDocument();
     expect(
       screen.getByText(/Still to do: Daily notes, Fitness plan, Projects/),
     ).toBeInTheDocument();

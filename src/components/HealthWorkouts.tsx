@@ -1,5 +1,6 @@
 import type { HealthWorkout } from "../api";
 import { shortLabel } from "../fitnessStats";
+import { EmptyHint } from "./EmptyHint";
 
 const SOURCE = { health: "Apple Health", vault: "Vault" } as const;
 
@@ -19,7 +20,9 @@ export function HealthWorkouts({ workouts }: { workouts: HealthWorkout[] }) {
         Workouts
       </h2>
       {workouts.length === 0 ? (
-        <p className="muted">No workouts yet.</p>
+        <EmptyHint lead="No workouts yet.">
+          Workouts come from Health Auto Export, and from workout notes in your vault.
+        </EmptyHint>
       ) : (
         <ul className="sessions" aria-label="Workouts, newest first">
           {workouts.map((w, i) => (

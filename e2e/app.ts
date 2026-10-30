@@ -227,14 +227,24 @@ function setHealthExportAge(dir: string, ageMs: number): void {
   utimesSync(join(dir, "export-newer.json"), newer, newer);
 }
 
-/** Starts the debug build against a copy of the synthetic vault in a throwaway data folder. */
-export async function launchApp(options: { vault?: boolean } = {}): Promise<RunningApp> {
+/**
+ * Starts the debug build against a copy of the synthetic vault in a throwaway
+ * data folder. `health: true` also sets a Health folder when there is no vault
+ * (a profile that has only a Health folder, to prove sample data never reads it).
+ */
+export async function launchApp(
+  options: { vault?: boolean; health?: boolean } = {},
+): Promise<RunningApp> {
   const withVault = options.vault ?? true;
   const work = mkdtempSync(join(tmpdir(), "lifeos-e2e-"));
   const vault = join(work, "vault");
   const data = join(work, "data");
   const healthDir = join(work, "health");
   mkdirSync(data);
+  if (!withVault && options.health === true) {
+    writeHealthExport(healthDir);
+    writeFileSync(join(data, "settings.json"), JSON.stringify({ healthPath: healthDir }));
+  }
   if (withVault) {
     cpSync(FIXTURE_VAULT, vault, { recursive: true });
     writeFitnessNotes(vault);

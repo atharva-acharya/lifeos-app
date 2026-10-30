@@ -3,6 +3,7 @@ import type { HealthDay } from "../api";
 import { shortLabel } from "../fitnessStats";
 import { latestSleep, sleepHours } from "../healthStats";
 import { BarChart, type Series } from "./BarChart";
+import { EmptyHint } from "./EmptyHint";
 
 interface Row {
   date: string;
@@ -50,7 +51,9 @@ export function HealthSleep({ days, goal }: { days: HealthDay[]; goal: number })
         )}
       </header>
       {night === null ? (
-        <p className="muted">No sleep recorded in this range.</p>
+        <EmptyHint lead="No sleep recorded in this range.">
+          Turn on Sleep Analysis in Health Auto Export, or pick a longer range.
+        </EmptyHint>
       ) : (
         <>
           <div className="chart__plot" aria-hidden="true">

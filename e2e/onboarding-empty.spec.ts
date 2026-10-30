@@ -53,6 +53,13 @@ test("a first run shows Welcome, then every page explains what is missing", asyn
   await expect(page.getByRole("heading", { level: 1, name: "Fitness" })).toBeVisible();
   await expectNotConnected(page, "weight, workouts and lifts");
 
+  await page.getByRole("button", { name: "Health" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Health" })).toBeVisible();
+  const health = page.locator("section.placeholder");
+  await expect(health.getByText("Not set up", { exact: true })).toBeVisible();
+  await expect(health).toContainText("Choose the folder where Health Auto Export saves its files");
+  await expect(health.getByRole("button", { name: "Try with sample data" })).toBeVisible();
+
   await page.getByRole("button", { name: "Projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await expectNotConnected(page, "projects and where to resume");
@@ -60,18 +67,19 @@ test("a first run shows Welcome, then every page explains what is missing", asyn
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   const setup = page.getByRole("region", { name: "Setup" });
-  await expect(setup.getByText("0 of 5 set up", { exact: true })).toBeVisible();
+  await expect(setup.getByText("0 of 6 set up", { exact: true })).toBeVisible();
   await expect(setup.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute(
     "aria-valuenow",
     "0",
   );
   await expect(setup.getByRole("button", { name: "Choose folder" })).toBeVisible();
   // The vault is required, so it cannot be skipped; the optional items can.
-  await expect(setup.getByRole("button", { name: "Skip" })).toHaveCount(4);
+  await expect(setup.getByRole("button", { name: "Skip" })).toHaveCount(5);
   await setup.getByRole("button", { name: "Skip" }).first().click();
-  await expect(setup.getByText("0 of 5 set up · 1 skipped", { exact: true })).toBeVisible();
+  await expect(setup.getByText("0 of 6 set up · 1 skipped", { exact: true })).toBeVisible();
   await setup.getByRole("button", { name: "Undo" }).click();
-  await expect(setup.getByText("0 of 5 set up", { exact: true })).toBeVisible();
+  await expect(setup.getByText("0 of 6 set up", { exact: true })).toBeVisible();
+  await expect(setup.getByRole("link", { name: "Settings › Health" })).toBeVisible();
   // A guide shows the exact front matter to copy.
   await setup.getByRole("button", { name: "Guide" }).first().click();
   await expect(setup.locator("pre").first()).toContainText("type:");

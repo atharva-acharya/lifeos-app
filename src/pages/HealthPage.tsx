@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getHealth, localDate, type Health, type HealthResponse } from "../api";
+import { EmptyHint } from "../components/EmptyHint";
 import { HealthToday } from "../components/HealthToday";
 import { HealthTrends } from "../components/HealthTrends";
 import { HealthWorkouts } from "../components/HealthWorkouts";
+import { NotConnected } from "../components/NotConnected";
 import { ago, dateTime, wholeDays } from "../healthStats";
-import type { RouteId } from "../routes";
+import type { Navigate } from "../routes";
 
 const REFRESH_MS = 5 * 60_000;
 const DATE_CHECK_MS = 60_000;
@@ -43,9 +45,9 @@ function Dashboard({ health, now }: { health: Health; now: number }) {
     <div className="fitness">
       <Notices health={health} now={now} />
       {health.latestData === null && (
-        <p className="muted">
-          The export files have no steps, energy, sleep, heart or weight data yet.
-        </p>
+        <EmptyHint lead="The export files have no steps, energy, sleep, heart or weight data yet.">
+          In Health Auto Export, add those metrics to the export, then let it run once.
+        </EmptyHint>
       )}
       <HealthToday day={health.ringsDay} goals={health.goals} />
       <HealthTrends days={health.days} sleepGoal={health.goals.sleepHours} />
@@ -54,7 +56,7 @@ function Dashboard({ health, now }: { health: Health; now: number }) {
   );
 }
 
-export function HealthPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function HealthPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<HealthResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [date, setDate] = useState(() => localDate());
@@ -122,30 +124,18 @@ export function HealthPage({ onNavigate }: { onNavigate: (id: RouteId) => void }
         </p>
       )}
       {response?.status === "notConfigured" && (
-        <section className="card placeholder">
-          <span className="pill pill--pending">Not set up</span>
-          <p>
-            Choose the folder where Health Auto Export saves its files, to see your steps, sleep,
-            heart rate and weight. The app only reads it.
-          </p>
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              onNavigate("settings");
-            }}
-          >
-            Open settings
-          </button>
-        </section>
+        <NotConnected onNavigate={onNavigate} pill="Not set up">
+          Choose the folder where Health Auto Export saves its files, to see your steps, sleep,
+          heart rate and weight. The app only reads it.
+        </NotConnected>
       )}
       {health?.fileCount === 0 && (
         <section className="card placeholder">
           <span className="pill pill--pending">No files yet</span>
-          <p>
-            The Health folder has no export files. Check that Health Auto Export is writing JSON
-            files to it, and that iCloud for Windows has synced them.
-          </p>
+          <EmptyHint lead="The Health folder has no export files.">
+            Check that Health Auto Export is writing JSON files to it, and that iCloud for Windows
+            has synced them.
+          </EmptyHint>
           <button
             type="button"
             className="button"

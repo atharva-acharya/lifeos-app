@@ -386,7 +386,7 @@ export function getHealth(date: string): Promise<HealthResponse> {
   return invoke<HealthResponse>("get_health", { date, nowMs: Date.now() });
 }
 
-export type SetupItemId = "vault" | "daily" | "plan" | "sheet" | "projects";
+export type SetupItemId = "vault" | "daily" | "plan" | "sheet" | "projects" | "health";
 
 export interface SetupItem {
   id: SetupItemId;
