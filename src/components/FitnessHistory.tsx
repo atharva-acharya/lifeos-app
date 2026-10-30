@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { ExerciseSet, FitnessWorkout } from "../api";
 import { shortLabel } from "../fitnessStats";
 import { withTransition } from "../motion";
+import type { Navigate } from "../routes";
+import { EmptyHint } from "./EmptyHint";
 
 const DAYS = ["Push A", "Pull A", "Legs", "Push B", "Pull B"];
 const OTHER = "Other";
@@ -36,7 +38,13 @@ function Session({ w }: { w: FitnessWorkout }) {
 }
 
 /** Past sessions, one tab per training day. */
-export function FitnessHistory({ workouts }: { workouts: FitnessWorkout[] }) {
+export function FitnessHistory({
+  workouts,
+  onNavigate,
+}: {
+  workouts: FitnessWorkout[];
+  onNavigate?: Navigate;
+}) {
   const tabs = workouts.some((w) => w.day === null) ? [...DAYS, OTHER] : DAYS;
   const dayOf = (w: FitnessWorkout) => w.day ?? OTHER;
   const [chosen, setChosen] = useState<string | null>(null);
@@ -51,7 +59,11 @@ export function FitnessHistory({ workouts }: { workouts: FitnessWorkout[] }) {
         Workout history
       </h2>
       {workouts.length === 0 ? (
-        <p className="muted">No workouts logged yet.</p>
+        <EmptyHint lead="No workouts logged yet." guide="workout" onNavigate={onNavigate}>
+          Add one <code>type: workout</code> note per session (suggested <code>Fitness/Log/</code>)
+          with <code>date</code>, <code>day</code> and an <code>exercises</code> list such as{" "}
+          <code>- Bench 3 x 8 @ 60</code>.
+        </EmptyHint>
       ) : (
         <>
           <div className="tabs" role="tablist" aria-label="Workout days">

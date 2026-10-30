@@ -56,6 +56,8 @@ export interface Resume {
 
 export interface Today {
   date: string;
+  /** A daily note exists for `date`; without one the numbers are blank, not zero. */
+  hasDailyNote: boolean;
   weight: number | null;
   weightChange: number | null;
   applications: number | null;
@@ -225,6 +227,9 @@ export interface FitnessPlan {
   targetWeight: number | null;
   stepsGoal: number;
   proteinGoal: number;
+  /** True when the plan note has no goal and the app default is used. */
+  stepsGoalDefault?: boolean;
+  proteinGoalDefault?: boolean;
 }
 
 export interface ExerciseSet {
@@ -379,4 +384,58 @@ export type HealthResponse = { status: "notConfigured" } | { status: "ready"; he
 
 export function getHealth(date: string): Promise<HealthResponse> {
   return invoke<HealthResponse>("get_health", { date, nowMs: Date.now() });
+}
+
+export type SetupItemId = "vault" | "daily" | "plan" | "sheet" | "projects";
+
+export interface SetupItem {
+  id: SetupItemId;
+  title: string;
+  required: boolean;
+  done: boolean;
+  /** Skipped and not done. */
+  skipped: boolean;
+  /** Extra progress, for example "2 of 3 fields". */
+  detail: string | null;
+}
+
+export interface Setup {
+  items: SetupItem[];
+  dismissed: boolean;
+  total: number;
+  setUp: number;
+  skipped: number;
+  /** Every item is done or skipped. */
+  complete: boolean;
+}
+
+export function getSetup(): Promise<Setup> {
+  return invoke<Setup>("get_setup");
+}
+
+export function skipSetupItem(id: SetupItemId): Promise<Setup> {
+  return invoke<Setup>("skip_setup_item", { id });
+}
+
+export function unskipSetupItem(id: SetupItemId): Promise<Setup> {
+  return invoke<Setup>("unskip_setup_item", { id });
+}
+
+export function dismissSetup(): Promise<Setup> {
+  return invoke<Setup>("dismiss_setup");
+}
+
+export type AppMode = "real" | "sample";
+
+export function getMode(): Promise<AppMode> {
+  return invoke<AppMode>("get_mode");
+}
+
+/** Turns sample data on; dates in the demo vault are relative to the owner's local date. */
+export function enterSampleMode(date: string = localDate()): Promise<AppMode> {
+  return invoke<AppMode>("enter_sample_mode", { date });
+}
+
+export function exitSampleMode(): Promise<AppMode> {
+  return invoke<AppMode>("exit_sample_mode");
 }

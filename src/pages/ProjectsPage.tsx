@@ -1,19 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import { getProjects, onIndexUpdated, type ProjectsResponse, type Projects } from "../api";
 import { ProjectCard } from "../components/ProjectCard";
-import type { RouteId } from "../routes";
+import { EmptyHint } from "../components/EmptyHint";
+import { NotConnected } from "../components/NotConnected";
+import type { Navigate } from "../routes";
 
-function Dashboard({ data }: { data: Projects }) {
+function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate }) {
   const active = data.projects.filter((p) => p.active);
   const other = data.projects.filter((p) => !p.active);
   return (
     <div className="projects">
       {data.projects.length === 0 ? (
-        <section className="card placeholder">
-          <p>
-            No project notes yet. Add a note with <code>type: project</code> under{" "}
-            <code>Projects/</code> in your vault.
-          </p>
+        <section className="card">
+          <EmptyHint lead="No project notes yet." guide="projects" onNavigate={onNavigate}>
+            Add a note with <code>type: project</code> under <code>Projects/</code> in your vault,
+            with <code>project</code>, <code>status</code> (active, paused or done),{" "}
+            <code>next_step</code>, <code>updated</code>, a <code>## Steps</code> checklist (
+            <code>- [ ] …</code>) and an optional <code>## Log</code> list.
+          </EmptyHint>
         </section>
       ) : (
         <>
@@ -22,7 +26,9 @@ function Dashboard({ data }: { data: Projects }) {
               Active
             </h2>
             {active.length === 0 ? (
-              <p className="muted">No active projects.</p>
+              <EmptyHint lead="No active projects.">
+                Set <code>status: active</code> on a project note to see it here and on Today.
+              </EmptyHint>
             ) : (
               <div className="projects__list">
                 {active.map((p) => (
@@ -55,7 +61,7 @@ function Dashboard({ data }: { data: Projects }) {
   );
 }
 
-export function ProjectsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function ProjectsPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<ProjectsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,21 +113,11 @@ export function ProjectsPage({ onNavigate }: { onNavigate: (id: RouteId) => void
         </p>
       )}
       {response?.status === "noVault" && (
-        <section className="card placeholder">
-          <span className="pill pill--pending">Not connected</span>
-          <p>Choose your Life OS vault folder to see your projects and where to resume.</p>
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              onNavigate("settings");
-            }}
-          >
-            Open settings
-          </button>
-        </section>
+        <NotConnected onNavigate={onNavigate}>
+          Choose your Life OS vault folder to see your projects and where to resume.
+        </NotConnected>
       )}
-      {ready && <Dashboard data={ready} />}
+      {ready && <Dashboard data={ready} onNavigate={onNavigate} />}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Lift } from "../api";
 import { shortLabel } from "../fitnessStats";
+import { EmptyHint } from "./EmptyHint";
 import { LineChart } from "./LineChart";
 
 /** Top set per session for one exercise at a time. */
@@ -17,7 +18,10 @@ export function FitnessLifts({ lifts }: { lifts: Lift[] }) {
         <span className="muted">Heaviest set of each session. Deload weeks are left out.</span>
       </header>
       {!lift ? (
-        <p className="muted">No lifts with a weight logged yet.</p>
+        <EmptyHint lead="No lifts with a weight logged yet." guide="workout">
+          Lift progress needs <code>type: workout</code> notes whose <code>exercises</code> lines
+          end in a weight, like <code>- Bench 3 x 8 @ 60</code>.
+        </EmptyHint>
       ) : (
         <>
           <div className="toolbar">

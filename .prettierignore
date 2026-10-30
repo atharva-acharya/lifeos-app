@@ -5,3 +5,4 @@ src-tauri/target
 src-tauri/gen
 docs/requirements.md
 src-tauri/tests/fixtures
+src-tauri/demo

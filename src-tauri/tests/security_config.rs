@@ -112,6 +112,13 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-set-auto-update",
             "allow-check-for-update",
             "allow-install-update",
+            "allow-get-setup",
+            "allow-skip-setup-item",
+            "allow-unskip-setup-item",
+            "allow-dismiss-setup",
+            "allow-get-mode",
+            "allow-enter-sample-mode",
+            "allow-exit-sample-mode",
         ]
     );
 }

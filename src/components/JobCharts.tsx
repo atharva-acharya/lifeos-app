@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getApplications, localDate, type Application, type ApplicationsView } from "../api";
 import { parseApplied, perWeek, replyRates, type SourceRate, type WeekCount } from "../jobStats";
-import type { RouteId } from "../routes";
+import type { Navigate } from "../routes";
+import { NotConnected } from "./NotConnected";
 import { BarChart, type Series } from "./BarChart";
 
 const WEEKLY: Series<WeekCount>[] = [
@@ -115,7 +116,7 @@ export function JobCharts({ rows }: { rows: Application[] }) {
 }
 
 /** Charts tab: reads the saved copy of the Sheet; the Applications tab refreshes it. */
-export function ChartsTab({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function ChartsTab({ onNavigate }: { onNavigate: Navigate }) {
   const [view, setView] = useState<ApplicationsView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,26 +139,15 @@ export function ChartsTab({ onNavigate }: { onNavigate: (id: RouteId) => void })
   if (!view) return null;
 
   if (!view.cache) {
-    return (
+    return view.connected ? (
       <section className="card placeholder">
         <span className="pill pill--pending">No data yet</span>
-        <p>
-          {view.connected
-            ? "Open the Applications tab to load your Sheet."
-            : "Connect your Google Sheet in Settings to see your charts."}
-        </p>
-        {!view.connected && (
-          <button
-            type="button"
-            className="button"
-            onClick={() => {
-              onNavigate("settings");
-            }}
-          >
-            Open settings
-          </button>
-        )}
+        <p>Open the Applications tab to load your Sheet.</p>
       </section>
+    ) : (
+      <NotConnected onNavigate={onNavigate} pill="No data yet">
+        Connect your Google Sheet in Settings to see your charts.
+      </NotConnected>
     );
   }
 

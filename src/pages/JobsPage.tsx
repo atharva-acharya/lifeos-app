@@ -10,7 +10,9 @@ import {
 import { ApplicationsTab } from "../components/ApplicationsTab";
 import { ChartsTab } from "../components/JobCharts";
 import { withTransition } from "../motion";
-import type { RouteId } from "../routes";
+import { EmptyHint } from "../components/EmptyHint";
+import { NotConnected } from "../components/NotConnected";
+import type { Navigate } from "../routes";
 
 type Tab = "applications" | "pipeline" | "outreach" | "charts";
 
@@ -68,39 +70,60 @@ function Card({ card, today }: { card: CompanyCard; today: string }) {
 function Pipeline({
   stages,
   today,
+  onNavigate,
 }: {
   stages: { stage: string; companies: CompanyCard[] }[];
   today: string;
+  onNavigate: Navigate;
 }) {
+  const empty = stages.every((s) => s.companies.length === 0);
   return (
-    <div className="kanban" role="list" aria-label="Pipeline">
-      {stages.map((s) => (
-        <section
-          key={s.stage}
-          className="kanban__column"
-          role="listitem"
-          aria-label={title(s.stage)}
-        >
-          <header className="kanban__head">
-            <span className={`pill ${STAGE_TONE[s.stage] ?? "pill--read"}`}>{title(s.stage)}</span>
-            <span className="muted">{s.companies.length}</span>
-          </header>
-          {s.companies.length === 0 ? (
-            <p className="muted kanban__empty">None</p>
-          ) : (
-            <ul className="kanban__cards">
-              {s.companies.map((c) => (
-                <Card key={c.path} card={c} today={today} />
-              ))}
-            </ul>
-          )}
+    <>
+      {empty && (
+        <section className="card" aria-label="Pipeline setup">
+          <EmptyHint
+            lead="No companies in your pipeline yet."
+            guide="company"
+            onNavigate={onNavigate}
+          >
+            Add one note per company under <code>Jobs/Companies/</code> with{" "}
+            <code>type: company</code>, <code>company</code>, <code>role</code>, <code>stage</code>{" "}
+            (applied, replied, screen, interview, offer or rejected), <code>next_action</code> and{" "}
+            <code>next_date</code>.
+          </EmptyHint>
         </section>
-      ))}
-    </div>
+      )}
+      <div className="kanban" role="list" aria-label="Pipeline">
+        {stages.map((s) => (
+          <section
+            key={s.stage}
+            className="kanban__column"
+            role="listitem"
+            aria-label={title(s.stage)}
+          >
+            <header className="kanban__head">
+              <span className={`pill ${STAGE_TONE[s.stage] ?? "pill--read"}`}>
+                {title(s.stage)}
+              </span>
+              <span className="muted">{s.companies.length}</span>
+            </header>
+            {s.companies.length === 0 ? (
+              <p className="muted kanban__empty">None</p>
+            ) : (
+              <ul className="kanban__cards">
+                {s.companies.map((c) => (
+                  <Card key={c.path} card={c} today={today} />
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
+      </div>
+    </>
   );
 }
 
-function Outreach({ rows }: { rows: OutreachEntry[] }) {
+function Outreach({ rows, onNavigate }: { rows: OutreachEntry[]; onNavigate: Navigate }) {
   const [status, setStatus] = useState("all");
   const [kind, setKind] = useState("all");
   const statuses = useMemo(
@@ -155,7 +178,13 @@ function Outreach({ rows }: { rows: OutreachEntry[] }) {
           {rows.length} contacted · {replied} replied
         </span>
       </div>
-      {shown.length === 0 ? (
+      {rows.length === 0 ? (
+        <EmptyHint lead="No contacts match." guide="outreach" onNavigate={onNavigate}>
+          Keep a note with <code>type: outreach-log</code> (suggested <code>Jobs/Outreach.md</code>)
+          holding a table with the columns Sent, Name, Profile, Company / role, Type, Status and
+          Last update.
+        </EmptyHint>
+      ) : shown.length === 0 ? (
         <p className="muted">No contacts match.</p>
       ) : (
         <table className="table">
@@ -193,7 +222,7 @@ function Outreach({ rows }: { rows: OutreachEntry[] }) {
   );
 }
 
-export function JobsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
   const [tab, setTab] = useState<Tab>("pipeline");
   const [response, setResponse] = useState<JobsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -266,24 +295,14 @@ export function JobsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) 
         ) : tab === "charts" ? (
           <ChartsTab onNavigate={onNavigate} />
         ) : response?.status === "noVault" ? (
-          <section className="card placeholder">
-            <span className="pill pill--pending">Not connected</span>
-            <p>Choose your Life OS vault folder to see your pipeline and outreach.</p>
-            <button
-              type="button"
-              className="button"
-              onClick={() => {
-                onNavigate("settings");
-              }}
-            >
-              Open settings
-            </button>
-          </section>
+          <NotConnected onNavigate={onNavigate}>
+            Choose your Life OS vault folder to see your pipeline and outreach.
+          </NotConnected>
         ) : response?.status === "ready" ? (
           tab === "pipeline" ? (
-            <Pipeline stages={response.jobs.pipeline} today={today} />
+            <Pipeline stages={response.jobs.pipeline} today={today} onNavigate={onNavigate} />
           ) : (
-            <Outreach rows={response.jobs.outreach} />
+            <Outreach rows={response.jobs.outreach} onNavigate={onNavigate} />
           )
         ) : null}
       </div>

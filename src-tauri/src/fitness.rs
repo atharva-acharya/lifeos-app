@@ -52,6 +52,9 @@ pub struct PlanView {
     pub target_weight: Option<f64>,
     pub steps_goal: i64,
     pub protein_goal: i64,
+    /// True when the plan note has no goal and the app default is used.
+    pub steps_goal_default: bool,
+    pub protein_goal_default: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -168,14 +171,18 @@ fn plan(index: &Index) -> rusqlite::Result<Option<PlanView>> {
              FROM plan ORDER BY path = ?1 DESC, path LIMIT 1",
             params![PLAN_PATH],
             |r| {
+                let steps = r.get::<_, Option<i64>>(5)?;
+                let protein = r.get::<_, Option<i64>>(6)?;
                 Ok(PlanView {
                     name: r.get(0)?,
                     start: r.get(1)?,
                     end: r.get(2)?,
                     start_weight: r.get(3)?,
                     target_weight: r.get(4)?,
-                    steps_goal: r.get::<_, Option<i64>>(5)?.unwrap_or(DEFAULT_STEPS_GOAL),
-                    protein_goal: r.get::<_, Option<i64>>(6)?.unwrap_or(DEFAULT_PROTEIN_GOAL),
+                    steps_goal: steps.unwrap_or(DEFAULT_STEPS_GOAL),
+                    protein_goal: protein.unwrap_or(DEFAULT_PROTEIN_GOAL),
+                    steps_goal_default: steps.is_none(),
+                    protein_goal_default: protein.is_none(),
                 })
             },
         )
@@ -376,6 +383,7 @@ mod tests {
         assert_eq!(plan.start_weight, Some(85.0));
         assert_eq!(plan.target_weight, Some(80.0));
         assert_eq!((plan.steps_goal, plan.protein_goal), (8500, 160));
+        assert!(!plan.steps_goal_default && !plan.protein_goal_default);
 
         let index = vault_with(&[(
             "Fitness/Plan.md",
@@ -387,6 +395,7 @@ mod tests {
             .expect("plan");
         assert_eq!(plan.target_weight, None);
         assert_eq!((plan.steps_goal, plan.protein_goal), (8000, 170));
+        assert!(plan.steps_goal_default && plan.protein_goal_default);
     }
 
     #[test]
@@ -920,6 +929,7 @@ mod edge_tests {
         assert_eq!(plan.start.as_deref(), Some("2026-03-01"));
         assert_eq!(plan.end.as_deref(), Some("2026-01-01"));
         assert_eq!((plan.steps_goal, plan.protein_goal), (8000, 170));
+        assert!(plan.steps_goal_default && plan.protein_goal_default);
     }
 
     #[test]

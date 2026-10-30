@@ -2,7 +2,14 @@ import { SESSIONS_GOAL, type WeekSummary } from "../fitnessStats";
 import { Rings, type Ring } from "./Rings";
 
 /** This week at a glance: steps, protein days and sessions against their goals. */
-export function FitnessWeek({ summary }: { summary: WeekSummary }) {
+export function FitnessWeek({
+  summary,
+  defaults,
+}: {
+  summary: WeekSummary;
+  /** Which goals are the app's own defaults rather than set in the plan note. */
+  defaults?: { steps: boolean; protein: boolean };
+}) {
   const rings: Ring[] = [
     {
       key: "steps",
@@ -36,6 +43,22 @@ export function FitnessWeek({ summary }: { summary: WeekSummary }) {
         <p className="muted">
           Protein goal is {summary.proteinGoal} g. Steps use the days you logged in the last 7.
         </p>
+        {defaults && (defaults.steps || defaults.protein) && (
+          <p className="muted">
+            {defaults.steps && (
+              <>
+                Steps goal {summary.stepsGoal.toLocaleString("en-GB")} (default; set{" "}
+                <code>steps_goal</code> in <code>Fitness/Plan.md</code>).{" "}
+              </>
+            )}
+            {defaults.protein && (
+              <>
+                Protein goal {summary.proteinGoal} g (default; set <code>protein_goal</code> in{" "}
+                <code>Fitness/Plan.md</code>).
+              </>
+            )}
+          </p>
+        )}
       </div>
     </section>
   );

@@ -5,6 +5,8 @@ import { SettingsPage } from "./SettingsPage";
 
 // Diagnostics has its own tests; stubbed so these tests control every invoke.
 vi.mock("../components/DiagnosticsSettings", () => ({ DiagnosticsSettings: () => null }));
+// The checklist has its own tests; stubbed so the queued results below stay in order.
+vi.mock("../components/SetupChecklist", () => ({ SetupChecklist: () => null }));
 
 const VAULT = "D:\\Notes\\Life OS";
 const HEALTH = String.raw`D:\iCloud\Health`;

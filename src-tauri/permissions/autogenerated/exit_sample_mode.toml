@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-exit-sample-mode"
+description = "Enables the exit_sample_mode command without any pre-configured scope."
+commands.allow = ["exit_sample_mode"]
+
+[[permission]]
+identifier = "deny-exit-sample-mode"
+description = "Denies the exit_sample_mode command without any pre-configured scope."
+commands.deny = ["exit_sample_mode"]

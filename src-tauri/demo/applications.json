@@ -1,0 +1,104 @@
+{
+  "fetchedAt": 0,
+  "missingColumns": [],
+  "rows": [
+    {
+      "applied": "{{d-3}}",
+      "company": "Northwind Labs",
+      "role": "Junior Analyst",
+      "source": "Company site",
+      "status": "Applied"
+    },
+    {
+      "applied": "{{d-4}}",
+      "company": "Contoso Group",
+      "role": "IT Support Analyst",
+      "source": "Indeed",
+      "status": "Replied"
+    },
+    {
+      "applied": "{{d-6}}",
+      "company": "Northwind Labs",
+      "role": "Security Intern",
+      "source": "LinkedIn Easy Apply",
+      "status": "Applied"
+    },
+    {
+      "applied": "{{d-9}}",
+      "company": "Fabrikam",
+      "role": "Security Analyst",
+      "source": "Referral",
+      "status": "Interview"
+    },
+    {
+      "applied": "{{d-11}}",
+      "company": "Adventure Works",
+      "role": "Help Desk Analyst",
+      "source": "Indeed",
+      "status": "Rejected"
+    },
+    {
+      "applied": "{{d-13}}",
+      "company": "Litware Inc",
+      "role": "SOC Analyst",
+      "source": "LinkedIn Easy Apply",
+      "status": "Applied"
+    },
+    {
+      "applied": "{{d-16}}",
+      "company": "Tailspin Systems",
+      "role": "Systems Analyst",
+      "source": "Company site",
+      "status": "Offer"
+    },
+    {
+      "applied": "{{d-19}}",
+      "company": "Wingtip Toys",
+      "role": "IT Support",
+      "source": "Indeed",
+      "status": "Rejected"
+    },
+    {
+      "applied": "{{d-22}}",
+      "company": "Example Security Ltd",
+      "role": "SOC Analyst",
+      "source": "LinkedIn Easy Apply",
+      "status": "Interview"
+    },
+    {
+      "applied": "{{d-26}}",
+      "company": "Proseware",
+      "role": "Junior Analyst",
+      "source": "Company site",
+      "status": "Applied"
+    },
+    {
+      "applied": "{{d-31}}",
+      "company": "Sample Bank",
+      "role": "Junior Security Analyst",
+      "source": "Company site",
+      "status": "Rejected"
+    },
+    {
+      "applied": "{{d-35}}",
+      "company": "Coho Winery",
+      "role": "IT Technician",
+      "source": "Indeed",
+      "status": "Replied"
+    },
+    {
+      "applied": "{{d-38}}",
+      "company": "Fourth Coffee",
+      "role": "Support Analyst",
+      "source": "LinkedIn Easy Apply",
+      "status": "Applied"
+    },
+    {
+      "applied": "{{d-44}}",
+      "company": "Lucerne Publishing",
+      "role": "Security Analyst",
+      "source": "Referral",
+      "status": "Rejected"
+    }
+  ]
+}
