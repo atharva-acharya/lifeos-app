@@ -70,6 +70,46 @@ describe("JobsPage", () => {
     expect(screen.getByText("Riley Test")).toBeInTheDocument();
   });
 
+  it("loads the Charts tab on demand from the saved Sheet copy", async () => {
+    invoke.mockImplementation((cmd: string) =>
+      Promise.resolve(
+        cmd === "get_applications"
+          ? {
+              configured: true,
+              connected: true,
+              error: null,
+              cache: {
+                fetchedAt: Date.now(),
+                missingColumns: [],
+                rows: [
+                  {
+                    applied: "2026-01-05",
+                    company: "Example Ltd",
+                    role: "SOC Analyst",
+                    source: "Company site",
+                    inbox: null,
+                    status: "Interview",
+                    lastUpdate: null,
+                    daysSince: null,
+                    followUp: null,
+                    email: null,
+                    notes: null,
+                    messageId: null,
+                  },
+                ],
+              },
+            }
+          : { status: "ready", jobs: JOBS },
+      ),
+    );
+    render(<JobsPage onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Charts" }));
+    expect(
+      await screen.findByRole("heading", { name: "Applications per week" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "Company site 1 1 0 100%" })).toBeInTheDocument();
+  });
+
   it("points to settings for the Sheet until Google is connected", async () => {
     invoke.mockResolvedValue({ status: "ready", jobs: JOBS });
     const onNavigate = vi.fn();

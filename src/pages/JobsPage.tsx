@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   getJobs,
   localDate,
@@ -10,12 +10,18 @@ import {
 import { ApplicationsTab } from "../components/ApplicationsTab";
 import type { RouteId } from "../routes";
 
-type Tab = "applications" | "pipeline" | "outreach";
+// Recharts is large; load it only when the Charts tab opens.
+const ChartsTab = lazy(() =>
+  import("../components/JobCharts").then((m) => ({ default: m.ChartsTab })),
+);
+
+type Tab = "applications" | "pipeline" | "outreach" | "charts";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "applications", label: "Applications" },
   { id: "pipeline", label: "Pipeline" },
   { id: "outreach", label: "Outreach" },
+  { id: "charts", label: "Charts" },
 ];
 
 const STAGE_TONE: Record<string, string> = {
@@ -258,6 +264,10 @@ export function JobsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "applications" ? (
           <ApplicationsTab onNavigate={onNavigate} />
+        ) : tab === "charts" ? (
+          <Suspense fallback={null}>
+            <ChartsTab onNavigate={onNavigate} />
+          </Suspense>
         ) : response?.status === "noVault" ? (
           <section className="card placeholder">
             <span className="pill pill--pending">Not connected</span>

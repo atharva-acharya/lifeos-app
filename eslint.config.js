@@ -5,7 +5,8 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri", "coverage"] },
+  // scripts/: browser-console snippets, not part of the app build.
+  { ignores: ["dist", "src-tauri", "coverage", "scripts"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   jsxA11y.flatConfigs.recommended,
