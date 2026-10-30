@@ -846,3 +846,591 @@ fn importing_never_changes_the_folder() {
     let _ = import_dir(dir.path());
     assert_eq!(snapshot(dir.path()), before);
 }
+
+// --- hardening: hostile JSON ------------------------------------------------
+
+#[test]
+fn byte_order_mark_empty_truncated_and_non_utf8_files_are_bad_not_fatal() {
+    let good = r#"{"data":{"metrics":[]}}"#;
+    let mut with_bom = vec![0xEF, 0xBB, 0xBF];
+    with_bom.extend_from_slice(good.as_bytes());
+    let mut bad_utf8 = br#"{"data":{"metrics":[{"name":""#.to_vec();
+    bad_utf8.extend_from_slice(&[0xFF, 0xFE, 0xC0, 0x80]);
+    bad_utf8.extend_from_slice(br#""}]}}"#);
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        ("empty", Vec::new()),
+        ("whitespace", b"   \n\t ".to_vec()),
+        ("bom", with_bom),
+        ("truncated", good.as_bytes()[..good.len() - 3].to_vec()),
+        ("bad-utf8", bad_utf8),
+        ("nul", vec![0; 64]),
+        (
+            "nan-token",
+            br#"{"data":{"metrics":[{"data":[{"qty":NaN}]}]}}"#.to_vec(),
+        ),
+        (
+            "inf-token",
+            br#"{"data":{"workouts":[{"duration":Infinity}]}}"#.to_vec(),
+        ),
+        (
+            "huge-exponent",
+            br#"{"data":{"workouts":[{"duration":1e999}]}}"#.to_vec(),
+        ),
+        ("trailing-garbage", br#"{"data":{}} x"#.to_vec()),
+    ];
+    for (label, bytes) in cases {
+        let result = std::panic::catch_unwind(|| parse_export(&bytes));
+        let parsed = result.unwrap_or_else(|_| panic!("{label} panicked"));
+        let reason = parsed.expect_err(label);
+        assert!(
+            ["not valid JSON", "unexpected layout", "could not be read"].contains(&reason.as_str()),
+            "{label}: {reason}"
+        );
+    }
+}
+
+#[test]
+fn duplicate_keys_are_a_bad_file_with_a_fixed_reason() {
+    let r = parse_export(br#"{"data":{},"data":{}}"#);
+    assert_eq!(r.err().as_deref(), Some("unexpected layout"));
+}
+
+#[test]
+fn wrong_typed_and_string_numbers_are_ignored_not_coerced() {
+    let day = "2026-10-01 00:00:00 +0100";
+    let p = json!([
+        {"date": day, "qty": "NaN"},
+        {"date": "2026-10-02 00:00:00 +0100", "qty": "Infinity"},
+        {"date": "2026-10-03 00:00:00 +0100", "qty": "5000"},
+        {"date": "2026-10-04 00:00:00 +0100", "qty": [5000]},
+        {"date": "2026-10-05 00:00:00 +0100", "qty": null},
+        {"date": "2026-10-06 00:00:00 +0100", "qty": true},
+        {"date": "2026-10-07 00:00:00 +0100", "qty": -0.0},
+        {"date": "2026-10-08 00:00:00 +0100", "qty": 1e308},
+        {"date": "2026-10-09 00:00:00 +0100", "qty": -5000},
+    ]);
+    let got = import_files(&[("a.json", HOUR_MS, one_metric("step_count", "count", &p))]);
+    // Only the negative zero is a valid step count.
+    assert_eq!(got.days.keys().collect::<Vec<_>>(), ["2026-10-07"]);
+    assert_eq!(got.days["2026-10-07"].steps, Some(-0.0));
+    assert!(got.bad_files.is_empty());
+}
+
+#[test]
+fn negative_sleep_and_energy_never_leave_a_day_with_negative_totals() {
+    let p =
+        json!([{"date": "2026-10-01 00:00:00 +0100", "totalSleep": -3, "core": -1, "awake": -2}]);
+    let got = import_files(&[("a.json", HOUR_MS, one_metric("sleep_analysis", "hr", &p))]);
+    assert!(got.days.is_empty());
+    let p = json!([{"date": "2026-10-01 00:00:00 +0100", "qty": -1}]);
+    let got = import_files(&[("a.json", HOUR_MS, one_metric("active_energy", "kcal", &p))]);
+    assert!(got.days.is_empty());
+}
+
+#[test]
+fn timestamps_that_are_not_iso_never_panic_on_char_boundaries() {
+    let stamps = [
+        "é2026-10-0",
+        "2026-10-0é",
+        "2026-10-01é",
+        "日本語2026-10-01",
+        "2026-10-日",
+        "2026年10月01日 00:00",
+        "🙂🙂🙂🙂",
+        "\u{202E}2026-10-01",
+        "２０２６-１０-０１",
+        "2026-10-01\u{0}",
+        "",
+        "2026",
+        "0000-00-00 00:00:00",
+    ];
+    let points: Vec<Value> = stamps
+        .iter()
+        .map(|s| json!({"date": s, "qty": 10, "totalSleep": 1.0}))
+        .collect();
+    let metrics = json!([
+        {"name": "step_count", "units": "count", "data": points},
+        {"name": "sleep_analysis", "units": "hr", "data": points},
+    ]);
+    let workouts: Vec<Value> = stamps
+        .iter()
+        .map(|s| json!({"id": s, "name": s, "start": s, "duration": 60}))
+        .collect();
+    let text = json!({"data": {"metrics": metrics, "workouts": workouts}}).to_string();
+    let got = import_files(&[("a.json", HOUR_MS, text)]);
+    assert!(got.bad_files.is_empty());
+    // Only a real calendar date in the first ten characters is kept, and a
+    // non-ASCII tail after it does not matter.
+    assert_eq!(got.days.keys().collect::<Vec<_>>(), ["2026-10-01"]);
+    // "2026-10-01é" and "2026-10-01<NUL>" are two different workouts.
+    assert_eq!(got.workouts.len(), 2);
+    assert!(got.workouts.iter().all(|w| w.date == "2026-10-01"));
+    assert_eq!(local_date("2026-10-0é"), None);
+    assert_eq!(local_date("2026-10-01é"), Some("2026-10-01"));
+}
+
+#[test]
+fn the_date_is_the_local_one_across_week_and_year_boundaries() {
+    let p = json!([
+        {"date": "2025-12-31 23:59:59 -0800", "qty": 1},
+        {"date": "2026-01-01 00:00:00 +0100", "qty": 2},
+        {"date": "2024-02-29 12:00:00 +0000", "qty": 4},
+    ]);
+    let got = import_files(&[("a.json", HOUR_MS, one_metric("step_count", "count", &p))]);
+    assert_eq!(got.days["2025-12-31"].steps, Some(1.0));
+    assert_eq!(got.days["2026-01-01"].steps, Some(2.0));
+    assert_eq!(got.days["2024-02-29"].steps, Some(4.0));
+}
+
+#[test]
+fn the_window_is_contiguous_across_a_year_end_and_a_leap_day() {
+    for today in ["2027-01-01", "2024-03-01", "2026-12-31", "2028-02-29"] {
+        let v = health(&Imported::default(), None, today, 0).expect("health");
+        assert_eq!(v.days.len(), 90, "{today}");
+        assert_eq!(v.days[89].date, today);
+        for pair in v.days.windows(2) {
+            assert_eq!(shift_days(&pair[0].date, 1), pair[1].date, "{today}");
+        }
+        assert!(v.days.iter().all(|d| is_iso_date(&d.date)));
+    }
+    let v = health(&Imported::default(), None, "2024-03-01", 0).expect("health");
+    assert_eq!(v.days[88].date, "2024-02-29");
+    let v = health(&Imported::default(), None, "2027-01-01", 0).expect("health");
+    assert!(v.days.iter().any(|d| d.date == "2026-12-31"));
+}
+
+#[test]
+fn units_are_matched_case_insensitively_and_trimmed() {
+    let day = "2026-10-01 00:00:00 +0100";
+    let metrics = json!([
+        {"name": "active_energy", "units": " KJ ", "data": [{"date": day, "qty": 4184}]},
+        {"name": "weight_body_mass", "units": "LB", "data": [{"date": day, "qty": 220.462_262}]},
+    ]);
+    let got = import_files(&[("a.json", HOUR_MS, export(&metrics))]);
+    let d = &got.days["2026-10-01"];
+    assert!((d.energy.expect("energy") - 1000.0).abs() < 1e-6);
+    assert!((d.weight().expect("weight") - 100.0).abs() < 1e-3);
+}
+
+#[test]
+fn conversions_apply_the_range_after_converting() {
+    // 20 kg is the lower edge: 44.0925 lb is just above, 44.0 lb just below.
+    assert!(weight_kg(Some(44.1), Some("lb")).is_some());
+    assert!(weight_kg(Some(44.0), Some("lb")).is_none());
+    // 20,000 kcal is the upper edge: in kJ it is 83,680.
+    assert!(energy_kcal(Some(83_680.0), Some("kJ")).is_some());
+    assert!(energy_kcal(Some(83_681.0), Some("kJ")).is_none());
+    assert!(energy_kcal(Some(f64::NAN), Some("kcal")).is_none());
+    assert!(energy_kcal(Some(f64::INFINITY), Some("kcal")).is_none());
+    assert!(energy_kcal(Some(1.0), None).is_none());
+    assert!(distance_km(Some(5000.0), Some("km")).is_some());
+    assert!(distance_km(Some(5000.1), Some("km")).is_none());
+    assert!(distance_km(Some(3106.0), Some("mi")).is_some());
+    assert!(distance_km(Some(3107.0), Some("mi")).is_none());
+    assert!(distance_km(Some(-1.0), Some("km")).is_none());
+    assert!(distance_km(Some(0.0), Some("km")).is_some());
+    assert!(weight_kg(Some(1e308), Some("lb")).is_none());
+}
+
+#[test]
+fn workout_names_lose_control_characters_and_are_capped_but_markup_is_kept_as_text() {
+    let long = "x".repeat(500);
+    let multibyte = "é".repeat(500);
+    let w = json!({"data": {"workouts": [
+        {"id": "1", "name": "<b>Run</b>\u{0007}\n\t&amp;", "start": "2026-10-01 08:00:00"},
+        {"id": "2", "name": long, "start": "2026-10-01 09:00:00"},
+        {"id": "3", "name": multibyte, "start": "2026-10-01 10:00:00"},
+        {"id": "4", "name": "   ", "start": "2026-10-01 11:00:00"},
+        {"id": "5", "name": 42, "start": "2026-10-01 12:00:00"},
+    ]}});
+    let got = import_files(&[("w.json", HOUR_MS, w.to_string())]);
+    let names: Vec<&str> = got.workouts.iter().map(|w| w.name.as_str()).collect();
+    assert_eq!(names[0], "<b>Run</b>&amp;");
+    assert_eq!(names[1].chars().count(), MAX_NAME_CHARS);
+    assert_eq!(names[2].chars().count(), MAX_NAME_CHARS);
+    assert_eq!(names[3], "Workout");
+    assert_eq!(names[4], "Workout");
+}
+
+#[test]
+fn workouts_dedupe_by_id_or_by_name_and_start() {
+    let one = |id: Option<&str>, name: &str, start: &str, dur: i64| {
+        let mut o = json!({"name": name, "start": start, "duration": dur});
+        if let Some(id) = id {
+            o["id"] = json!(id);
+        }
+        o
+    };
+    let old = json!({"data": {"workouts": [
+        one(Some("a"), "Run", "2026-10-01 08:00:00", 600),
+        one(None, "Swim", "2026-10-02 08:00:00", 600),
+        one(Some(""), "Walk", "2026-10-03 08:00:00", 600),
+    ]}});
+    let new = json!({"data": {"workouts": [
+        one(Some("a"), "Run (edited)", "2026-10-01 08:00:00", 1200),
+        one(None, "Swim", "2026-10-02 08:00:00", 1200),
+        one(Some(""), "Walk", "2026-10-03 08:00:00", 1200),
+        one(None, "Swim", "2026-10-02 09:00:00", 1200),
+    ]}});
+    let got = import_files(&[
+        ("old.json", HOUR_MS, old.to_string()),
+        ("new.json", 2 * HOUR_MS, new.to_string()),
+    ]);
+    assert_eq!(got.workouts.len(), 4);
+    // The newest file wins for each duplicate.
+    assert!(got.workouts.iter().all(|w| w.duration_min == Some(20)));
+}
+
+#[test]
+fn a_repeated_timestamp_inside_one_file_counts_once() {
+    let p = json!([
+        {"date": "2026-10-01 00:00:00 +0100", "qty": 100},
+        {"date": "2026-10-01 00:00:00 +0100", "qty": 100},
+    ]);
+    let got = import_files(&[("a.json", HOUR_MS, one_metric("step_count", "count", &p))]);
+    assert_eq!(got.days["2026-10-01"].steps, Some(100.0));
+}
+
+#[test]
+fn equal_mtimes_give_the_same_result_whatever_the_directory_order() {
+    let p = |qty: i64| json!([{"date": "2026-10-01 00:00:00 +0100", "qty": qty}]);
+    let files: Vec<(String, i64)> = (0..6).map(|i| (format!("f{i}.json"), i * 100)).collect();
+    let spec: Vec<(&str, i64, String)> = files
+        .iter()
+        .map(|(n, q)| {
+            (
+                n.as_str(),
+                HOUR_MS,
+                one_metric("step_count", "count", &p(*q)),
+            )
+        })
+        .collect();
+    let got = import_files(&spec);
+    // The last name sorts first (newest) and wins.
+    assert_eq!(got.days["2026-10-01"].steps, Some(500.0));
+    let again = import_files(&spec);
+    assert_eq!(again.days, got.days);
+}
+
+#[test]
+fn many_bad_files_are_all_counted_and_named_by_file_only() {
+    let mut spec: Vec<(String, i64, String)> = Vec::new();
+    for i in 0..60 {
+        spec.push((
+            format!("sub/dir/bad{i:02}&'.json"),
+            HOUR_MS,
+            "nope".to_owned(),
+        ));
+    }
+    let refs: Vec<(&str, i64, String)> = spec
+        .iter()
+        .map(|(n, m, t)| (n.as_str(), *m, t.clone()))
+        .collect();
+    let got = import_files(&refs);
+    assert_eq!(got.bad_files.len(), 60);
+    assert!(got.bad_files.iter().all(|b| !b.name.contains('/')));
+    assert!(got.bad_files.iter().all(|b| !b.reason.contains("nope")));
+    let v = health(&got, None, TODAY, HOUR_MS).expect("health");
+    assert_eq!(v.bad_files.len(), 50);
+    assert_eq!(v.bad_file_count, 60);
+    assert_eq!(v.file_count, 60);
+}
+
+#[test]
+fn clean_name_keeps_markup_as_inert_text() {
+    assert_eq!(
+        clean_name("<img src=x onerror=1>\n.json"),
+        "<img src=x onerror=1>.json"
+    );
+    assert_eq!(clean_name("\u{0}\u{1b}[31mred"), "[31mred");
+    assert_eq!(clean_name(""), "");
+}
+
+// --- hardening: the folder guard --------------------------------------------
+
+#[test]
+fn a_path_that_resolves_outside_the_folder_is_rejected() {
+    let outside = folder_with(&[("secret.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    let dir = folder_with(&[("ok.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    let canonical = fs::canonicalize(dir.path()).expect("canonical");
+    let out_name = outside
+        .path()
+        .file_name()
+        .expect("name")
+        .to_string_lossy()
+        .into_owned();
+    let entry = |rel: &str| FileEntry {
+        rel: rel.to_owned(),
+        len: 10,
+        mtime_ms: 0,
+    };
+    let sneaky = entry(&format!("../{out_name}/secret.json"));
+    // `..` leaves the folder; the temp parent is shared, so go up explicitly.
+    let up = canonical.parent().expect("parent").join(&out_name).exists();
+    let result = read_file(&canonical, &sneaky);
+    if up {
+        assert_eq!(result, Err("is outside the folder".to_owned()));
+    } else {
+        assert!(result.is_err());
+    }
+    assert!(read_file(&canonical, &entry("../../../../../../../../nothing.json")).is_err());
+    assert!(read_file(&canonical, &entry("ok.json")).is_ok());
+    assert!(read_file(&canonical, &entry("gone.json")).is_err());
+    assert!(read_file(&canonical, &entry("")).is_err());
+    // An absolute path in the listing must not replace the folder.
+    let abs = outside.path().join("secret.json");
+    let abs = abs.to_string_lossy().replace('\\', "/");
+    assert!(read_file(&canonical, &entry(&abs)).is_err());
+}
+
+#[test]
+fn a_file_larger_than_listed_is_still_capped_when_read() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("grew.json");
+    let f = fs::File::create(&path).expect("create");
+    f.set_len(MAX_FILE_BYTES + 10).expect("sparse");
+    drop(f);
+    let canonical = fs::canonicalize(dir.path()).expect("canonical");
+    let lying = FileEntry {
+        rel: "grew.json".to_owned(),
+        len: 5,
+        mtime_ms: 0,
+    };
+    assert_eq!(
+        read_file(&canonical, &lying),
+        Err("larger than 32 MB, not read".to_owned())
+    );
+}
+
+#[test]
+fn a_file_removed_after_listing_is_a_bad_file() {
+    let dir = folder_with(&[("a.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    let canonical = fs::canonicalize(dir.path()).expect("canonical");
+    let listing = list(&canonical).expect("list");
+    fs::remove_file(dir.path().join("a.json")).expect("remove");
+    let got = import(&canonical, &listing);
+    assert_eq!(got.bad_files.len(), 1);
+    assert_eq!(got.bad_files[0].reason, "could not be read");
+}
+
+#[test]
+fn a_folder_named_like_a_json_file_is_not_listed_or_read() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    fs::create_dir(dir.path().join("looks.json")).expect("mkdir");
+    fs::write(dir.path().join("looks.json").join("in.json"), "{}").expect("write");
+    let listing = list(dir.path()).expect("list");
+    let rels: Vec<&str> = listing.files.iter().map(|f| f.rel.as_str()).collect();
+    assert_eq!(rels, ["looks.json/in.json"]);
+}
+
+#[cfg(windows)]
+#[test]
+fn a_junction_to_a_folder_inside_a_subfolder_is_not_followed() {
+    let outside = folder_with(&[("secret.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    let dir = folder_with(&[("sub/ok.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    junction(&dir.path().join("sub").join("link"), outside.path());
+    let got = import_dir(dir.path());
+    assert_eq!(got.file_count, 1);
+    assert!(got.bad_files.is_empty());
+}
+
+#[cfg(any(unix, windows))]
+fn file_symlink(link: &Path, real: &Path) -> bool {
+    #[cfg(unix)]
+    let r = std::os::unix::fs::symlink(real, link);
+    #[cfg(windows)]
+    let r = std::os::windows::fs::symlink_file(real, link);
+    r.is_ok()
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn a_file_symlink_inside_the_folder_is_not_followed() {
+    let outside = folder_with(&[("secret.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    let dir = folder_with(&[("ok.json", HOUR_MS, r#"{"data":{}}"#.into())]);
+    if !file_symlink(
+        &dir.path().join("link.json"),
+        &outside.path().join("secret.json"),
+    ) {
+        // Creating symlinks needs a privilege on Windows; nothing to check.
+        return;
+    }
+    let canonical = fs::canonicalize(dir.path()).expect("canonical");
+    let listing = list(&canonical).expect("list");
+    let rels: Vec<&str> = listing.files.iter().map(|f| f.rel.as_str()).collect();
+    assert_eq!(rels, ["ok.json"]);
+    let sneaky = FileEntry {
+        rel: "link.json".to_owned(),
+        len: 5,
+        mtime_ms: 0,
+    };
+    assert_eq!(
+        read_file(&canonical, &sneaky),
+        Err("goes through a link".to_owned())
+    );
+}
+
+// --- hardening: staleness, rings, goals -------------------------------------
+
+#[test]
+fn staleness_flips_just_after_exactly_48_hours() {
+    let got = import_files(&[("a.json", 1_000 * HOUR_MS, "{\"data\":{}}".into())]);
+    let t = 1_000 * HOUR_MS;
+    let at = |now: i64| health(&got, None, TODAY, now).expect("health").stale;
+    assert!(!at(t + 48 * HOUR_MS - 1));
+    assert!(!at(t + 48 * HOUR_MS));
+    assert!(at(t + 48 * HOUR_MS + 1));
+    // A file dated in the future (clock skew) is not stale.
+    assert!(!at(t - 5 * HOUR_MS));
+    assert!(!at(i64::MIN));
+    assert!(!at(t));
+}
+
+#[test]
+fn staleness_uses_the_newest_file_even_if_it_is_bad() {
+    let got = import_files(&[
+        ("old.json", 1_000 * HOUR_MS, "{\"data\":{}}".into()),
+        ("new.json", 1_100 * HOUR_MS, "garbage".into()),
+    ]);
+    let v = health(&got, None, TODAY, 1_101 * HOUR_MS).expect("health");
+    assert!(!v.stale);
+    assert_eq!(v.last_export, Some(1_100 * HOUR_MS));
+}
+
+#[test]
+fn rings_fall_back_when_today_has_only_non_ring_data() {
+    let metrics = json!([
+        {"name": "heart_rate_variability", "units": "ms", "data": [{"date": "2026-10-29", "qty": 40}]},
+        {"name": "sleep_analysis", "units": "hr", "data": [{"date": "2026-10-27", "awake": 0.5}]},
+    ]);
+    let got = import_files(&[("a.json", HOUR_MS, export(&metrics))]);
+    let v = health(&got, None, TODAY, HOUR_MS).expect("health");
+    let r = v.rings_day.expect("rings");
+    assert!(!r.is_today);
+    assert_eq!(r.day.date, "2026-10-27");
+    assert_eq!(r.day.sleep.expect("sleep").total, 0.0);
+    // The newest day with any value is today, even though the rings are not.
+    assert_eq!(v.latest_data.as_deref(), Some("2026-10-29"));
+}
+
+#[test]
+fn rings_day_older_than_the_window_is_still_offered() {
+    let p = json!([{"date": "2025-01-01 00:00:00", "qty": 10}]);
+    let got = import_files(&[("a.json", HOUR_MS, one_metric("step_count", "count", &p))]);
+    let v = health(&got, None, TODAY, HOUR_MS).expect("health");
+    assert_eq!(v.rings_day.expect("rings").day.date, "2025-01-01");
+    assert!(v.days.iter().all(|d| d.steps.is_none()));
+}
+
+#[test]
+fn out_of_range_or_wrong_typed_plan_goals_fall_back_to_defaults() {
+    for plan in [
+        "steps_goal: 0\nactive_energy_goal: 0\nsleep_goal: 0.5",
+        "steps_goal: 100001\nactive_energy_goal: 10001\nsleep_goal: 16.5",
+        "steps_goal: -5\nactive_energy_goal: -1\nsleep_goal: -8",
+        "steps_goal: lots\nactive_energy_goal: many\nsleep_goal: long",
+        "steps_goal: [1]\nactive_energy_goal: 1.5\nsleep_goal: .nan",
+        "sleep_goal: .inf",
+    ] {
+        let text = format!("---\ntype: plan\n{plan}\n---\n");
+        let index = vault_with(&[("Fitness/Plan.md", &text)]);
+        let v = health(&Imported::default(), Some(&index), TODAY, 0).expect("health");
+        assert_eq!(v.goals, Goals::default(), "{plan}");
+    }
+}
+
+#[test]
+fn plan_goal_edges_are_accepted_and_each_field_falls_back_alone() {
+    let text = "---\ntype: plan\nsteps_goal: 100000\nactive_energy_goal: 1\nsleep_goal: 16\n---\n";
+    let index = vault_with(&[("Fitness/Plan.md", text)]);
+    let v = health(&Imported::default(), Some(&index), TODAY, 0).expect("health");
+    assert_eq!(v.goals.steps, 100_000);
+    assert_eq!(v.goals.active_energy, 1);
+    assert!((v.goals.sleep_hours - 16.0).abs() < f64::EPSILON);
+
+    let text = "---\ntype: plan\nsteps_goal: 0\nactive_energy_goal: 700\nsleep_goal: 1\n---\n";
+    let index = vault_with(&[("Fitness/Plan.md", text)]);
+    let v = health(&Imported::default(), Some(&index), TODAY, 0).expect("health");
+    assert_eq!(v.goals.steps, 8000);
+    assert_eq!(v.goals.active_energy, 700);
+    assert!((v.goals.sleep_hours - 1.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn the_fitness_plan_note_wins_over_other_plans() {
+    let index = vault_with(&[
+        ("A/Plan.md", "---\ntype: plan\nsteps_goal: 1111\n---\n"),
+        (
+            "Fitness/Plan.md",
+            "---\ntype: plan\nsteps_goal: 2222\n---\n",
+        ),
+    ]);
+    let v = health(&Imported::default(), Some(&index), TODAY, 0).expect("health");
+    assert_eq!(v.goals.steps, 2222);
+}
+
+// --- hardening: properties --------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(512))]
+
+    #[test]
+    fn local_date_never_panics_and_only_returns_a_valid_prefix(s in "\\PC{0,30}") {
+        if let Some(d) = local_date(&s) {
+            prop_assert!(is_iso_date(d));
+            prop_assert!(s.starts_with(d));
+            prop_assert_eq!(d.len(), 10);
+        }
+    }
+
+    #[test]
+    fn local_date_survives_multibyte_prefixes(
+        pre in "[é日🙂]{0,3}",
+        d in "20[0-9]{2}-[0-1][0-9]-[0-3][0-9]",
+        post in "[é日🙂 :0-9+]{0,8}",
+    ) {
+        let s = format!("{pre}{d}{post}");
+        let got = local_date(&s);
+        if pre.is_empty() {
+            prop_assert_eq!(got.is_some(), is_iso_date(&d));
+        } else {
+            prop_assert!(got.is_none());
+        }
+    }
+
+    #[test]
+    fn converted_values_are_always_finite_and_in_range(
+        q in prop_oneof![any::<f64>(), -1e12f64..1e12],
+        units in prop::sample::select(vec!["kcal", "kJ", "kg", "lb", "km", "mi", "", "x"]),
+    ) {
+        if let Some(v) = energy_kcal(Some(q), Some(units)) {
+            prop_assert!(v.is_finite() && (0.0..=20_000.0).contains(&v));
+        }
+        if let Some(v) = weight_kg(Some(q), Some(units)) {
+            prop_assert!(v.is_finite() && (20.0..=400.0).contains(&v));
+        }
+        if let Some(v) = distance_km(Some(q), Some(units)) {
+            prop_assert!(v.is_finite() && (0.0..=5000.0).contains(&v));
+        }
+    }
+
+    #[test]
+    fn arbitrary_listed_paths_never_panic_and_never_escape(rel in "[a-zA-Z0-9_./\\\\:~ -]{0,40}") {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let canonical = fs::canonicalize(dir.path()).expect("canonical");
+        let entry = FileEntry { rel, len: 1, mtime_ms: 0 };
+        // The folder is empty, so nothing can be read at all.
+        prop_assert!(read_file(&canonical, &entry).is_err());
+    }
+
+    #[test]
+    fn the_view_is_total_for_any_today_and_now(
+        y in 1u32..=9999, m in 1u32..=12, d in 1u32..=31, now in any::<i64>(),
+    ) {
+        let today = format!("{y:04}-{m:02}-{d:02}");
+        if is_iso_date(&today) {
+            let v = health(&Imported::default(), None, &today, now).expect("health");
+            prop_assert_eq!(v.days.len(), 90);
+        }
+    }
+}
