@@ -1,6 +1,6 @@
 import type { GuideId } from "./guides";
 
-export type RouteId = "today" | "jobs" | "fitness" | "projects" | "search" | "settings";
+export type RouteId = "today" | "jobs" | "fitness" | "health" | "projects" | "search" | "settings";
 
 export interface Route {
   id: RouteId;
@@ -31,6 +31,13 @@ export const MAIN_ROUTES: readonly Route[] = [
     kicker: "Training",
     phase: 3,
     summary: "Weight trend, steps, protein days, workout history and lift progress.",
+  },
+  {
+    id: "health",
+    label: "Health",
+    kicker: "Body",
+    phase: 3,
+    summary: "Steps, sleep, heart rate, weight and workouts from Apple Health exports.",
   },
   {
     id: "projects",

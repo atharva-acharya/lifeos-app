@@ -82,6 +82,11 @@ function Row({
               Settings › Google
             </a>
           )}
+          {!item.done && item.id === "health" && (
+            <a className="button button--quiet" href="#health-heading">
+              Settings › Health
+            </a>
+          )}
           {!item.done && guide && (
             <button
               type="button"

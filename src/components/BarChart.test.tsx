@@ -79,6 +79,21 @@ describe("BarChart", () => {
     expect(two.container.querySelector(".bar-chart__legend")?.textContent).toBe("AlphaBeta");
   });
 
+  it("draws a dashed target line and makes room for it on the axis", () => {
+    const { container } = render(
+      <BarChart
+        data={data}
+        label={(r) => r.name}
+        series={[A]}
+        target={{ value: 20, label: "Goal 20" }}
+      />,
+    );
+    expect(container.querySelector(".line-chart__target text")?.textContent).toBe("Goal 20");
+    // The data tops out at 4, but the axis must reach the target.
+    expect(container.textContent).toContain("20");
+    expect(container.querySelectorAll(".line-chart__target line")).toHaveLength(1);
+  });
+
   it("renders an empty chart without bars", () => {
     const { container } = render(<BarChart data={[]} label={(r: Row) => r.name} series={[A]} />);
     expect(container.querySelectorAll(".bar-chart__bar")).toHaveLength(0);

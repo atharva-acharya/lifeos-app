@@ -141,6 +141,10 @@ pub struct Plan {
     pub target_weight: Option<f64>,
     pub steps_goal: Option<i64>,
     pub protein_goal: Option<i64>,
+    /// Daily active energy goal, kcal.
+    pub active_energy_goal: Option<i64>,
+    /// Nightly sleep goal, hours (decimals allowed).
+    pub sleep_goal: Option<f64>,
 }
 
 /// One line of a workout's `exercises` list, read as `Name S x R @ KG`.
@@ -324,6 +328,12 @@ pub fn parse(text: &str) -> Result<Note, ParseError> {
             target_weight: f.float("target_weight")?.filter(|w| plausible_weight(*w)),
             steps_goal: f.int("steps_goal")?.filter(|n| (1..=100_000).contains(n)),
             protein_goal: f.int("protein_goal")?.filter(|n| (1..=1000).contains(n)),
+            active_energy_goal: f
+                .int("active_energy_goal")?
+                .filter(|n| (1..=10_000).contains(n)),
+            sleep_goal: f
+                .float("sleep_goal")?
+                .filter(|h| h.is_finite() && (1.0..=16.0).contains(h)),
         }),
         Some("outreach-log") => Note::Outreach(outreach_table(body)),
         _ => Note::Other,
@@ -1128,6 +1138,16 @@ type: plan
         assert_eq!(plan("steps_goal: 100000").steps_goal, Some(100_000));
         assert_eq!(plan("protein_goal: 1001").protein_goal, None);
         assert_eq!(plan("protein_goal: 1").protein_goal, Some(1));
+        assert_eq!(plan("active_energy_goal: 0").active_energy_goal, None);
+        assert_eq!(plan("active_energy_goal: 10001").active_energy_goal, None);
+        assert_eq!(
+            plan("active_energy_goal: 600").active_energy_goal,
+            Some(600)
+        );
+        assert_eq!(plan("sleep_goal: 7.5").sleep_goal, Some(7.5));
+        assert_eq!(plan("sleep_goal: 8").sleep_goal, Some(8.0));
+        assert_eq!(plan("sleep_goal: 0.5").sleep_goal, None);
+        assert_eq!(plan("sleep_goal: 17").sleep_goal, None);
         assert_eq!(plan("target_weight: 0").target_weight, None);
         assert_eq!(plan("target_weight: -80").target_weight, None);
         assert_eq!(plan("start_weight: 1000.5").start_weight, None);

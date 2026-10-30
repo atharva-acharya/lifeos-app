@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::vault::{self, FileInfo, note::Note};
 
 /// Bump when the schema changes; a mismatch drops and rebuilds the index.
-pub const SCHEMA_VERSION: i32 = 4;
+pub const SCHEMA_VERSION: i32 = 5;
 
 /// Most log entries kept per project note (the newest).
 const MAX_LOG_ENTRIES: usize = 1000;
@@ -56,7 +56,7 @@ CREATE TABLE project (
 CREATE TABLE plan (
     path TEXT PRIMARY KEY REFERENCES notes(path) ON DELETE CASCADE,
     name TEXT, start TEXT, end TEXT, start_weight REAL, target_weight REAL,
-    steps_goal INTEGER, protein_goal INTEGER
+    steps_goal INTEGER, protein_goal INTEGER, active_energy_goal INTEGER, sleep_goal REAL
 );
 CREATE TABLE outreach (
     path TEXT NOT NULL REFERENCES notes(path) ON DELETE CASCADE,
@@ -312,7 +312,7 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
         }
         Some(Note::Plan(pl)) => {
             tx.execute(
-                "INSERT INTO plan VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO plan VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 params![
                     p,
                     pl.name,
@@ -321,7 +321,9 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
                     pl.start_weight,
                     pl.target_weight,
                     pl.steps_goal,
-                    pl.protein_goal
+                    pl.protein_goal,
+                    pl.active_energy_goal,
+                    pl.sleep_goal
                 ],
             )?;
         }

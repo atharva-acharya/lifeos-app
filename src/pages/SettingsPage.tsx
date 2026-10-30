@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { chooseVaultFolder, getSettings, type AppSettings } from "../api";
 import { DiagnosticsSettings } from "../components/DiagnosticsSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
+import { HealthSettings } from "../components/HealthSettings";
 import { SetupChecklist } from "../components/SetupChecklist";
 import { UpdateSettings } from "../components/UpdateSettings";
 import type { GuideId } from "../guides";
@@ -102,6 +103,10 @@ export function SettingsPage({ openGuide = null }: { openGuide?: GuideId | null 
             {status === "choosing" ? "Choosing…" : vault ? "Change folder" : "Choose folder"}
           </button>
         </section>
+
+        {settings && (
+          <HealthSettings healthPath={settings.healthPath ?? null} onChange={setSettings} />
+        )}
 
         {settings && <GoogleSettings google={settings.google} onChange={setSettings} />}
 

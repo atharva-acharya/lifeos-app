@@ -7,9 +7,8 @@ use serde::Serialize;
 use crate::index::Index;
 use crate::settings::{Onboarding, Settings};
 
-/// Checklist items in display order. The `health` item joins when that
-/// feature ships. Anything else the UI sends is refused.
-pub const ITEM_IDS: &[&str] = &["vault", "daily", "plan", "sheet", "projects"];
+/// Checklist items in display order. Anything else the UI sends is refused.
+pub const ITEM_IDS: &[&str] = &["vault", "daily", "plan", "sheet", "projects", "health"];
 const PLAN_PATH: &str = "Fitness/Plan.md";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -51,6 +50,7 @@ fn title(id: &str) -> &'static str {
         "daily" => "Daily notes",
         "plan" => "Fitness plan",
         "sheet" => "Google Sheet",
+        "health" => "Health export",
         _ => "Projects",
     }
 }
@@ -95,6 +95,7 @@ pub fn compute(settings: &Settings, google_connected: bool, index: Option<&Index
                     None => (false, None),
                 },
                 "sheet" => (google_ready, None),
+                "health" => (settings.health_path.is_some(), None),
                 _ => (projects, None),
             };
             SetupItem {
@@ -171,7 +172,7 @@ mod tests {
     #[test]
     fn blank_profile_has_nothing_done() {
         let s = compute(&Settings::default(), false, None);
-        assert_eq!((s.set_up, s.skipped, s.total), (0, 0, 5));
+        assert_eq!((s.set_up, s.skipped, s.total), (0, 0, 6));
         assert!(!s.complete);
         assert!(item(&s, "vault").required);
         assert!(s.items.iter().all(|i| !i.done && i.detail.is_none()));
@@ -187,6 +188,18 @@ mod tests {
         assert!(item(&s, "projects").done);
         assert!(!item(&s, "sheet").done);
         assert_eq!((s.set_up, s.skipped), (4, 0));
+        assert!(!item(&s, "health").done);
+    }
+
+    #[test]
+    fn health_is_done_once_its_folder_is_set() {
+        let mut settings = with_vault();
+        assert!(!item(&compute(&settings, false, None), "health").done);
+        settings.health_path = Some(PathBuf::from("health"));
+        let s = compute(&settings, false, None);
+        assert!(item(&s, "health").done);
+        assert!(!item(&s, "health").required);
+        assert_eq!((s.set_up, s.total), (2, 6));
     }
 
     #[test]
@@ -251,6 +264,8 @@ mod tests {
         let index = fixture_index();
         let mut settings = with_vault();
         skip(&mut settings.onboarding, "sheet").expect("skip");
+        assert!(!compute(&settings, false, Some(&index)).complete);
+        skip(&mut settings.onboarding, "health").expect("skip");
         assert!(compute(&settings, false, Some(&index)).complete);
     }
 
@@ -259,7 +274,7 @@ mod tests {
         let mut o = Onboarding::default();
         assert_eq!(skip(&mut o, "nope"), Err(OnboardingError::UnknownItem));
         assert_eq!(skip(&mut o, ""), Err(OnboardingError::UnknownItem));
-        assert_eq!(skip(&mut o, "health"), Err(OnboardingError::UnknownItem));
+        assert_eq!(skip(&mut o, "Health"), Err(OnboardingError::UnknownItem));
         assert_eq!(skip(&mut o, "vault"), Err(OnboardingError::Required));
         assert_eq!(unskip(&mut o, "../x"), Err(OnboardingError::UnknownItem));
         assert!(o.skipped.is_empty());

@@ -12,7 +12,7 @@ function running(): RunningApp {
 
 test.beforeAll(async () => {
   test.setTimeout(120_000);
-  app = await launchApp({ vault: false });
+  app = await launchApp({ vault: false, health: true });
 });
 
 test.afterAll(async () => {
@@ -20,7 +20,7 @@ test.afterAll(async () => {
 });
 
 test("sample data is labelled everywhere, read-only, and leaves no trace", async () => {
-  const { page, data, errors } = running();
+  const { page, data, healthDir, errors } = running();
   const settingsFile = join(data, "settings.json");
 
   await expect(page.getByRole("heading", { level: 1, name: "Welcome to Life OS" })).toBeVisible();
@@ -56,6 +56,15 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   await expect(page.getByRole("heading", { name: "Weight trend" })).toBeVisible();
   await expect(page.locator(".line-chart__dot").first()).toBeVisible();
 
+  // Health: the sample export, never the owner's own folder (which is set
+  // and holds 9,120 steps today).
+  await goTo("Health");
+  await expect(page.getByRole("heading", { name: "Trends" })).toBeVisible();
+  await expect(page.getByText("5,511 /")).toBeVisible();
+  await expect(page.getByText("9,120")).toHaveCount(0);
+  await expect(page.getByText("Outdoor Run").first()).toBeVisible();
+  await expect(page.locator("section.placeholder")).toHaveCount(0);
+
   // Projects
   await goTo("Projects");
   await expect(page.getByRole("heading", { name: "home-lab" })).toBeVisible();
@@ -73,6 +82,9 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
     expect(await control.isDisabled()).toBe(true);
   }
   await expect(page.getByRole("button", { name: "Choose folder" })).toBeDisabled();
+  // The Health folder cannot be changed either.
+  await expect(page.getByRole("button", { name: "Change Health folder" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Remove" })).toBeDisabled();
   // The setup checklist is hidden, so it cannot be skipped into the demo.
   await expect(page.getByRole("region", { name: "Setup" })).toHaveCount(0);
 
@@ -88,6 +100,8 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   }
   expect(existsSync(join(data, "sample"))).toBe(false);
   expect(existsSync(join(data, "index-sample.db"))).toBe(false);
+  // The owner's Health folder is still set, and was left as it was.
+  expect(JSON.parse(readFileSync(settingsFile, "utf8"))).toHaveProperty("healthPath", healthDir);
 
   await expect(page.locator("[role=alert]")).toHaveCount(0);
   await expect(page.locator("[data-error-boundary]")).toHaveCount(0);

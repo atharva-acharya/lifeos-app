@@ -9,6 +9,7 @@ vi.mock("../components/DiagnosticsSettings", () => ({ DiagnosticsSettings: () =>
 vi.mock("../components/SetupChecklist", () => ({ SetupChecklist: () => null }));
 
 const VAULT = "D:\\Notes\\Life OS";
+const HEALTH = String.raw`D:\iCloud\Health`;
 const SHEET = "1AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789-ab";
 const NO_GOOGLE = {
   clientId: "",
@@ -25,6 +26,44 @@ describe("SettingsPage", () => {
     expect(await screen.findByText("Not set")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose folder" })).toBeEnabled();
     expect(invoke).toHaveBeenCalledWith("get_settings");
+  });
+
+  it("shows the Health export card next to the vault card", async () => {
+    invoke.mockResolvedValueOnce({
+      vaultPath: VAULT,
+      healthPath: HEALTH,
+      google: NO_GOOGLE,
+    });
+    render(<SettingsPage />);
+    expect(await screen.findByRole("heading", { name: "Health export" })).toBeInTheDocument();
+    expect(screen.getByText(HEALTH)).toBeInTheDocument();
+    // The vault card keeps its own button.
+    expect(screen.getByRole("button", { name: "Change folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change Health folder" })).toBeInTheDocument();
+  });
+
+  it("shows a refused Health folder on its own card and keeps the old folder", async () => {
+    invoke
+      .mockResolvedValueOnce({ vaultPath: VAULT, healthPath: HEALTH, google: NO_GOOGLE })
+      .mockRejectedValueOnce("the chosen Health folder is a link or junction; <b>pick</b> it");
+    const { container } = render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Change Health folder" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("link or junction");
+    // Text, not markup.
+    expect(alert).toHaveTextContent("<b>pick</b>");
+    expect(container.querySelector("b")).toBeNull();
+    expect(screen.getByText(HEALTH)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change Health folder" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeEnabled();
+    expect(screen.getByText(VAULT)).toBeInTheDocument();
+  });
+
+  it("treats a missing healthPath from an older backend as not chosen", async () => {
+    invoke.mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
+    render(<SettingsPage />);
+    expect(await screen.findByText("Not chosen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose Health folder" })).toBeEnabled();
   });
 
   it("shows the connected vault", async () => {

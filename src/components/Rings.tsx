@@ -6,6 +6,8 @@ export interface Ring {
   goal: number;
   color: string;
   unit?: string;
+  /** Writes a value in the legend (e.g. "7 h 12 min"); overrides `unit`. */
+  format?: (n: number) => string;
 }
 
 const STROKE = 14;
@@ -15,6 +17,11 @@ const GAP = 4;
 export function progress(value: number, goal: number): number {
   if (!(goal > 0) || !Number.isFinite(value) || value <= 0) return 0;
   return Math.min(1, value / goal);
+}
+
+function legendValue(r: Ring, n: number): string {
+  if (r.format) return r.format(n);
+  return `${Math.round(n).toLocaleString("en-GB")}${r.unit ?? ""}`;
 }
 
 /** Concentric activity rings in the style of Apple Health. The legend
@@ -64,9 +71,7 @@ export function Rings({ rings, size = 168 }: { rings: Ring[]; size?: number }) {
               <span className="bar-chart__swatch" style={{ background: r.color }} />
               <span className="rings__name">{r.name}</span>
               <span className="rings__value">
-                {Math.round(r.value).toLocaleString("en-GB")}
-                {r.unit ?? ""} / {Math.round(r.goal).toLocaleString("en-GB")}
-                {r.unit ?? ""}
+                {legendValue(r, r.value)} / {legendValue(r, r.goal)}
               </span>
             </li>
           ))}

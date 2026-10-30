@@ -10,6 +10,7 @@ use crate::applications::{self, Cache};
 use crate::diagnostics::{self, Diagnostics};
 use crate::fitness::{self, Fitness};
 use crate::google::{self, GoogleConfig};
+use crate::health::{self, Health, HealthState};
 use crate::jobs::{self, Jobs};
 use crate::live::{self, LiveState, Mode};
 use crate::onboarding::{self, Setup};
@@ -23,6 +24,7 @@ use crate::updates::{self, Pending, UpdateInfo};
 #[serde(rename_all = "camelCase")]
 pub struct SettingsView {
     pub vault_path: Option<String>,
+    pub health_path: Option<String>,
     pub google: GoogleView,
     pub auto_update: bool,
 }
@@ -50,6 +52,7 @@ impl From<Settings> for SettingsView {
         });
         Self {
             vault_path: s.vault_path.map(|p| p.to_string_lossy().into_owned()),
+            health_path: s.health_path.map(|p| p.to_string_lossy().into_owned()),
             google,
             auto_update: s.auto_update.unwrap_or(true),
         }
@@ -111,6 +114,56 @@ pub async fn choose_vault_folder(
         live::start(&app, &vault)?;
     }
     Ok(current.into())
+}
+
+/// Opens the native folder picker for the Health Auto Export folder.
+/// Returns the new settings, or the current ones if the picker was cancelled.
+#[tauri::command]
+pub async fn choose_health_folder(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+) -> Result<SettingsView, String> {
+    state.require_real()?;
+    let dir = config_dir(&app)?;
+    let picked = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Choose your Health Auto Export folder")
+            .pick_folder()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    // Sample data may have been turned on while the picker was open.
+    state.require_real()?;
+    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+    if let Some(folder) = picked {
+        let folder = settings::validate_health_folder(&folder).map_err(|e| e.to_string())?;
+        current.health_path = Some(folder);
+        settings::save(&dir, &current).map_err(|e| e.to_string())?;
+        app.state::<HealthState>().clear();
+    }
+    Ok(current.into())
+}
+
+/// Forgets the Health folder. The folder itself is never touched.
+#[tauri::command]
+pub async fn clear_health_folder(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+) -> Result<SettingsView, String> {
+    state.require_real()?;
+    let dir = config_dir(&app)?;
+    // Settings are files; keep that off the UI thread. Clearing bumps the
+    // generation, so an import still running cannot bring the folder back.
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+        current.health_path = None;
+        settings::save(&dir, &current).map_err(|e| e.to_string())?;
+        app.state::<HealthState>().clear();
+        Ok(current.into())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(Debug, Serialize)]
@@ -380,6 +433,79 @@ pub fn get_projects(state: tauri::State<'_, LiveState>) -> Result<ProjectsRespon
     }
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum HealthResponse {
+    /// No Health folder chosen yet.
+    NotConfigured,
+    Ready {
+        health: Box<Health>,
+    },
+}
+
+/// Which folder `get_health` reads. Sample data reads only its own synthetic
+/// folder, and the owner's configured folder is not even looked up
+/// (threat model T23); in real mode it comes from settings.
+fn health_folder(
+    mode: Mode,
+    sample_data_dir: impl FnOnce() -> Result<PathBuf, String>,
+    configured: impl FnOnce() -> Result<Option<PathBuf>, String>,
+) -> Result<Option<PathBuf>, String> {
+    match mode {
+        Mode::Sample => Ok(Some(sample::health_dir(&sample_data_dir()?))),
+        Mode::Real => configured(),
+    }
+}
+
+/// Apple Health data from the export folder, with the 90-day window ending
+/// on `date` (the owner's local date, YYYY-MM-DD) and `now_ms` the current
+/// time. The folder comes from settings, never from the UI. Works without a
+/// vault; the vault then adds nothing (default goals, no vault workouts).
+#[tauri::command]
+pub async fn get_health(
+    app: AppHandle,
+    date: String,
+    now_ms: i64,
+) -> Result<HealthResponse, String> {
+    if !crate::vault::note::is_iso_date(&date) || crate::fitness::shift_days(&date, 0) != date {
+        return Err("date must look like 2026-10-29".to_owned());
+    }
+    let mode = app.state::<LiveState>().mode();
+    let Some(folder) = health_folder(
+        mode,
+        || cache_dir(&app),
+        || {
+            let dir = config_dir(&app)?;
+            Ok(settings::load(&dir).map_err(|e| e.to_string())?.health_path)
+        },
+    )?
+    else {
+        return Ok(HealthResponse::NotConfigured);
+    };
+    // Opening an iCloud placeholder can download it, so keep this off the UI thread.
+    tauri::async_runtime::spawn_blocking(move || {
+        let imported = app
+            .state::<HealthState>()
+            .load(&folder)
+            .map_err(|e| format!("the Health folder could not be read: {}", e.kind()))?;
+        // The mode changed while the import ran: never hand data from the
+        // other side to a UI that has switched.
+        if app.state::<LiveState>().mode() != mode {
+            return Err(live::SAMPLE_REFUSED.to_owned());
+        }
+        let view = app
+            .state::<LiveState>()
+            .with_index(|index| health::health(&imported, Some(index), &date, now_ms))
+            .unwrap_or_else(|| health::health(&imported, None, &date, now_ms))
+            .map_err(|e| e.to_string())?;
+        Ok(HealthResponse::Ready {
+            health: Box::new(view),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Records a UI error in the local log; nothing is sent anywhere.
 #[tauri::command]
 pub fn log_error(app: AppHandle, message: String) -> Result<(), String> {
@@ -511,6 +637,7 @@ pub async fn enter_sample_mode(
     // Already in sample mode: close the old index but keep refusing like
     // sample mode while the files are rebuilt (never pass through real mode).
     state.begin_rebuild();
+    app.state::<HealthState>().clear();
     let built = sample::applications(&date)
         .and_then(|apps| sample::build(&data, &date).map(|(v, i)| (v, i, apps)));
     match built {
@@ -533,6 +660,7 @@ pub async fn enter_sample_mode(
 /// regardless (leftovers are removed again at the next start).
 fn leave_sample(app: &AppHandle, state: &LiveState) {
     state.clear();
+    app.state::<HealthState>().clear();
     if let Ok(dir) = cache_dir(app)
         && let Err(e) = sample::cleanup(&dir)
     {
@@ -563,4 +691,39 @@ pub async fn exit_sample_mode(
     let _switching = state.switching().await;
     leave_sample(&app, &state);
     Ok(Mode::Real)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+
+    #[test]
+    fn sample_mode_never_looks_up_the_owners_health_folder() {
+        let folder = health_folder(
+            Mode::Sample,
+            || Ok(PathBuf::from("data")),
+            || panic!("the configured Health folder was read in sample mode"),
+        )
+        .expect("folder");
+        assert_eq!(folder, Some(sample::health_dir(Path::new("data"))));
+        assert!(
+            folder
+                .expect("folder")
+                .starts_with(sample::sample_dir(Path::new("data")))
+        );
+    }
+
+    #[test]
+    fn real_mode_uses_the_configured_folder_or_none() {
+        let set = health_folder(
+            Mode::Real,
+            || panic!("sample folder used in real mode"),
+            || Ok(Some(PathBuf::from("health"))),
+        );
+        assert_eq!(set, Ok(Some(PathBuf::from("health"))));
+        let unset = health_folder(Mode::Real, || panic!("unused"), || Ok(None));
+        assert_eq!(unset, Ok(None));
+    }
 }
