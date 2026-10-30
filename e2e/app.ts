@@ -1,5 +1,7 @@
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -8,6 +10,63 @@ const ROOT = resolve(import.meta.dirname, "..");
 const EXE = join(ROOT, "src-tauri", "target", "debug", "lifeos-app.exe");
 const FIXTURE_VAULT = join(ROOT, "src-tauri", "tests", "fixtures", "vault");
 const FIXTURE_CACHE = join(ROOT, "e2e", "fixtures", "applications.json");
+const FIXTURE_UPDATE = join(ROOT, "e2e", "fixtures", "update");
+
+/**
+ * Which forged update the local stand-in for GitHub Releases offers. The app
+ * trusts a throwaway test key (`test-key.pub`) in these runs:
+ * - "wrong-key": version 9.9.9 signed with a different key.
+ * - "replay": a genuine signature for version 0.0.1 announced as 9.9.9 (a
+ *   downgrade dressed up as an update).
+ * Both must be refused. The app never contacts GitHub during tests.
+ */
+export type UpdateScenario = "wrong-key" | "replay";
+
+async function startUpdateServer(): Promise<{
+  server: Server;
+  endpoint: string;
+  use: (scenario: UpdateScenario) => void;
+}> {
+  const installer = readFileSync(join(FIXTURE_UPDATE, "fake-setup.exe"));
+  const signatures: Record<UpdateScenario, string> = {
+    "wrong-key": readFileSync(join(FIXTURE_UPDATE, "wrong-key.sig"), "utf8").trim(),
+    replay: readFileSync(join(FIXTURE_UPDATE, "replay.sig"), "utf8").trim(),
+  };
+  let scenario: UpdateScenario = "wrong-key";
+  const server = createServer((req, res) => {
+    const { port } = server.address() as AddressInfo;
+    if (req.url === "/latest.json") {
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          version: "9.9.9",
+          notes: "Test update",
+          pub_date: "2026-01-01T00:00:00Z",
+          platforms: {
+            "windows-x86_64": {
+              signature: signatures[scenario],
+              url: `http://127.0.0.1:${String(port)}/fake-setup.exe`,
+            },
+          },
+        }),
+      );
+    } else if (req.url === "/fake-setup.exe") {
+      res.end(installer);
+    } else {
+      res.statusCode = 404;
+      res.end();
+    }
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const { port } = server.address() as AddressInfo;
+  return {
+    server,
+    endpoint: `http://127.0.0.1:${String(port)}/latest.json`,
+    use: (next) => {
+      scenario = next;
+    },
+  };
+}
 const PORT = 9333;
 
 export interface RunningApp {
@@ -15,6 +74,10 @@ export interface RunningApp {
   vault: string;
   /** Uncaught page errors seen so far. */
   errors: string[];
+  /** The app's stdout and stderr so far (for diagnosing failures). */
+  output: () => string;
+  /** Switches the forged update the local update server offers. */
+  offerUpdate: (scenario: UpdateScenario) => void;
   close: () => Promise<void>;
 }
 
@@ -42,10 +105,13 @@ export async function launchApp(): Promise<RunningApp> {
   });
   writeFileSync(join(data, "applications.json"), JSON.stringify(cache));
 
+  const updates = await startUpdateServer();
   const child: ChildProcess = spawn(EXE, [], {
     env: {
       ...process.env,
       LIFEOS_DATA_DIR: data,
+      LIFEOS_UPDATE_ENDPOINT: updates.endpoint,
+      LIFEOS_UPDATE_PUBKEY: readFileSync(join(FIXTURE_UPDATE, "test-key.pub"), "utf8").trim(),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${String(PORT)}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -68,7 +134,10 @@ export async function launchApp(): Promise<RunningApp> {
     page,
     vault,
     errors,
+    output: () => output,
+    offerUpdate: updates.use,
     close: async () => {
+      updates.server.close();
       await browser.close().catch(() => undefined);
       child.kill();
     },

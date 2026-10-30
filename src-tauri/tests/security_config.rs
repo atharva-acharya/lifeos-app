@@ -104,6 +104,9 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-get-jobs",
             "allow-log-error",
             "allow-get-diagnostics",
+            "allow-set-auto-update",
+            "allow-check-for-update",
+            "allow-install-update",
         ]
     );
 }

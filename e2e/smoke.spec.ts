@@ -1,7 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { launchApp, type RunningApp } from "./app";
+
+/** The version under test, so these tests survive version bumps. */
+const APP_VERSION = (
+  JSON.parse(
+    readFileSync(join(import.meta.dirname, "..", "src-tauri", "tauri.conf.json"), "utf8"),
+  ) as {
+    version: string;
+  }
+).version;
 
 let app: RunningApp | undefined;
 
@@ -105,8 +114,36 @@ test("an uncaught error is logged locally and shown in Diagnostics", async () =>
   await page.getByRole("button", { name: "Today" }).click();
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
-  await expect(page.getByText("Version 0.2.0")).toBeVisible();
+  await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
   await expect(page.getByText("1 recent error logged")).toBeVisible();
+});
+
+test("an update signed with the wrong key is offered but refused", async () => {
+  const { page } = running();
+  // The start-up check found the local test server's version 9.9.9.
+  const banner = page.getByLabel("Update available");
+  await expect(banner).toContainText("Life OS 9.9.9 is available.");
+  await banner.getByRole("button", { name: "Install and restart" }).click();
+  await expect(banner.getByRole("alert")).toContainText("failed its security check", {
+    timeout: 15_000,
+  });
+  await banner.getByRole("button", { name: "Dismiss" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
+});
+
+test("an old signed release announced as new is refused (no downgrade)", async () => {
+  const { page, offerUpdate } = running();
+  offerUpdate("replay");
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByText("Version 9.9.9 is available.")).toBeVisible();
+  await page.getByRole("button", { name: "Install and restart" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "failed its security check" }),
+  ).toBeVisible({ timeout: 15_000 });
+  // Nothing was installed: same process, same version.
+  await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 
 test("the page cannot reach the network or load remote scripts", async () => {

@@ -7,12 +7,15 @@ pub mod jobs;
 mod live;
 pub mod settings;
 pub mod today;
+mod updates;
 pub mod vault;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(live::LiveState::default())
+        .manage(updates::Pending::default())
         .setup(|app| {
             // Panics go to the local error log as well as stderr.
             if let Ok(dir) = commands::cache_dir(app.handle()) {
@@ -52,7 +55,10 @@ pub fn run() {
             commands::refresh_applications,
             commands::get_jobs,
             commands::log_error,
-            commands::get_diagnostics
+            commands::get_diagnostics,
+            commands::set_auto_update,
+            commands::check_for_update,
+            commands::install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running Life OS");
