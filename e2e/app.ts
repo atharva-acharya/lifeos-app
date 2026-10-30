@@ -72,6 +72,8 @@ const PORT = 9333;
 export interface RunningApp {
   page: Page;
   vault: string;
+  /** The app's data folder (settings.json, caches, the sample folder). */
+  data: string;
   /** Uncaught page errors seen so far. */
   errors: string[];
   /** The app's stdout and stderr so far (for diagnosing failures). */
@@ -132,29 +134,32 @@ function writeFitnessNotes(vault: string): void {
 }
 
 /** Starts the debug build against a copy of the synthetic vault in a throwaway data folder. */
-export async function launchApp(): Promise<RunningApp> {
+export async function launchApp(options: { vault?: boolean } = {}): Promise<RunningApp> {
+  const withVault = options.vault ?? true;
   const work = mkdtempSync(join(tmpdir(), "lifeos-e2e-"));
   const vault = join(work, "vault");
   const data = join(work, "data");
-  cpSync(FIXTURE_VAULT, vault, { recursive: true });
   mkdirSync(data);
-  writeFitnessNotes(vault);
-  writeFileSync(join(data, "settings.json"), JSON.stringify({ vaultPath: vault }));
-  // A saved copy of the Sheet (synthetic, Sheet-style values), so the Jobs
-  // tabs work without Google. One row is dated today for the weekly chart.
-  const cache = JSON.parse(readFileSync(FIXTURE_CACHE, "utf8")) as {
-    fetchedAt: number;
-    rows: Record<string, string | null>[];
-  };
-  cache.fetchedAt = Date.now();
-  cache.rows.push({
-    applied: new Date().toLocaleDateString("en-CA"),
-    company: "Today Example",
-    role: "SOC Analyst",
-    source: "Indeed",
-    status: "Applied",
-  });
-  writeFileSync(join(data, "applications.json"), JSON.stringify(cache));
+  if (withVault) {
+    cpSync(FIXTURE_VAULT, vault, { recursive: true });
+    writeFitnessNotes(vault);
+    writeFileSync(join(data, "settings.json"), JSON.stringify({ vaultPath: vault }));
+    // A saved copy of the Sheet (synthetic, Sheet-style values), so the Jobs
+    // tabs work without Google. One row is dated today for the weekly chart.
+    const cache = JSON.parse(readFileSync(FIXTURE_CACHE, "utf8")) as {
+      fetchedAt: number;
+      rows: Record<string, string | null>[];
+    };
+    cache.fetchedAt = Date.now();
+    cache.rows.push({
+      applied: new Date().toLocaleDateString("en-CA"),
+      company: "Today Example",
+      role: "SOC Analyst",
+      source: "Indeed",
+      status: "Applied",
+    });
+    writeFileSync(join(data, "applications.json"), JSON.stringify(cache));
+  }
 
   const updates = await startUpdateServer();
   const child: ChildProcess = spawn(EXE, [], {
@@ -184,6 +189,7 @@ export async function launchApp(): Promise<RunningApp> {
   return {
     page,
     vault,
+    data,
     errors,
     output: () => output,
     offerUpdate: updates.use,

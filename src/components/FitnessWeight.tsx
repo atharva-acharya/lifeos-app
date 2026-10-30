@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import type { FitnessDay, FitnessPlan } from "../api";
 import { averageChange, calendar, rollingAverage, shortLabel, targetLine } from "../fitnessStats";
+import type { Navigate } from "../routes";
+import { EmptyHint } from "./EmptyHint";
 import { LineChart, type Line } from "./LineChart";
 
 const DAYS = 90;
@@ -16,10 +18,12 @@ export function FitnessWeight({
   days,
   plan,
   today,
+  onNavigate,
 }: {
   days: FitnessDay[];
   plan: FitnessPlan | null;
   today: string;
+  onNavigate?: Navigate;
 }) {
   const view = useMemo(() => {
     // Average over the warm-up days too, then plot only the last 90.
@@ -80,7 +84,10 @@ export function FitnessWeight({
         )}
       </header>
       {readings.length === 0 ? (
-        <p className="muted">No weigh-ins in the last 90 days.</p>
+        <EmptyHint lead="No weigh-ins in the last 90 days." guide="daily" onNavigate={onNavigate}>
+          Weight comes from <code>type: daily</code> notes with <code>weight</code> (kg). Steps and
+          protein come from <code>steps</code> and <code>protein_g</code> in the same notes.
+        </EmptyHint>
       ) : (
         <>
           <div className="chart__plot" aria-hidden="true">

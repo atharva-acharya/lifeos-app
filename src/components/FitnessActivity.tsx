@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { FitnessDay } from "../api";
 import { calendar, shortLabel } from "../fitnessStats";
 import { BarChart, type Series } from "./BarChart";
+import { EmptyHint } from "./EmptyHint";
 
 const DAYS = 14;
 
@@ -54,6 +55,7 @@ export function FitnessActivity({
     [days, proteinGoal, today],
   );
   const hits = rows.filter((r) => r.hit === "hit").length;
+  const nothingLogged = rows.every((r) => r.loggedSteps === null && r.proteinG === null);
 
   return (
     <section className="card chart" aria-labelledby="fitness-activity">
@@ -69,6 +71,11 @@ export function FitnessActivity({
           days
         </span>
       </header>
+      {nothingLogged && (
+        <EmptyHint lead="No steps or protein logged in the last 14 days.">
+          Add <code>steps</code> and <code>protein_g</code> to your <code>type: daily</code> notes.
+        </EmptyHint>
+      )}
       <div className="chart__plot" aria-hidden="true">
         <BarChart data={rows} label={(r) => r.label} series={STEPS} />
       </div>

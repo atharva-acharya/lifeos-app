@@ -1,3 +1,4 @@
+import { useMode } from "../mode";
 import { MAIN_ROUTES, SETTINGS_ROUTE, type Route, type RouteId } from "../routes";
 import { NavIcon } from "./NavIcon";
 
@@ -26,12 +27,18 @@ function NavButton({ route, current, onNavigate }: { route: Route } & SidebarPro
 }
 
 export function Sidebar({ current, onNavigate }: SidebarProps) {
+  const mode = useMode();
   return (
     <aside className="sidebar">
       <div className="brand">
         <span className="brand__mark" aria-hidden="true" />
         Life OS
       </div>
+      {mode === "sample" && (
+        <p className="sidebar__mode">
+          <span className="pill pill--read">Sample</span>
+        </p>
+      )}
       <nav aria-label="Main">
         <ul className="nav">
           {MAIN_ROUTES.map((route) => (

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-unskip-setup-item"
+description = "Enables the unskip_setup_item command without any pre-configured scope."
+commands.allow = ["unskip_setup_item"]
+
+[[permission]]
+identifier = "deny-unskip-setup-item"
+description = "Denies the unskip_setup_item command without any pre-configured scope."
+commands.deny = ["unskip_setup_item"]

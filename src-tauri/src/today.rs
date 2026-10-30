@@ -9,6 +9,8 @@ use crate::index::Index;
 #[serde(rename_all = "camelCase")]
 pub struct Today {
     pub date: String,
+    /// A `type: daily` note exists for `date`; without one the numbers below are blank, not zero.
+    pub has_daily_note: bool,
     pub weight: Option<f64>,
     /// Change since the previous weigh-in.
     pub weight_change: Option<f64>,
@@ -80,6 +82,7 @@ pub fn today(index: &Index, date: &str) -> rusqlite::Result<Today> {
         )
         .optional()?;
     if let Some((weight, applications, gym, steps, protein_g, meals, mobility)) = day {
+        out.has_daily_note = true;
         out.weight = weight;
         out.applications = applications;
         out.gym = gym;
@@ -201,6 +204,7 @@ mod tests {
     #[test]
     fn builds_today_from_the_fixture_vault() {
         let t = today(&fixture_index(), "2026-01-13").expect("today");
+        assert!(t.has_daily_note);
         assert_eq!(t.weight, Some(83.9));
         assert_eq!(t.weight_change, Some(-0.2));
         assert_eq!(t.applications, Some(4));
@@ -250,6 +254,7 @@ mod tests {
     #[test]
     fn empty_day_has_no_values() {
         let t = today(&fixture_index(), "2030-01-01").expect("today");
+        assert!(!t.has_daily_note);
         assert_eq!(t.weight, None);
         assert_eq!(t.weight_change, None);
         assert_eq!(t.habits, Habits::default());

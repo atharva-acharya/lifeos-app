@@ -15,6 +15,13 @@ const COMMANDS: &[&str] = &[
     "set_auto_update",
     "check_for_update",
     "install_update",
+    "get_setup",
+    "skip_setup_item",
+    "unskip_setup_item",
+    "dismiss_setup",
+    "get_mode",
+    "enter_sample_mode",
+    "exit_sample_mode",
 ];
 
 fn main() {

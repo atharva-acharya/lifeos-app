@@ -5,7 +5,8 @@ import {
   type Application,
   type ApplicationsView,
 } from "../api";
-import type { RouteId } from "../routes";
+import type { Navigate } from "../routes";
+import { NotConnected } from "./NotConnected";
 
 const STALE_MS = 15 * 60 * 1000;
 
@@ -33,7 +34,7 @@ function unique(rows: Application[], key: "status" | "source"): string[] {
   return [...new Set(rows.map((r) => r[key]).filter((v): v is string => v !== null))].sort();
 }
 
-export function ApplicationsTab({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
+export function ApplicationsTab({ onNavigate }: { onNavigate: Navigate }) {
   const [view, setView] = useState<ApplicationsView | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState("all");
@@ -105,19 +106,9 @@ export function ApplicationsTab({ onNavigate }: { onNavigate: (id: RouteId) => v
 
   if (!view.cache && !view.connected) {
     return (
-      <section className="card placeholder">
-        <span className="pill pill--pending">Not connected</span>
-        <p>Connect your Google Sheet in Settings to see your applications here.</p>
-        <button
-          type="button"
-          className="button"
-          onClick={() => {
-            onNavigate("settings");
-          }}
-        >
-          Open settings
-        </button>
-      </section>
+      <NotConnected onNavigate={onNavigate}>
+        Connect your Google Sheet in Settings to see your applications here.
+      </NotConnected>
     );
   }
 

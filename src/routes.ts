@@ -1,3 +1,5 @@
+import type { GuideId } from "./guides";
+
 export type RouteId = "today" | "jobs" | "fitness" | "projects" | "search" | "settings";
 
 export interface Route {
@@ -55,3 +57,6 @@ export const SETTINGS_ROUTE: Route = {
 };
 
 export const ALL_ROUTES: readonly Route[] = [...MAIN_ROUTES, SETTINGS_ROUTE];
+
+/** Moves to a page; for Settings, `guide` opens that setup item's guide. */
+export type Navigate = (id: RouteId, guide?: GuideId) => void;
