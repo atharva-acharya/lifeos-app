@@ -181,6 +181,7 @@ test("Money splits a bill and settles up", async () => {
   await expect(page.getByText("Alex owes you £10.00")).toBeVisible();
 
   await page.getByRole("button", { name: "Settle up with Sam" }).click();
+  await page.getByRole("button", { name: "Confirm £10.00 paid by Sam" }).click();
   await expect(page.getByText("Settled up with Sam")).toBeVisible();
   const text = readFileSync(join(vault, "Money", "Splits.md"), "utf8");
   expect(text).toContain("| E2E dinner | Sam | 10.00 |");

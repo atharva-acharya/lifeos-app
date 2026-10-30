@@ -34,7 +34,12 @@ describe("MoneySplits", () => {
     mockCommands({ settle_up: undefined });
     const onChanged = renderSplits();
     expect(screen.queryByRole("button", { name: "Settle up with Kim" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Settle up with Alex" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(invoke).not.toHaveBeenCalledWith("settle_up", expect.anything());
+
     fireEvent.click(screen.getByRole("button", { name: "Settle up with Sam" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm £12.00 paid by Sam" }));
     expect(await screen.findByText("Recorded a settle-up with Sam.")).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("settle_up", {
       friend: "Sam",

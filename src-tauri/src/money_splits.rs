@@ -98,6 +98,11 @@ fn clean_name(name: &str) -> Result<String, String> {
     Ok(n)
 }
 
+/// Names match ignoring case in any script ("Zoë" is "ZOË"), as in the UI.
+fn same_name(a: &str, b: &str) -> bool {
+    a.to_lowercase() == b.to_lowercase()
+}
+
 fn check_date(date: &str) -> Result<(), String> {
     if is_iso_date(date) {
         Ok(())
@@ -117,12 +122,16 @@ impl NewSplit {
         if self.total <= 0 || self.total > MAX_AMOUNT_PENCE {
             return Err("The total must be more than £0 and at most £10,000,000.".into());
         }
+        // Cap before the pairwise duplicate check below.
+        if self.people.len() > MAX_FRIENDS + 1 {
+            return Err(format!("Add between 1 and {MAX_FRIENDS} friends."));
+        }
         let mut names: Vec<Option<String>> = Vec::with_capacity(self.people.len());
         for p in &self.people {
             let name = p.name.as_deref().map(clean_name).transpose()?;
             let taken = names.iter().any(|n| match (n, &name) {
                 (None, None) => true,
-                (Some(a), Some(b)) => a.eq_ignore_ascii_case(b),
+                (Some(a), Some(b)) => same_name(a, b),
                 _ => false,
             });
             if taken {
@@ -170,8 +179,17 @@ impl NewSplit {
     }
 
     /// The splits rows this adds: each friend's share when the owner paid,
-    /// or what the owner owes the friend who paid.
+    /// or what the owner owes the friend who paid. A split where nobody owes
+    /// anything is refused rather than saved as nothing.
     pub fn rows(&self) -> Result<Vec<SplitRow>, String> {
+        let rows = self.owed()?;
+        if rows.is_empty() {
+            return Err("Nothing to record: no one owes anything in this split.".into());
+        }
+        Ok(rows)
+    }
+
+    fn owed(&self) -> Result<Vec<SplitRow>, String> {
         let shares = self.shares()?;
         let description = cell(&self.description);
         let row = |friend: &str, amount: i64| SplitRow {
@@ -189,7 +207,7 @@ impl NewSplit {
             Some(payer) => {
                 let payer = shares
                     .iter()
-                    .find_map(|(n, _)| n.as_ref().filter(|n| n.eq_ignore_ascii_case(&payer)))
+                    .find_map(|(n, _)| n.as_ref().filter(|n| same_name(n, &payer)))
                     .ok_or("The person who paid must be in the split.")?;
                 let mine = shares
                     .iter()
@@ -219,28 +237,19 @@ fn values(rows: &[SplitRow]) -> Vec<Vec<Value<'static>>> {
         .collect()
 }
 
-fn append(vault: &Path, rows: &[SplitRow]) -> Result<Option<WriteRecord>, String> {
-    if rows.is_empty() {
-        return Ok(None);
-    }
+fn append(vault: &Path, rows: &[SplitRow]) -> Result<WriteRecord, String> {
     write::append_rows(vault, SPLITS_NOTE, FRONT, SPLIT_COLUMNS, &values(rows))
-        .map(Some)
         .map_err(|e| format!("Could not save: {e}"))
 }
 
 /// Adds a split to `Money/Splits.md`.
-pub fn add(vault: &Path, split: &NewSplit) -> Result<Option<WriteRecord>, String> {
+pub fn add(vault: &Path, split: &NewSplit) -> Result<WriteRecord, String> {
     append(vault, &split.rows()?)
 }
 
 /// Records a settle-up: `amount` pence that clears what the friend owes
 /// (negative) or what the owner owes them (positive).
-pub fn settle(
-    vault: &Path,
-    friend: &str,
-    amount: i64,
-    date: &str,
-) -> Result<Option<WriteRecord>, String> {
+pub fn settle(vault: &Path, friend: &str, amount: i64, date: &str) -> Result<WriteRecord, String> {
     check_date(date)?;
     if amount == 0 || amount.abs() > MAX_AMOUNT_PENCE {
         return Err("The amount must be more than £0 and at most £10,000,000.".into());
@@ -260,7 +269,7 @@ pub fn balances(index: &Index) -> rusqlite::Result<(Vec<FriendBalance>, Vec<Spli
     let friends = conn
         .prepare(
             "SELECT MIN(friend), SUM(amount) AS b, MAX(date) FROM split
-             GROUP BY lower(friend) ORDER BY abs(b) DESC, MIN(friend)",
+             GROUP BY friend_key ORDER BY abs(b) DESC, MIN(friend)",
         )?
         .query_map([], |r| {
             Ok(FriendBalance {
@@ -421,6 +430,32 @@ mod tests {
         assert_eq!(b, vec![("Alex", 2_000), ("Sam", 0)]);
         assert_eq!(recent[0].description, "Settle-up");
         assert_eq!(recent.len(), 4);
+    }
+
+    #[test]
+    fn names_crowds_and_empty_splits_are_refused() {
+        let accents = split(
+            5_000,
+            Method::Equal,
+            vec![friend("Zoë", 0), friend("ZOË", 0)],
+        );
+        assert!(accents.rows().is_err(), "case is ignored beyond ASCII");
+        let crowd = split(
+            5_000,
+            Method::Equal,
+            (0..100_000).map(|i| friend(&format!("F{i}"), 0)).collect(),
+        );
+        assert!(
+            crowd.rows().is_err(),
+            "too many people is refused before any checks"
+        );
+        let nobody = split(1, Method::Equal, vec![me(0), friend("Sam", 0)]);
+        assert!(
+            nobody
+                .rows()
+                .expect_err("nobody owes")
+                .starts_with("Nothing to record")
+        );
     }
 
     #[test]

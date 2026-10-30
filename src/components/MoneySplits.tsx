@@ -34,6 +34,7 @@ type Message = { error: boolean; text: string } | null;
 
 function Balances({ friends, onChanged }: { friends: FriendBalance[]; onChanged: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [message, setMessage] = useState<Message>(null);
 
   const settle = (f: FriendBalance) => {
@@ -63,18 +64,43 @@ function Balances({ friends, onChanged }: { friends: FriendBalance[]; onChanged:
                 <span className="row__title">{balanceText(f)}</span>
                 <span className="row__sub">Last change {f.lastDate}</span>
               </div>
-              {f.balance !== 0 && (
-                <button
-                  type="button"
-                  className="button"
-                  disabled={busy !== null}
-                  onClick={() => {
-                    settle(f);
-                  }}
-                >
-                  Settle up with {f.friend}
-                </button>
-              )}
+              {f.balance !== 0 &&
+                (confirming === f.friend ? (
+                  <span className="setup__actions">
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      disabled={busy !== null}
+                      onClick={() => {
+                        setConfirming(null);
+                        settle(f);
+                      }}
+                    >
+                      Confirm {pounds(Math.abs(f.balance))}{" "}
+                      {f.balance > 0 ? `paid by ${f.friend}` : `paid to ${f.friend}`}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--quiet"
+                      onClick={() => {
+                        setConfirming(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      setConfirming(f.friend);
+                    }}
+                  >
+                    Settle up with {f.friend}
+                  </button>
+                ))}
             </li>
           ))}
         </ul>

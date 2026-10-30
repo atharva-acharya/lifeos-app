@@ -94,6 +94,8 @@ CREATE TABLE split (
     position INTEGER NOT NULL,
     date TEXT NOT NULL, description TEXT NOT NULL, friend TEXT NOT NULL,
     amount INTEGER NOT NULL,
+    -- Lower-cased in Rust (any script), so balances group as the UI matches.
+    friend_key TEXT NOT NULL,
     PRIMARY KEY (path, position)
 );
 CREATE TABLE project_log (
@@ -399,14 +401,15 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
         Some(Note::Splits(rows)) => {
             for (i, s) in rows.iter().take(MAX_LEDGER_ROWS).enumerate() {
                 tx.execute(
-                    "INSERT INTO split VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    "INSERT INTO split VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     params![
                         p,
                         i64::try_from(i).unwrap_or(i64::MAX),
                         s.date,
                         s.description,
                         s.friend,
-                        s.amount
+                        s.amount,
+                        s.friend.to_lowercase()
                     ],
                 )?;
             }

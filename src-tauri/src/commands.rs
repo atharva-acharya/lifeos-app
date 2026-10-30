@@ -575,8 +575,8 @@ pub fn import_csv(
     Ok(result)
 }
 
-fn log_split(app: &AppHandle, record: Option<&crate::vault::write::WriteRecord>) {
-    if let (Some(record), Ok(dir)) = (record, live::data_dir(app)) {
+fn log_split(app: &AppHandle, record: &crate::vault::write::WriteRecord) {
+    if let Ok(dir) = live::data_dir(app) {
         crate::vault::write::log_write(&dir, "append-row", money_splits::SPLITS_NOTE, record);
     }
     live::resync(app);
@@ -594,7 +594,7 @@ pub fn add_split(
         .vault()
         .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
     let record = money_splits::add(&vault, &split)?;
-    log_split(&app, record.as_ref());
+    log_split(&app, &record);
     Ok(())
 }
 
@@ -613,7 +613,7 @@ pub fn settle_up(
         .vault()
         .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
     let record = money_splits::settle(&vault, &friend, amount, &date)?;
-    log_split(&app, record.as_ref());
+    log_split(&app, &record);
     Ok(())
 }
 
