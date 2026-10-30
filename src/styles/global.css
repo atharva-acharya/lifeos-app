@@ -36,16 +36,21 @@ button {
   margin: 0;
   font-size: var(--fs-kicker);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  /* No outline; the transparent border keeps room for coloured ones. */
+  border: 1px solid transparent;
   border-radius: var(--radius);
   padding: var(--space-5);
+}
+
+a {
+  color: var(--accent);
 }
 
 .pill {
@@ -56,7 +61,8 @@ button {
   border-radius: var(--radius-pill);
   font-size: var(--fs-kicker);
   font-weight: 600;
-  border: 1px solid currentColor;
+  /* Opaque, so text contrast is the same on every surface (AA). */
+  background: color-mix(in srgb, currentColor 18%, var(--bg-page));
   white-space: nowrap;
 }
 

@@ -57,7 +57,7 @@ export function Rings({ rings, size = 168 }: { rings: Ring[]; size?: number }) {
                 r={radius}
                 stroke={r.color}
                 pathLength={1}
-                style={{ strokeDashoffset: 1 - p }}
+                style={{ strokeDashoffset: 1 - p, color: r.color }}
                 opacity={p > 0 ? 1 : 0}
               />
             </g>

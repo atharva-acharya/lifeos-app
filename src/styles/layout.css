@@ -27,7 +27,12 @@
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  background: linear-gradient(135deg, var(--c-read), var(--c-progress));
+  background: conic-gradient(
+    var(--ring-move),
+    var(--ring-exercise),
+    var(--ring-stand),
+    var(--ring-move)
+  );
 }
 
 .nav {
@@ -50,7 +55,7 @@
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-muted);
   text-align: left;
@@ -58,14 +63,18 @@
 }
 
 .nav__item:hover {
-  background: var(--bg-hover);
+  background: var(--bg-card);
   color: var(--text);
 }
 
 .nav__item[aria-current="page"] {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg-sidebar));
   color: var(--text);
-  box-shadow: inset 3px 0 0 var(--c-progress);
+  font-weight: 600;
+}
+
+.nav__item[aria-current="page"] .nav__icon {
+  color: var(--accent);
 }
 
 .nav__icon {
@@ -82,7 +91,7 @@
 
 .main {
   overflow-y: auto;
-  padding: var(--space-6) 40px;
+  padding: 40px 48px;
 }
 
 .page-header {
@@ -96,7 +105,9 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-title);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 
 .placeholder {
@@ -169,15 +180,15 @@
 .button {
   flex: none;
   padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
   background: var(--bg-hover);
   font-weight: 600;
   cursor: pointer;
 }
 
 .button:hover:not(:disabled) {
-  border-color: var(--c-read);
+  background: #3a3a3c;
 }
 
 .button:disabled {
@@ -216,8 +227,10 @@
 .stat__value {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--fs-number);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat__value--progress {
@@ -254,14 +267,15 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
+  background: var(--bg-hover);
   color: var(--text-muted);
 }
 
 .habit--done {
   color: var(--text);
-  border-color: color-mix(in srgb, var(--c-done) 50%, var(--border));
+  background: color-mix(in srgb, var(--c-done) 16%, var(--bg-card));
 }
 
 .habit__tick {
@@ -284,6 +298,22 @@
 .habit__value {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.today-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
+.today-hero__habits {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 260px;
 }
 
 .columns {
@@ -362,14 +392,14 @@
 .progress {
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--bg-page);
-  border: 1px solid var(--border);
+  background: var(--bg-hover);
   overflow: hidden;
 }
 
 .progress span {
   display: block;
   height: 100%;
+  border-radius: inherit;
   background: linear-gradient(90deg, var(--c-progress), var(--c-done));
 }
 
@@ -392,9 +422,8 @@
   gap: var(--space-1);
   padding: var(--space-1);
   margin-bottom: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-sidebar);
+  border-radius: var(--radius-control);
+  background: var(--bg-card);
 }
 
 .tabs__tab {
@@ -408,9 +437,8 @@
 }
 
 .tabs__tab[aria-selected="true"] {
-  background: var(--bg-card);
+  background: #636366;
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--border);
 }
 
 .kanban {
@@ -426,9 +454,8 @@
   min-width: 0;
   min-height: 220px;
   padding: var(--space-2);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-sidebar);
+  background: var(--bg-card);
 }
 
 .kanban__head {
@@ -454,9 +481,8 @@
   min-width: 0;
   padding: var(--space-3) var(--space-2);
   overflow-wrap: anywhere;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-card);
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
 }
 
 .kanban__action {
@@ -484,9 +510,9 @@
 .toolbar select {
   min-width: 150px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-page);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
   color: var(--text);
   font: inherit;
 }
@@ -545,9 +571,9 @@
 
 .form input {
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-page);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -571,9 +597,9 @@
 .toolbar__search {
   min-width: 220px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-page);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
   color: var(--text);
   font: inherit;
 }
@@ -756,16 +782,18 @@
 .rings__track,
 .rings__fill {
   fill: none;
-  stroke-width: 14px;
+  stroke-width: 16px;
 }
 
 .rings__track {
-  opacity: 0.18;
+  opacity: 0.22;
 }
 
 .rings__fill {
   stroke-linecap: round;
   stroke-dasharray: 1;
+  /* The fill's colour is set inline, so the glow follows it. */
+  filter: drop-shadow(0 0 4px color-mix(in srgb, currentColor 60%, transparent));
 }
 
 .rings__legend {
@@ -789,6 +817,9 @@
 
 .rings__value {
   justify-self: end;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -801,7 +832,7 @@
 }
 
 .setting__check input {
-  accent-color: var(--c-read);
+  accent-color: var(--accent);
 }
 
 .update-banner {
@@ -896,13 +927,14 @@
 
 .projects__list {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-5);
   margin-top: var(--space-3);
 }
 
 .project {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  padding: var(--space-6);
 }
 
 .project__head {
@@ -914,8 +946,9 @@
 
 .project__name {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .project p {

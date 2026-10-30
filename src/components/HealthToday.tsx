@@ -12,14 +12,14 @@ export function HealthToday({ day, goals }: { day: HealthRingsDay | null; goals:
       name: "Steps",
       value: day?.steps ?? 0,
       goal: goals.steps,
-      color: "var(--c-progress)",
+      color: "var(--ring-move)",
     },
     {
       key: "energy",
       name: "Active energy",
       value: day?.activeEnergy ?? 0,
       goal: goals.activeEnergy,
-      color: "var(--c-danger)",
+      color: "var(--ring-exercise)",
       unit: " kcal",
     },
     {
@@ -27,7 +27,7 @@ export function HealthToday({ day, goals }: { day: HealthRingsDay | null; goals:
       name: "Sleep",
       value: day?.sleep?.total ?? 0,
       goal: goals.sleepHours,
-      color: "var(--c-read)",
+      color: "var(--ring-stand)",
       format: sleepHours,
     },
   ];

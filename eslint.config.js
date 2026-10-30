@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // scripts/: browser-console snippets, not part of the app build.
-  { ignores: ["dist", "src-tauri", "coverage", "scripts"] },
+  { ignores: ["dist", "src-tauri", "coverage", "scripts", ".claude"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   jsxA11y.flatConfigs.recommended,
