@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { appendFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { launchApp, type RunningApp } from "./app";
+import { ageHealthExport, launchApp, type RunningApp } from "./app";
 
 /** The version under test, so these tests survive version bumps. */
 const APP_VERSION = (
@@ -160,6 +160,46 @@ test("Projects shows progress and where to resume", async () => {
   await expect(page.getByText(/project notes? could not be read/)).toHaveCount(0);
 });
 
+test("Health shows rings, trends and workouts", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Health" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Health" })).toBeVisible();
+  await expect(page.getByText(/Last export arrived/)).toBeVisible();
+
+  // Today's rings against the plan's step goal (8,500) and the default goals.
+  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
+  await expect(page.getByText("9,120 / 8,500")).toBeVisible();
+  await expect(page.getByText("410 kcal / 500 kcal")).toBeVisible();
+  await expect(page.getByText("7 h 12 min / 8 h")).toBeVisible();
+
+  // The synthetic export is fresh and every file reads cleanly.
+  await expect(page.getByText(/No new export/)).toHaveCount(0);
+  await expect(page.getByText(/export files? could not be read/)).toHaveCount(0);
+
+  // Ten days of resting heart rate: a week shows 7 of them, a month all 10.
+  const heartRate = page.getByRole("table", { name: "Resting heart rate" }).getByRole("row");
+  await expect(heartRate).toHaveCount(8);
+  await page.getByRole("tab", { name: "Month" }).click();
+  await expect(page.getByRole("tab", { name: "Month" })).toHaveAttribute("aria-selected", "true");
+  await expect(heartRate).toHaveCount(11);
+  await expect(page.locator(".line-chart__dot").first()).toBeVisible();
+  await expect(page.locator(".bar-chart__bar").first()).toBeVisible();
+  await page.getByRole("tab", { name: "Month" }).press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "3 months" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+
+  // An Apple Health workout beside a vault workout, each with its source.
+  const workouts = page.getByRole("list", { name: "Workouts, newest first" });
+  await expect(workouts.getByRole("listitem").filter({ hasText: "Outdoor Run" })).toContainText(
+    "Apple Health",
+  );
+  await expect(workouts.getByRole("listitem").filter({ hasText: "Pull A" }).first()).toContainText(
+    "Vault",
+  );
+});
+
 test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings" }).click();
@@ -221,4 +261,15 @@ test("the page cannot reach the network or load remote scripts", async () => {
     }
   });
   expect(blocked).toBe(true);
+});
+
+test("an export folder with nothing new for three days shows the stale warning", async () => {
+  const { page, healthDir } = running();
+  ageHealthExport(healthDir, 3 * 24 * 60 * 60 * 1000 + 60_000);
+  await page.reload();
+  await page.getByRole("button", { name: "Health" }).click();
+  await expect(page.getByText(/No new export for 3 days/)).toContainText(
+    "Check Health Auto Export on your iPhone and iCloud for Windows.",
+  );
+  await expect(page.getByText(/Last export arrived 3 days ago/)).toBeVisible();
 });

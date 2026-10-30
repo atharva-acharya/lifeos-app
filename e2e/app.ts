@@ -2,7 +2,7 @@ import { chromium, type Browser, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -72,6 +72,8 @@ const PORT = 9333;
 export interface RunningApp {
   page: Page;
   vault: string;
+  /** The synthetic Health Auto Export folder. */
+  healthDir: string;
   /** Uncaught page errors seen so far. */
   errors: string[];
   /** The app's stdout and stderr so far (for diagnosing failures). */
@@ -131,15 +133,106 @@ function writeFitnessNotes(vault: string): void {
   workout(9, "Pull A", 3, ["Deadlift 3 x 5 @ 125"]);
 }
 
+/**
+ * A synthetic Health Auto Export folder, dated relative to today: two
+ * overlapping files (the second sharing three days with the first), ten days
+ * of readings in all, and one Apple Health workout. Today has 9,120 steps,
+ * 410 kcal and 7 h 12 min of sleep. Every file is touched to now, so the
+ * export counts as fresh.
+ */
+function writeHealthExport(dir: string): void {
+  mkdirSync(dir, { recursive: true });
+  const stamp = (daysAgo: number, time = "00:00:00") => `${localDateAgo(daysAgo)} ${time} +0000`;
+  const exportFor = (from: number, to: number, workouts: object[]) => {
+    const ages = Array.from({ length: to - from + 1 }, (_, i) => from + i);
+    const points = (value: (age: number) => object) =>
+      ages.map((age) => ({ date: stamp(age), ...value(age) }));
+    return {
+      data: {
+        metrics: [
+          {
+            name: "step_count",
+            units: "count",
+            data: points((age) => ({ qty: age === 0 ? 9120 : 6000 + age * 100 })),
+          },
+          {
+            name: "active_energy",
+            units: "kcal",
+            data: points((age) => ({ qty: age === 0 ? 410 : 300 + age * 10 })),
+          },
+          {
+            name: "resting_heart_rate",
+            units: "count/min",
+            data: points((age) => ({ qty: 50 + (age % 5) })),
+          },
+          {
+            name: "heart_rate_variability",
+            units: "ms",
+            data: points((age) => ({ qty: 40 + (age % 7) })),
+          },
+          {
+            name: "weight_body_mass",
+            units: "kg",
+            data: age0Only(points((age) => ({ qty: 81 + age / 10 }))),
+          },
+          {
+            name: "sleep_analysis",
+            units: "hr",
+            data: points((age) => ({
+              totalSleep: age === 0 ? 7.2 : 7,
+              core: 4.2,
+              deep: 1.1,
+              rem: 1.8,
+              awake: 0.4,
+            })),
+          },
+        ],
+        workouts,
+      },
+    };
+  };
+  // Only today's and the oldest day's weight come from Apple Health; the
+  // vault supplies the days in between.
+  const age0Only = (all: object[]) => [all[0], all[all.length - 1]];
+  const run = {
+    id: "e2e-run-1",
+    name: "Outdoor Run",
+    start: stamp(1, "07:00:00"),
+    end: stamp(1, "07:30:00"),
+    duration: 1800,
+    activeEnergyBurned: { qty: 310, units: "kcal" },
+    distance: { qty: 5.1, units: "km" },
+  };
+  writeFileSync(join(dir, "export-older.json"), JSON.stringify(exportFor(3, 9, [run])));
+  writeFileSync(join(dir, "export-newer.json"), JSON.stringify(exportFor(0, 5, [run])));
+  const now = new Date();
+  for (const name of ["export-older.json", "export-newer.json"]) {
+    utimesSync(join(dir, name), now, now);
+  }
+}
+
+/** Sets the modification time of every file in the Health folder to `ageMs` ago. */
+export function ageHealthExport(dir: string, ageMs: number): void {
+  const then = new Date(Date.now() - ageMs);
+  for (const name of ["export-older.json", "export-newer.json"]) {
+    utimesSync(join(dir, name), then, then);
+  }
+}
+
 /** Starts the debug build against a copy of the synthetic vault in a throwaway data folder. */
 export async function launchApp(): Promise<RunningApp> {
   const work = mkdtempSync(join(tmpdir(), "lifeos-e2e-"));
   const vault = join(work, "vault");
   const data = join(work, "data");
+  const healthDir = join(work, "health");
   cpSync(FIXTURE_VAULT, vault, { recursive: true });
   mkdirSync(data);
   writeFitnessNotes(vault);
-  writeFileSync(join(data, "settings.json"), JSON.stringify({ vaultPath: vault }));
+  writeHealthExport(healthDir);
+  writeFileSync(
+    join(data, "settings.json"),
+    JSON.stringify({ vaultPath: vault, healthPath: healthDir }),
+  );
   // A saved copy of the Sheet (synthetic, Sheet-style values), so the Jobs
   // tabs work without Google. One row is dated today for the weekly chart.
   const cache = JSON.parse(readFileSync(FIXTURE_CACHE, "utf8")) as {
@@ -184,6 +277,7 @@ export async function launchApp(): Promise<RunningApp> {
   return {
     page,
     vault,
+    healthDir,
     errors,
     output: () => output,
     offerUpdate: updates.use,
