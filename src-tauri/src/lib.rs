@@ -6,6 +6,7 @@ pub mod google;
 pub mod index;
 pub mod jobs;
 mod live;
+pub mod projects;
 pub mod settings;
 pub mod today;
 mod updates;
@@ -56,6 +57,7 @@ pub fn run() {
             commands::refresh_applications,
             commands::get_jobs,
             commands::get_fitness,
+            commands::get_projects,
             commands::log_error,
             commands::get_diagnostics,
             commands::set_auto_update,

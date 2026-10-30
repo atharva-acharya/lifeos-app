@@ -121,6 +121,45 @@ test("Fitness shows weight, workout history and lift progress", async () => {
   await expect(page.getByText(/daily or fitness note/)).toHaveCount(0);
 });
 
+test("Projects shows progress and where to resume", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Projects" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
+
+  const card = page.locator("section.project", {
+    has: page.getByRole("heading", { name: "home-lab" }),
+  });
+  await expect(card.getByText("Step 2 of 3")).toBeVisible();
+  await expect(card.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+  const resume = card.getByRole("group", { name: "Resume home-lab" });
+  await expect(resume).toContainText("Set up log forwarding");
+  // The Today test may have appended a newer line; the older one is in the log.
+  await card.locator("summary").click();
+  await expect(card.getByText("Hypervisor running.").last()).toBeVisible();
+
+  const current = card.locator('li[aria-current="step"]');
+  await expect(current).toHaveText(/Set up log forwarding/);
+  await expect(current).toHaveClass(/breathing/);
+
+  // The paused project sits under Other and does not breathe.
+  const other = page.getByRole("region", { name: "Other" });
+  await expect(other.getByRole("heading", { name: "garden-planner" })).toBeVisible();
+  await expect(other.locator(".breathing")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Active" }).locator(".breathing")).toHaveCount(1);
+
+  // Reduced motion switches the animation off.
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect
+      .poll(() => current.evaluate((el) => getComputedStyle(el).animationName))
+      .toBe("none");
+  } finally {
+    await page.emulateMedia({ reducedMotion: null });
+  }
+
+  await expect(page.getByText(/project notes? could not be read/)).toHaveCount(0);
+});
+
 test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings" }).click();

@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "refresh_applications",
     "get_jobs",
     "get_fitness",
+    "get_projects",
     "log_error",
     "get_diagnostics",
     "set_auto_update",

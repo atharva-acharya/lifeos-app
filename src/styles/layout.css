@@ -876,3 +876,104 @@
   padding-left: var(--space-5);
   color: var(--text-muted);
 }
+
+.projects {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.projects__list {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.project {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.project__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.project__name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.project p {
+  margin: 0;
+}
+
+.project__resume {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.project__resume .kicker {
+  margin: 0;
+}
+
+.project__steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project__step {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+}
+
+.project__step--done {
+  color: var(--text-muted);
+}
+
+.project__step--done .project__step-text {
+  text-decoration: line-through;
+}
+
+.project__step[aria-current="step"] {
+  font-weight: 600;
+}
+
+.project__mark {
+  color: var(--c-progress);
+}
+
+.project__step--done .project__mark {
+  color: var(--c-done);
+}
+
+.project__log summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.project__log summary:hover {
+  color: var(--text);
+}
+
+.project__log ul {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project__log time {
+  color: var(--text-muted);
+  margin-right: var(--space-1);
+}
