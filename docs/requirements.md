@@ -61,12 +61,15 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 - Bill splitting: split an expense with friends (equal, by amount or by share); running balance per friend ("Sam owes you £12"); record settle-ups.
 - Income analytics: income by source and month, savings rate, spending by category over time, month-on-month comparison.
 
-## 4. Design (option A, "studio dark")
+## 4. Design ("Apple dark", in the style of Apple Fitness and Health)
 
-- Dark UI: page `#141414`, sidebar `#1b1b1b`, cards `#232323` with `#333` border, 12px radius.
-- Font: Segoe UI Variable (fallback Segoe UI); comfortable sizes, nothing below 12px; uppercase spaced kickers for section labels.
-- Colour meaning, used consistently: purple = read/viewed, orange = in progress/editing/due, green = done/positive, yellow = pending, red = destructive.
-- File-type and category badges; rounded status pills.
+- Dark only. Pure black page `#000000`, sidebar `#111113`, cards `#1c1c1e` with no outline, raised controls `#2c2c2e`, 16px card radius; separators `#38383a`.
+- Font: Segoe UI Variable (fallback Segoe UI); nothing below 12px; large bold page titles (34px) and big bold numbers on stat tiles and ring legends; small uppercase labels for sections.
+- Apple system colours adapted to dark. Colour meaning, used consistently: purple `#bf5af2` = read/viewed, orange `#ff9f0a` = in progress/editing/due, green `#30d158` = done/positive, yellow `#ffd60a` = pending, red `#ff453a` = destructive. Apple blue `#0a84ff` for the current page, links, checkboxes and focus rings.
+- Activity rings use the Activity colours: red `#fa114f`, green `#a6ff00`, cyan `#00e5ff`, thick strokes with a soft glow.
+- File-type and category badges; rounded status pills filled with a tint of their colour.
+- Today opens with a habits ring next to the day's habits; Fitness and Health lead with their rings.
+- Text contrast meets WCAG AA on every surface.
 - The active item (current project step, item being edited) has a slow breathing highlight; respects "reduce motion".
 - Left sidebar: Today, Jobs, Fitness, Health, Money, Projects, Search; settings at the bottom.
 
@@ -107,3 +110,4 @@ Each phase ends with a working, released build and owner sign-off before the nex
 - 2026-10-29: Scope change agreed with owner after v0.1.0. Added Health section with Apple Health import via an iPhone auto-export app and iCloud Drive (route A), Apple-inspired motion; added Money module (budgets, CSV import, bill splitting with friends, income analytics), no bank linking. Phases now 5: Money becomes phase 4, Editor + search moves to phase 5 (release 1.0). Deferred: live workout logging (future iOS app), Gmail viewer, bank linking. Sidebar gains Health and Money.
 - 2026-10-29: Outreach log described as it exists in the vault: table columns listed, contact type added, statuses are sent / accepted / messaged / replied / withdrawn (was three). Phase 1 signed off by the owner.
 - 2026-10-30: Owner approved signed auto-update: one update check against GitHub Releases, switchable off in Settings (phase 3, PR B). Charts are in-house SVG (ADR 0001 update).
+- 2026-10-30: Owner chose a new look before phase 4: "Apple dark" in the style of Apple Fitness and Health replaces "studio dark" (§4 rewritten). Same colour meanings and features; Today gains a habits ring. Dark only.
