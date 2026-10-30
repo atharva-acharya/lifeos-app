@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { FitnessPage } from "./pages/FitnessPage";
 import { JobsPage } from "./pages/JobsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -49,6 +50,8 @@ export default function App() {
             <TodayPage onNavigate={navigate} />
           ) : route.id === "jobs" ? (
             <JobsPage onNavigate={navigate} />
+          ) : route.id === "fitness" ? (
+            <FitnessPage onNavigate={navigate} />
           ) : route.id === "settings" ? (
             <SettingsPage />
           ) : (
