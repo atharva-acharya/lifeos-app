@@ -9,8 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { getApplications, type Application, type ApplicationsView } from "../api";
-import { perWeek, replyRates } from "../jobStats";
+import { getApplications, localDate, type Application, type ApplicationsView } from "../api";
+import { parseApplied, perWeek, replyRates } from "../jobStats";
 import type { RouteId } from "../routes";
 
 const AXIS = { fill: "var(--text-muted)", fontSize: 12 };
@@ -31,7 +31,9 @@ function reducedMotion(): boolean {
 }
 
 function PerWeek({ rows, animate }: { rows: Application[]; animate: boolean }) {
-  const weeks = useMemo(() => perWeek(rows, new Date()), [rows]);
+  // Keyed on today's date so the window moves on if the app stays open overnight.
+  const today = localDate();
+  const weeks = useMemo(() => perWeek(rows, parseApplied(today) ?? new Date()), [rows, today]);
   const total = weeks.reduce((n, w) => n + w.count, 0);
   const thisWeek = weeks[weeks.length - 1]?.count ?? 0;
   const average = Math.round((total / weeks.length) * 10) / 10;
@@ -64,7 +66,13 @@ function PerWeek({ rows, animate }: { rows: Application[]; animate: boolean }) {
         </ResponsiveContainer>
       </div>
       <table className="sr-only">
-        <caption>Applications per week, week starting</caption>
+        <caption>Applications per week</caption>
+        <thead>
+          <tr>
+            <th scope="col">Week starting</th>
+            <th scope="col">Applications</th>
+          </tr>
+        </thead>
         <tbody>
           {weeks.map((w) => (
             <tr key={w.week}>
@@ -156,7 +164,8 @@ function ReplyRate({ rows, animate }: { rows: Application[]; animate: boolean })
 
 export function JobCharts({ rows }: { rows: Application[] }) {
   const animate = !reducedMotion();
-  if (rows.length === 0) {
+  // "Reply only" rows alone give nothing to chart.
+  if (replyRates(rows).sources.length === 0) {
     return <p className="muted">No applications in the saved copy yet.</p>;
   }
   return (
@@ -170,12 +179,23 @@ export function JobCharts({ rows }: { rows: Application[] }) {
 /** Charts tab: reads the saved copy of the Sheet; the Applications tab refreshes it. */
 export function ChartsTab({ onNavigate }: { onNavigate: (id: RouteId) => void }) {
   const [view, setView] = useState<ApplicationsView | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getApplications()
       .then(setView)
-      .catch(() => undefined);
+      .catch((err: unknown) => {
+        setError(typeof err === "string" ? err : "Could not load applications.");
+      });
   }, []);
+
+  if (error) {
+    return (
+      <p className="setting__error" role="alert">
+        {error}
+      </p>
+    );
+  }
 
   if (!view) return null;
 
@@ -203,5 +223,14 @@ export function ChartsTab({ onNavigate }: { onNavigate: (id: RouteId) => void })
     );
   }
 
-  return <JobCharts rows={view.cache.rows} />;
+  return (
+    <>
+      {view.error && (
+        <p className="notice" role="status">
+          {view.error}
+        </p>
+      )}
+      <JobCharts rows={view.cache.rows} />
+    </>
+  );
 }

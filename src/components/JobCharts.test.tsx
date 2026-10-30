@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Application, ApplicationsView } from "../api";
 import { invoke } from "../test/tauri-mocks";
 import { ChartsTab, JobCharts } from "./JobCharts";
@@ -23,8 +23,8 @@ function app(over: Partial<Application>): Application {
 }
 
 const ROWS = [
-  app({ applied: "2026-01-05", source: "Easy Apply", status: "Applied" }),
-  app({ applied: "2026-01-06", source: "Easy Apply", status: "Rejected" }),
+  app({ applied: "2026-01-05", source: "LinkedIn Easy Apply", status: "Applied" }),
+  app({ applied: "2026-01-06", source: "LinkedIn Easy Apply", status: "Rejected" }),
   app({ applied: "2026-01-07", source: "Company site", status: "Interview" }),
   app({ source: "Reply only", status: "Rejected" }),
 ];
@@ -33,12 +33,15 @@ function view(over: Partial<ApplicationsView>): ApplicationsView {
   return { configured: true, connected: true, error: null, cache: null, ...over };
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("JobCharts", () => {
   it("shows both charts with a reply-rate table and the unmatched note", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 0, 8));
     render(<JobCharts rows={ROWS} />);
-    vi.useRealTimers();
 
     expect(screen.getByRole("heading", { name: "Applications per week" })).toBeInTheDocument();
     const weekly = screen.getByRole("table", { name: /Applications per week/ });
@@ -50,18 +53,54 @@ describe("JobCharts", () => {
       .find((t) => within(t).queryByRole("columnheader", { name: "Reply rate" }));
     expect(rates).toBeDefined();
     if (!rates) return;
-    expect(within(rates).getByRole("row", { name: "Easy Apply 2 0 1 50%" })).toBeInTheDocument();
+    expect(
+      within(rates).getByRole("row", { name: "LinkedIn Easy Apply 2 0 1 50%" }),
+    ).toBeInTheDocument();
     expect(within(rates).getByRole("row", { name: "Company site 1 1 0 100%" })).toBeInTheDocument();
     expect(screen.getByText(/1 reply not matched/)).toBeInTheDocument();
   });
 
-  it("says so when the saved copy is empty", () => {
-    render(<JobCharts rows={[]} />);
+  it("says so when the saved copy is empty or only has unmatched replies", () => {
+    const { unmount } = render(<JobCharts rows={[]} />);
     expect(screen.getByText("No applications in the saved copy yet.")).toBeInTheDocument();
+    unmount();
+    render(<JobCharts rows={[app({ source: "Reply only", status: "Rejected" })]} />);
+    expect(screen.getByText("No applications in the saved copy yet.")).toBeInTheDocument();
+  });
+
+  it("shows reply rates to one decimal place", () => {
+    render(
+      <JobCharts
+        rows={[
+          app({ applied: "2026-01-05", source: "Indeed", status: "Interview" }),
+          app({ applied: "2026-01-05", source: "Indeed", status: "Applied" }),
+          app({ applied: "2026-01-05", source: "Indeed", status: "Applied" }),
+        ]}
+      />,
+    );
+    expect(screen.getByRole("row", { name: "Indeed 3 1 0 33.3%" })).toBeInTheDocument();
   });
 });
 
 describe("ChartsTab", () => {
+  it("shows an error when the saved copy cannot be read", async () => {
+    invoke.mockRejectedValue("Could not read the saved copy.");
+    render(<ChartsTab onNavigate={() => undefined} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not read the saved copy.");
+  });
+
+  it("shows the Sheet error above charts from an older copy", async () => {
+    invoke.mockResolvedValue(
+      view({
+        error: "Google sign-in expired.",
+        cache: { fetchedAt: 0, rows: ROWS, missingColumns: [] },
+      }),
+    );
+    render(<ChartsTab onNavigate={() => undefined} />);
+    expect(await screen.findByRole("status")).toHaveTextContent("Google sign-in expired.");
+    expect(screen.getByRole("heading", { name: "Applications per week" })).toBeInTheDocument();
+  });
+
   it("renders charts from the saved copy without refreshing", async () => {
     invoke.mockResolvedValue(
       view({ cache: { fetchedAt: Date.now(), rows: ROWS, missingColumns: [] } }),

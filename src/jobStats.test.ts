@@ -118,7 +118,7 @@ describe("replyRates", () => {
       rejected: 1,
       rate: 66.7,
       positivePct: 33.3,
-      rejectedPct: 33.3,
+      rejectedPct: 33.4,
     });
     expect(sources[2]).toMatchObject({ applied: 1, rate: 0 });
   });

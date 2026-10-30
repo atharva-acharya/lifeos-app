@@ -115,13 +115,13 @@ export function replyRates(rows: Application[]): ReplyRates {
     map.set(source, entry);
   }
   const sources = [...map.entries()]
-    .map(([source, e]) => ({
-      source,
-      ...e,
-      rate: pct(e.positive + e.rejected, e.applied),
-      positivePct: pct(e.positive, e.applied),
-      rejectedPct: pct(e.rejected, e.applied),
-    }))
+    .map(([source, e]) => {
+      const rate = pct(e.positive + e.rejected, e.applied);
+      const positivePct = pct(e.positive, e.applied);
+      // Derived so the two stacked segments always add up to the rate.
+      const rejectedPct = Math.round((rate - positivePct) * 10) / 10;
+      return { source, ...e, rate, positivePct, rejectedPct };
+    })
     .sort((a, b) => b.applied - a.applied || a.source.localeCompare(b.source));
   return { sources, unmatched };
 }
