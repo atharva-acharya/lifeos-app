@@ -160,3 +160,19 @@ export function getApplications(): Promise<ApplicationsView> {
 export function refreshApplications(): Promise<ApplicationsView> {
   return invoke<ApplicationsView>("refresh_applications");
 }
+
+export interface Diagnostics {
+  version: string;
+  os: string;
+  /** Newest entries of the local error log, oldest first. */
+  log: string[];
+}
+
+/** Records an error in the local log (never sent anywhere). */
+export function logError(message: string): Promise<undefined> {
+  return invoke<undefined>("log_error", { message });
+}
+
+export function getDiagnostics(): Promise<Diagnostics> {
+  return invoke<Diagnostics>("get_diagnostics");
+}

@@ -1,0 +1,101 @@
+/* Motion system (phase 3). Durations and easings come from tokens.css, which
+   sets them to 0 under "reduce motion", so nothing here needs its own
+   reduced-motion branch. Only transform, opacity and colours animate. */
+
+/* Interaction feedback: quick colour changes and a slight press. */
+.nav__item,
+.button,
+.tabs__tab,
+.kanban__card,
+.table td {
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard),
+    opacity var(--dur-base) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+.button:active:not(:disabled),
+.tabs__tab:active,
+.nav__item:active {
+  transform: scale(0.97);
+}
+
+.kanban__card:hover {
+  transform: translateY(-1px);
+}
+
+/* Cards, notices and table rows ease in when they first appear. */
+/* (Kanban cards keep the interaction transitions above, which include opacity.) */
+.card,
+.notice {
+  transition:
+    opacity var(--dur-base) var(--ease-standard),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+@starting-style {
+  .card,
+  .notice,
+  .kanban__card {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Page and tab changes (View Transitions API, see src/motion.ts): the main
+   area cross-fades with a small lift; the sidebar stays still. */
+.main {
+  view-transition-name: page;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(page) {
+  animation: page-out var(--dur-fast) var(--ease-exit) both;
+}
+
+::view-transition-new(page) {
+  animation: page-in var(--dur-slow) var(--ease-spring) both;
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Line charts draw themselves in; rings fill with a spring. Keyframe
+   animations (not transitions) so the inline final value is the end point. */
+.line-chart__line {
+  animation: line-draw calc(var(--dur-slow) * 2) var(--ease-standard) both;
+}
+
+@keyframes line-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+.rings__fill {
+  animation: ring-fill calc(var(--dur-slow) * 3) var(--ease-spring) both;
+  transition: stroke-dashoffset var(--dur-slow) var(--ease-spring);
+}
+
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: 1;
+  }
+}

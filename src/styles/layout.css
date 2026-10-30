@@ -649,7 +649,7 @@
 
 .bar-chart__bar {
   transform-box: view-box;
-  animation: bar-grow 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: bar-grow var(--dur-slow) var(--ease-spring) both;
 }
 
 .bar-chart__bar:hover {
@@ -703,4 +703,87 @@
   .charts {
     grid-template-columns: 1fr;
   }
+}
+
+.line-chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.line-chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.line-chart__line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+}
+
+.line-chart__dot {
+  stroke: var(--bg-card);
+  stroke-width: 1.5;
+}
+
+.line-chart__target line {
+  stroke: var(--c-pending);
+  stroke-dasharray: 4 4;
+}
+
+.line-chart__target text {
+  fill: var(--c-pending);
+  font-size: 11px;
+}
+
+.rings {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.rings svg {
+  flex: none;
+}
+
+.rings__track,
+.rings__fill {
+  fill: none;
+  stroke-width: 14px;
+}
+
+.rings__track {
+  opacity: 0.18;
+}
+
+.rings__fill {
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+}
+
+.rings__legend {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rings__legend li {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rings__name {
+  color: var(--text-muted);
+}
+
+.rings__value {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
 }

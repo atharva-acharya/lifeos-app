@@ -1,5 +1,6 @@
 pub mod applications;
 mod commands;
+pub mod diagnostics;
 pub mod google;
 pub mod index;
 pub mod jobs;
@@ -13,6 +14,19 @@ pub fn run() {
     tauri::Builder::default()
         .manage(live::LiveState::default())
         .setup(|app| {
+            // Panics go to the local error log as well as stderr.
+            if let Ok(dir) = commands::cache_dir(app.handle()) {
+                let default = std::panic::take_hook();
+                std::panic::set_hook(Box::new(move |info| {
+                    let _ = diagnostics::append(
+                        &dir,
+                        applications::now_ms(),
+                        "panic",
+                        &info.to_string(),
+                    );
+                    default(info);
+                }));
+            }
             let handle = app.handle().clone();
             // Index in the background so the window appears at once.
             std::thread::spawn(move || {
@@ -36,7 +50,9 @@ pub fn run() {
             commands::disconnect_google,
             commands::get_applications,
             commands::refresh_applications,
-            commands::get_jobs
+            commands::get_jobs,
+            commands::log_error,
+            commands::get_diagnostics
         ])
         .run(tauri::generate_context!())
         .expect("error while running Life OS");

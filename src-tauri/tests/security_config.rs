@@ -102,6 +102,8 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-get-applications",
             "allow-refresh-applications",
             "allow-get-jobs",
+            "allow-log-error",
+            "allow-get-diagnostics",
         ]
     );
 }
