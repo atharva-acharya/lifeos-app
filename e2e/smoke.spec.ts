@@ -179,12 +179,15 @@ test("Health shows rings, trends and workouts", async () => {
   // Ten days of resting heart rate: a week shows 7 of them, a month all 10.
   const heartRate = page.getByRole("table", { name: "Resting heart rate" }).getByRole("row");
   await expect(heartRate).toHaveCount(8);
-  await page.getByRole("tab", { name: "Month" }).click();
-  await expect(page.getByRole("tab", { name: "Month" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Month", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Month", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   await expect(heartRate).toHaveCount(11);
   await expect(page.locator(".line-chart__dot").first()).toBeVisible();
   await expect(page.locator(".bar-chart__bar").first()).toBeVisible();
-  await page.getByRole("tab", { name: "Month" }).press("ArrowRight");
+  await page.getByRole("tab", { name: "Month", exact: true }).press("ArrowRight");
   await expect(page.getByRole("tab", { name: "3 months" })).toHaveAttribute(
     "aria-selected",
     "true",
