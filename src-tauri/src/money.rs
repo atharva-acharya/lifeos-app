@@ -8,13 +8,14 @@ use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::index::Index;
-use crate::vault::note::{LEDGER_COLUMNS, MAX_AMOUNT_PENCE, format_pence, is_iso_date};
-use crate::vault::write::{self, MAX_CELL_CHARS, WriteError};
+use crate::vault::note::{
+    ACCOUNT_HEADERS, AMOUNT_HEADERS, CATEGORY_HEADERS, DATE_HEADERS, DESCRIPTION_HEADERS,
+    LEDGER_COLUMNS, MAX_AMOUNT_PENCE, format_pence, is_iso_date,
+};
+use crate::vault::write::{self, MAX_CELL_CHARS, Value, WriteError, WriteRecord};
 
 /// Category for rows that have none.
 pub const UNCATEGORISED: &str = "Uncategorised";
-/// Spending at or above this share of a budget is "near" (orange).
-const NEAR_SHARE: f64 = 0.8;
 /// Most transactions sent to the page for one month.
 const MAX_ROWS: i64 = 500;
 
@@ -80,19 +81,20 @@ pub fn is_month(s: &str) -> bool {
     s.len() == 7 && is_iso_date(&format!("{s}-01"))
 }
 
+/// Green under 80% of the limit, orange from 80% to the limit, red over it.
 fn status(spent: i64, limit: i64) -> BudgetStatus {
-    #[allow(clippy::cast_precision_loss)]
-    let share = spent as f64 / limit as f64;
     if spent > limit {
         BudgetStatus::Over
-    } else if share >= NEAR_SHARE {
+    } else if i128::from(spent) * 5 >= i128::from(limit) * 4 {
         BudgetStatus::Near
     } else {
         BudgetStatus::Under
     }
 }
 
-/// The money view for `month` (`YYYY-MM`).
+/// The money view for `month` (`YYYY-MM`). Spending counts money out only:
+/// a refund is money in, so it raises income and does not lower a
+/// category's spending.
 pub fn money(index: &Index, month: &str) -> rusqlite::Result<Money> {
     let conn = index.conn();
     let like = format!("{month}-%");
@@ -252,20 +254,21 @@ impl NewTransaction {
 }
 
 /// Appends `t` to its month's ledger note, creating the note if needed.
-pub fn add(vault: &Path, t: &NewTransaction) -> Result<(), String> {
+/// Returns the hashes for the write log.
+pub fn add(vault: &Path, t: &NewTransaction) -> Result<WriteRecord, String> {
     t.validate()?;
     let opt = |v: &Option<String>| v.as_deref().map(str::trim).unwrap_or_default().to_owned();
-    let values = [
-        ("Date", t.date.clone()),
-        ("Description", t.description.clone()),
-        ("Category", opt(&t.category)),
-        ("Amount", format_pence(t.amount)),
-        ("Account", opt(&t.account)),
+    let values: [Value<'_>; 5] = [
+        (DATE_HEADERS, t.date.clone()),
+        (DESCRIPTION_HEADERS, t.description.clone()),
+        (CATEGORY_HEADERS, opt(&t.category)),
+        (AMOUNT_HEADERS, format_pence(t.amount)),
+        (ACCOUNT_HEADERS, opt(&t.account)),
     ];
     let front = format!("type: ledger\nmonth: {}", &t.date[..7]);
     write::append_row(vault, &t.ledger_path(), &front, LEDGER_COLUMNS, &values).map_err(|e| match e
     {
-        WriteError::Conflict => e.to_string(),
+        WriteError::Conflict | WriteError::NoColumn(_) => e.to_string(),
         other => format!("Could not save: {other}"),
     })
 }

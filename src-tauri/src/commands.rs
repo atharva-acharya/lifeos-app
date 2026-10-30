@@ -472,7 +472,10 @@ pub fn add_transaction(
     let vault = state
         .vault()
         .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
-    money::add(&vault, &transaction)?;
+    let record = money::add(&vault, &transaction)?;
+    if let Ok(dir) = live::data_dir(&app) {
+        crate::vault::write::log_write(&dir, "append-row", &transaction.ledger_path(), &record);
+    }
     live::resync(&app);
     Ok(())
 }

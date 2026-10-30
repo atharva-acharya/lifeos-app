@@ -109,7 +109,11 @@ describe("MoneyPage", () => {
     });
     expect(screen.getByLabelText("Description")).toHaveValue("");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Money in" }));
+    const out = screen.getByRole("radio", { name: "Money out" });
+    expect(out).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("radio", { name: "Money in" })).toHaveAttribute("tabindex", "-1");
+    fireEvent.keyDown(out, { key: "ArrowRight" });
+    expect(screen.getByRole("radio", { name: "Money in" })).toHaveAttribute("aria-checked", "true");
     fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Refund" } });
     fireEvent.change(screen.getByLabelText("Amount (£)"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));

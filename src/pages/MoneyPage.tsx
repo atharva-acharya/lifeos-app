@@ -106,6 +106,7 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault();
+    if (busy) return;
     const pence = toPence(amount);
     if (pence === null || pence === 0) {
       setMessage({ error: true, text: "Enter an amount like 12.50." });
@@ -141,17 +142,31 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
       </h2>
       {sample && <p className="muted">Quick add is off while sample data is on.</p>}
       <form onSubmit={submit}>
-        <fieldset className="settings-group" disabled={sample || busy}>
+        {/* Not disabled while saving, so focus stays on the Add button. */}
+        <fieldset className="settings-group" disabled={sample}>
           <div className="tabs" role="radiogroup" aria-label="Money out or in">
             {(["out", "in"] as const).map((k) => (
               <button
                 key={k}
                 type="button"
                 role="radio"
+                data-kind={k}
                 aria-checked={kind === k}
+                tabIndex={kind === k ? 0 : -1}
                 className="tabs__tab"
                 onClick={() => {
                   setKind(k);
+                }}
+                onKeyDown={(e) => {
+                  // Two options: any arrow key moves to the other one.
+                  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+                    e.preventDefault();
+                    const next = k === "out" ? "in" : "out";
+                    setKind(next);
+                    e.currentTarget.parentElement
+                      ?.querySelector<HTMLElement>(`[data-kind="${next}"]`)
+                      ?.focus();
+                  }
                 }}
               >
                 {k === "out" ? "Money out" : "Money in"}
@@ -228,7 +243,10 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
         </fieldset>
       </form>
       {message && (
-        <p className={message.error ? "setting__error" : "muted"} role="status">
+        <p
+          className={message.error ? "setting__error" : "muted"}
+          role={message.error ? "alert" : "status"}
+        >
           {message.text}
         </p>
       )}

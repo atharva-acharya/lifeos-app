@@ -642,6 +642,14 @@ pub struct Budget {
 /// Ledger columns, in the order a new ledger note gets them.
 pub const LEDGER_COLUMNS: &[&str] = &["Date", "Description", "Category", "Amount", "Account"];
 
+/// Header names (lower case) read as each ledger column; the writer uses the
+/// same lists, so a row always lands in the column the parser reads.
+pub const DATE_HEADERS: &[&str] = &["date"];
+pub const DESCRIPTION_HEADERS: &[&str] = &["description", "payee", "details"];
+pub const CATEGORY_HEADERS: &[&str] = &["category"];
+pub const AMOUNT_HEADERS: &[&str] = &["amount"];
+pub const ACCOUNT_HEADERS: &[&str] = &["account"];
+
 /// Largest amount accepted in one row: £10 million, in pence.
 pub const MAX_AMOUNT_PENCE: i64 = 1_000_000_000;
 
@@ -730,11 +738,11 @@ pub fn ledger_table(body: &str) -> Vec<Transaction> {
         return Vec::new();
     };
     let (date, desc, cat, amount, account) = (
-        column(&headers, &["date"]),
-        column(&headers, &["description", "payee", "details"]),
-        column(&headers, &["category"]),
-        column(&headers, &["amount"]),
-        column(&headers, &["account"]),
+        column(&headers, DATE_HEADERS),
+        column(&headers, DESCRIPTION_HEADERS),
+        column(&headers, CATEGORY_HEADERS),
+        column(&headers, AMOUNT_HEADERS),
+        column(&headers, ACCOUNT_HEADERS),
     );
     rows.iter()
         .filter_map(|r| {
