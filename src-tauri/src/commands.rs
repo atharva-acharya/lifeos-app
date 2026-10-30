@@ -139,12 +139,27 @@ pub fn save_google_config(
     if !google::valid_sheet_id(&sheet_id) {
         return Err(google::GoogleError::BadSheetId.to_string());
     }
+    let client_id = client_id.trim();
+    if !google::valid_client_id(client_id) {
+        return Err("the client ID should end in .apps.googleusercontent.com".to_owned());
+    }
+    let secret = client_secret.trim();
+    if !secret.is_empty() && !google::valid_client_secret(secret) {
+        return Err("the client secret does not look right; copy it again".to_owned());
+    }
     let dir = config_dir(&app)?;
     let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
     let previous = current.google.take().unwrap_or_default();
-    let secret = client_secret.trim();
+    // A different Sheet: the saved copy belongs to the old one.
+    if previous.sheet_id != sheet_id {
+        applications::clear(&cache_dir(&app)?).map_err(|e| e.to_string())?;
+    }
+    // The grant belongs to one client; switching needs a fresh sign-in.
+    if google::is_connected() && !previous.client_id.is_empty() && previous.client_id != client_id {
+        return Err("disconnect Google before changing the client ID".to_owned());
+    }
     current.google = Some(GoogleConfig {
-        client_id: client_id.trim().to_owned(),
+        client_id: client_id.to_owned(),
         client_secret: if secret.is_empty() {
             previous.client_secret
         } else {
@@ -173,12 +188,21 @@ pub async fn connect_google(app: AppHandle) -> Result<SettingsView, String> {
     get_settings(app)
 }
 
-/// Revokes and forgets the Google token.
+/// Revokes and forgets the Google token and the saved copy of the Sheet.
+/// If Google could not be told, says so: the token is gone locally but
+/// stays valid until the owner removes the app's access in their account.
 #[tauri::command]
 pub async fn disconnect_google(app: AppHandle) -> Result<SettingsView, String> {
-    google::disconnect().await.map_err(|e| e.to_string())?;
+    let revoked = google::disconnect().await.map_err(|e| e.to_string())?;
+    applications::clear(&cache_dir(&app)?).map_err(|e| e.to_string())?;
+    if !revoked {
+        return Err(REVOKE_FAILED.to_owned());
+    }
     get_settings(app)
 }
+
+pub const REVOKE_FAILED: &str = "Disconnected here, but Google could not be reached to cancel \
+    access. Remove Life OS at myaccount.google.com/permissions.";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -229,7 +253,10 @@ pub async fn refresh_applications(app: AppHandle) -> Result<ApplicationsView, St
                 rows,
                 missing_columns,
             };
-            applications::save(&cache_dir(&app)?, &cache).map_err(|e| e.to_string())?;
+            // Disconnect may have run while the Sheet was loading; it wins.
+            if google::is_connected() {
+                applications::save(&cache_dir(&app)?, &cache).map_err(|e| e.to_string())?;
+            }
             None
         }
         Err(e) => Some(e.to_string()),

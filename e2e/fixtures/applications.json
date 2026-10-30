@@ -1,0 +1,42 @@
+{
+  "fetchedAt": 0,
+  "missingColumns": ["message id"],
+  "rows": [
+    {
+      "applied": "05 Jan 2026",
+      "company": "Example Security Ltd",
+      "role": "SOC Analyst",
+      "source": "LinkedIn Easy Apply",
+      "status": "Applied"
+    },
+    {
+      "applied": "07 Jan 2026",
+      "company": "Sample Bank",
+      "role": "Security Analyst",
+      "source": "Company site",
+      "status": "Rejected"
+    },
+    {
+      "applied": "08 Jan 2026",
+      "company": "Northwind Labs",
+      "role": "Junior Analyst",
+      "source": "Company site",
+      "status": "Interview"
+    },
+    {
+      "applied": "2026-01-12",
+      "company": "Contoso Group",
+      "role": "IT Support Analyst",
+      "source": "Indeed",
+      "status": "Applied",
+      "notes": "<img src=x onerror=alert(1)> <script>alert(2)</script>"
+    },
+    {
+      "applied": null,
+      "company": "Fabrikam",
+      "role": "Security Analyst",
+      "source": "Reply only",
+      "status": "Rejected"
+    }
+  ]
+}

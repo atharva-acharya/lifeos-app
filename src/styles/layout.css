@@ -628,8 +628,67 @@
   color: var(--text);
 }
 
-.chart__plot {
-  height: 240px;
+.bar-chart {
+  width: 100%;
+  min-width: 0;
+}
+
+.bar-chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.bar-chart__grid {
+  stroke: var(--border);
+}
+
+.bar-chart__tick {
+  fill: var(--text-muted);
+  font-size: 12px;
+}
+
+.bar-chart__bar {
+  transform-box: view-box;
+  animation: bar-grow 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.bar-chart__bar:hover {
+  filter: brightness(1.15);
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-chart__bar {
+    animation: none;
+  }
+}
+
+.bar-chart__legend {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.bar-chart__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bar-chart__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
 }
 
 .chart__table tbody th {

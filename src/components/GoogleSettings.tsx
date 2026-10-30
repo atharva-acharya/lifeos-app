@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   connectGoogle,
   disconnectGoogle,
+  getSettings,
   saveGoogleConfig,
   type AppSettings,
   type GoogleView,
@@ -37,6 +38,11 @@ export function GoogleSettings({
       })
       .catch((err: unknown) => {
         setError(message(err));
+        // A failed step can still change state (Disconnect removes the token
+        // locally even when Google cannot be reached), so show what is true now.
+        getSettings()
+          .then(onChange)
+          .catch(() => undefined);
       })
       .finally(() => {
         setBusy(null);

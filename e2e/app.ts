@@ -1,17 +1,20 @@
 import { chromium, type Browser, type Page } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const EXE = join(ROOT, "src-tauri", "target", "debug", "lifeos-app.exe");
 const FIXTURE_VAULT = join(ROOT, "src-tauri", "tests", "fixtures", "vault");
+const FIXTURE_CACHE = join(ROOT, "e2e", "fixtures", "applications.json");
 const PORT = 9333;
 
 export interface RunningApp {
   page: Page;
   vault: string;
+  /** Uncaught page errors seen so far. */
+  errors: string[];
   close: () => Promise<void>;
 }
 
@@ -23,30 +26,21 @@ export async function launchApp(): Promise<RunningApp> {
   cpSync(FIXTURE_VAULT, vault, { recursive: true });
   mkdirSync(data);
   writeFileSync(join(data, "settings.json"), JSON.stringify({ vaultPath: vault }));
-  // A saved copy of the Sheet, so the Applications tab works without Google.
-  writeFileSync(
-    join(data, "applications.json"),
-    JSON.stringify({
-      fetchedAt: Date.now(),
-      missingColumns: [],
-      rows: [
-        {
-          applied: "2026-01-05",
-          company: "Example Security Ltd",
-          role: "SOC Analyst",
-          source: "Easy Apply",
-          status: "Applied",
-        },
-        {
-          applied: "2026-01-07",
-          company: "Sample Bank",
-          role: "Security Analyst",
-          source: "Company site",
-          status: "Rejected",
-        },
-      ],
-    }),
-  );
+  // A saved copy of the Sheet (synthetic, Sheet-style values), so the Jobs
+  // tabs work without Google. One row is dated today for the weekly chart.
+  const cache = JSON.parse(readFileSync(FIXTURE_CACHE, "utf8")) as {
+    fetchedAt: number;
+    rows: Record<string, string | null>[];
+  };
+  cache.fetchedAt = Date.now();
+  cache.rows.push({
+    applied: new Date().toLocaleDateString("en-CA"),
+    company: "Today Example",
+    role: "SOC Analyst",
+    source: "Indeed",
+    status: "Applied",
+  });
+  writeFileSync(join(data, "applications.json"), JSON.stringify(cache));
 
   const child: ChildProcess = spawn(EXE, [], {
     env: {
@@ -67,10 +61,13 @@ export async function launchApp(): Promise<RunningApp> {
   const browser = await connect(() => exited !== null, describe);
   const page = await firstPage(browser);
   await page.waitForLoadState("domcontentloaded");
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
 
   return {
     page,
     vault,
+    errors,
     close: async () => {
       await browser.close().catch(() => undefined);
       child.kill();

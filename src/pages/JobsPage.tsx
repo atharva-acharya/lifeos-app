@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getJobs,
   localDate,
@@ -8,12 +8,8 @@ import {
   type OutreachEntry,
 } from "../api";
 import { ApplicationsTab } from "../components/ApplicationsTab";
+import { ChartsTab } from "../components/JobCharts";
 import type { RouteId } from "../routes";
-
-// Recharts is large; load it only when the Charts tab opens.
-const ChartsTab = lazy(() =>
-  import("../components/JobCharts").then((m) => ({ default: m.ChartsTab })),
-);
 
 type Tab = "applications" | "pipeline" | "outreach" | "charts";
 
@@ -265,9 +261,7 @@ export function JobsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) 
         {tab === "applications" ? (
           <ApplicationsTab onNavigate={onNavigate} />
         ) : tab === "charts" ? (
-          <Suspense fallback={null}>
-            <ChartsTab onNavigate={onNavigate} />
-          </Suspense>
+          <ChartsTab onNavigate={onNavigate} />
         ) : response?.status === "noVault" ? (
           <section className="card placeholder">
             <span className="pill pill--pending">Not connected</span>
