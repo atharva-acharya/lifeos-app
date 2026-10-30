@@ -171,6 +171,69 @@ export function addTransaction(transaction: NewTransaction): Promise<undefined> 
   return invoke<undefined>("add_transaction", { transaction });
 }
 
+export type DateFormat = "dmy" | "ymd" | "mdy";
+
+/** Which CSV column (by header) holds each field of a bank statement. */
+export interface ImportMapping {
+  date: string;
+  dateFormat: DateFormat;
+  description: string;
+  amount: string | null;
+  moneyOut: string | null;
+  moneyIn: string | null;
+  category: string | null;
+  flipSign: boolean;
+}
+
+export interface ImportRow {
+  line: number;
+  date: string | null;
+  description: string;
+  category: string | null;
+  amount: number | null;
+  status: "new" | "duplicate" | "error";
+  error: string | null;
+}
+
+export interface ImportPreview {
+  headers: string[];
+  mapping: ImportMapping;
+  saved: boolean;
+  rows: ImportRow[];
+  new: number;
+  duplicates: number;
+  errors: number;
+}
+
+export interface ImportResult {
+  imported: number;
+  duplicates: number;
+  errors: number;
+  files: string[];
+}
+
+export function getBanks(): Promise<string[]> {
+  return invoke<string[]>("get_banks");
+}
+
+export function previewImport(
+  csv: string,
+  bank: string,
+  mapping: ImportMapping | null,
+  account: string | null,
+): Promise<ImportPreview> {
+  return invoke<ImportPreview>("preview_import", { csv, bank, mapping, account });
+}
+
+export function importCsv(
+  csv: string,
+  bank: string,
+  mapping: ImportMapping,
+  account: string | null,
+): Promise<ImportResult> {
+  return invoke<ImportResult>("import_csv", { csv, bank, mapping, account });
+}
+
 export interface GoogleView {
   clientId: string;
   sheetId: string;

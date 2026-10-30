@@ -14,6 +14,7 @@ use crate::health::{self, Health, HealthState};
 use crate::jobs::{self, Jobs};
 use crate::live::{self, LiveState, Mode};
 use crate::money::{self, Money, NewTransaction};
+use crate::money_import::{self, ImportResult, Mapping, Preview};
 use crate::onboarding::{self, Setup};
 use crate::projects::{self, Projects};
 use crate::sample;
@@ -478,6 +479,99 @@ pub fn add_transaction(
     }
     live::resync(&app);
     Ok(())
+}
+
+/// Banks with a saved CSV mapping, for the import form.
+#[tauri::command]
+pub fn get_banks(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+) -> Result<Vec<String>, String> {
+    state.require_real()?;
+    let current = settings::load(&config_dir(&app)?).map_err(|e| e.to_string())?;
+    Ok(current.bank_mappings.into_keys().collect())
+}
+
+/// The bank name (cleaned) and the account rows are saved under: the
+/// account the owner typed, or the bank's name.
+fn import_names(bank: &str, account: Option<&str>) -> Result<(String, String), String> {
+    let bank = money_import::bank_name(bank)?;
+    let account = account
+        .map(crate::vault::write::cell)
+        .filter(|a| !a.is_empty())
+        .unwrap_or_else(|| bank.clone());
+    Ok((bank, account))
+}
+
+fn import_preview(
+    app: &AppHandle,
+    state: &LiveState,
+    csv: &str,
+    (bank, account): (&str, &str),
+    mapping: Option<Mapping>,
+) -> Result<Preview, String> {
+    state.require_real()?;
+    let current = settings::load(&config_dir(app)?).map_err(|e| e.to_string())?;
+    state
+        .with_index(|index| {
+            money_import::preview(
+                index,
+                csv,
+                mapping,
+                current.bank_mappings.get(bank),
+                account,
+            )
+        })
+        .ok_or_else(|| "Choose your vault folder first.".to_owned())?
+}
+
+/// Reads a bank statement the owner picked (its text, never a path) and
+/// shows what an import would add. Nothing is written.
+#[tauri::command]
+pub fn preview_import(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+    csv: String,
+    bank: String,
+    mapping: Option<Mapping>,
+    account: Option<String>,
+) -> Result<Preview, String> {
+    let (bank, account) = import_names(&bank, account.as_deref())?;
+    import_preview(&app, &state, &csv, (&bank, &account), mapping)
+}
+
+/// Imports the new rows of a statement into the month ledger notes and
+/// saves the bank's column mapping. Duplicates are skipped.
+#[tauri::command]
+pub fn import_csv(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+    csv: String,
+    bank: String,
+    mapping: Mapping,
+    account: Option<String>,
+) -> Result<ImportResult, String> {
+    let (bank, account) = import_names(&bank, account.as_deref())?;
+    let preview = import_preview(&app, &state, &csv, (&bank, &account), Some(mapping))?;
+    money_import::validate(&preview.mapping, &preview.headers)?;
+    let vault = state
+        .vault()
+        .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
+    let (records, result) = money_import::import(&vault, &preview, &account);
+    // Log and re-index whatever was written, even if a later month failed.
+    if let Ok(dir) = live::data_dir(&app) {
+        for (rel, record) in &records {
+            crate::vault::write::log_write(&dir, "import-rows", rel, record);
+        }
+    }
+    live::resync(&app);
+    let result = result?;
+    // The mapping passed `validate`, so it only names this file's headers.
+    let dir = config_dir(&app)?;
+    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+    money_import::remember(&mut current.bank_mappings, &bank, &preview.mapping);
+    settings::save(&dir, &current).map_err(|e| e.to_string())?;
+    Ok(result)
 }
 
 #[derive(Debug, Serialize)]

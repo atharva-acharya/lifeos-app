@@ -8,6 +8,7 @@ pub mod index;
 pub mod jobs;
 mod live;
 pub mod money;
+pub mod money_import;
 pub mod onboarding;
 pub mod projects;
 pub mod sample;
@@ -80,6 +81,9 @@ pub fn run() {
             commands::get_health,
             commands::get_money,
             commands::add_transaction,
+            commands::get_banks,
+            commands::preview_import,
+            commands::import_csv,
             commands::log_error,
             commands::get_diagnostics,
             commands::set_auto_update,
