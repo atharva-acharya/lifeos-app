@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 
 export interface AppSettings {
   vaultPath: string | null;
+  /** Folder Health Auto Export writes to; the app only reads it. */
+  healthPath: string | null;
   google: GoogleView;
   /** Check GitHub for signed updates at start-up. */
   autoUpdate: boolean;
@@ -14,6 +16,16 @@ export function getSettings(): Promise<AppSettings> {
 /** Opens the native folder picker; resolves with the settings after the choice. */
 export function chooseVaultFolder(): Promise<AppSettings> {
   return invoke<AppSettings>("choose_vault_folder");
+}
+
+/** Opens the native folder picker for the Health export folder. */
+export function chooseHealthFolder(): Promise<AppSettings> {
+  return invoke<AppSettings>("choose_health_folder");
+}
+
+/** Forgets the Health folder (the folder itself is never touched). */
+export function clearHealthFolder(): Promise<AppSettings> {
+  return invoke<AppSettings>("clear_health_folder");
 }
 
 export interface Habits {
@@ -300,4 +312,71 @@ export type ProjectsResponse = { status: "noVault" } | { status: "ready"; projec
 
 export function getProjects(): Promise<ProjectsResponse> {
   return invoke<ProjectsResponse>("get_projects");
+}
+
+export interface HealthSleep {
+  total: number;
+  core: number;
+  deep: number;
+  rem: number;
+  awake: number;
+}
+
+export interface HealthDay {
+  date: string;
+  steps: number | null;
+  activeEnergy: number | null;
+  restingHr: number | null;
+  hrv: number | null;
+  sleep: HealthSleep | null;
+  weight: number | null;
+  weightSource: "health" | "vault" | null;
+}
+
+export interface HealthRingsDay extends HealthDay {
+  isToday: boolean;
+}
+
+export interface HealthGoals {
+  steps: number;
+  activeEnergy: number;
+  sleepHours: number;
+}
+
+export interface HealthWorkout {
+  source: "health" | "vault";
+  date: string;
+  name: string;
+  durationMin: number | null;
+  activeEnergy: number | null;
+  distanceKm: number | null;
+  path: string | null;
+}
+
+export interface BadFile {
+  name: string;
+  reason: string;
+}
+
+export interface Health {
+  /** Newest export file's modification time, ms since the Unix epoch. */
+  lastExport: number | null;
+  latestData: string | null;
+  stale: boolean;
+  /** The 90 days ending today, oldest first. */
+  days: HealthDay[];
+  ringsDay: HealthRingsDay | null;
+  goals: HealthGoals;
+  /** Newest first. */
+  workouts: HealthWorkout[];
+  badFiles: BadFile[];
+  badFileCount: number;
+  skippedFiles: number;
+  fileCount: number;
+}
+
+export type HealthResponse = { status: "notConfigured" } | { status: "ready"; health: Health };
+
+export function getHealth(date: string): Promise<HealthResponse> {
+  return invoke<HealthResponse>("get_health", { date, nowMs: Date.now() });
 }

@@ -7,6 +7,7 @@ import { SettingsPage } from "./SettingsPage";
 vi.mock("../components/DiagnosticsSettings", () => ({ DiagnosticsSettings: () => null }));
 
 const VAULT = "D:\\Notes\\Life OS";
+const HEALTH = String.raw`D:\iCloud\Health`;
 const SHEET = "1AbCdEfGhIjKlMnOpQrStUvWxYz_0123456789-ab";
 const NO_GOOGLE = {
   clientId: "",
@@ -23,6 +24,20 @@ describe("SettingsPage", () => {
     expect(await screen.findByText("Not set")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose folder" })).toBeEnabled();
     expect(invoke).toHaveBeenCalledWith("get_settings");
+  });
+
+  it("shows the Health export card next to the vault card", async () => {
+    invoke.mockResolvedValueOnce({
+      vaultPath: VAULT,
+      healthPath: HEALTH,
+      google: NO_GOOGLE,
+    });
+    render(<SettingsPage />);
+    expect(await screen.findByRole("heading", { name: "Health export" })).toBeInTheDocument();
+    expect(screen.getByText(HEALTH)).toBeInTheDocument();
+    // The vault card keeps its own button.
+    expect(screen.getByRole("button", { name: "Change folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change Health folder" })).toBeInTheDocument();
   });
 
   it("shows the connected vault", async () => {

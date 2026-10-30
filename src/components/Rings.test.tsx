@@ -42,4 +42,24 @@ describe("Rings", () => {
     expect(container.querySelector(".rings__legend")?.textContent).toContain("6,500 / 10,000");
     expect(container.querySelector(".rings__legend")?.textContent).toContain("0 kcal / 500 kcal");
   });
+
+  it("writes legend values with a custom format", () => {
+    const { container } = render(
+      <Rings
+        rings={[
+          {
+            key: "sleep",
+            name: "Sleep",
+            value: 7.2,
+            goal: 8,
+            color: "var(--c-read)",
+            unit: " ignored",
+            format: (n) => `${n.toFixed(1)}h`,
+          },
+        ]}
+      />,
+    );
+    expect(container.querySelector(".rings__legend")?.textContent).toContain("7.2h / 8.0h");
+    expect(container.querySelector(".rings__legend")?.textContent).not.toContain("ignored");
+  });
 });

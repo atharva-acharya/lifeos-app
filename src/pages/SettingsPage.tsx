@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { chooseVaultFolder, getSettings, type AppSettings } from "../api";
 import { DiagnosticsSettings } from "../components/DiagnosticsSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
+import { HealthSettings } from "../components/HealthSettings";
 import { UpdateSettings } from "../components/UpdateSettings";
 
 type Status = "loading" | "ready" | "choosing";
@@ -85,6 +86,10 @@ export function SettingsPage() {
           {status === "choosing" ? "Choosing…" : vault ? "Change folder" : "Choose folder"}
         </button>
       </section>
+
+      {settings && (
+        <HealthSettings healthPath={settings.healthPath ?? null} onChange={setSettings} />
+      )}
 
       {settings && <GoogleSettings google={settings.google} onChange={setSettings} />}
 

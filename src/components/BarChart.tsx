@@ -14,6 +14,8 @@ export interface BarChartProps<T> {
   series: Series<T>[];
   /** Fixed top of the y axis (e.g. 100 for percentages); otherwise a tidy round-up. */
   max?: number;
+  /** Horizontal dashed reference, e.g. a sleep goal. */
+  target?: { value: number; label: string };
   unit?: string;
   height?: number;
 }
@@ -45,6 +47,7 @@ export function BarChart<T>({
   label,
   series,
   max,
+  target,
   unit = "",
   height = 240,
 }: BarChartProps<T>) {
@@ -53,7 +56,7 @@ export function BarChart<T>({
   const totals = data.map((d) => series.reduce((n, s) => n + s.value(d), 0));
   const { top, ticks } =
     max === undefined
-      ? niceScale(Math.max(0, ...totals))
+      ? niceScale(Math.max(0, ...totals, target?.value ?? 0))
       : { top: max, ticks: [0, 25, 50, 75, 100].map((p) => (p / 100) * max) };
   const plotW = Math.max(0, width - PAD.left - PAD.right);
   const plotH = height - PAD.top - PAD.bottom;
@@ -87,6 +90,14 @@ export function BarChart<T>({
             </text>
           </g>
         ))}
+        {target && (
+          <g className="line-chart__target">
+            <line x1={PAD.left} x2={width - PAD.right} y1={y(target.value)} y2={y(target.value)} />
+            <text x={width - PAD.right} y={y(target.value) - 4} textAnchor="end">
+              {target.label}
+            </text>
+          </g>
+        )}
         {data.map((d, i) => {
           const x = PAD.left + slot * i + (slot - barW) / 2;
           let base = 0;

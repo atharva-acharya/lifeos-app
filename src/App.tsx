@@ -3,6 +3,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { FitnessPage } from "./pages/FitnessPage";
+import { HealthPage } from "./pages/HealthPage";
 import { JobsPage } from "./pages/JobsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -53,6 +54,8 @@ export default function App() {
             <JobsPage onNavigate={navigate} />
           ) : route.id === "fitness" ? (
             <FitnessPage onNavigate={navigate} />
+          ) : route.id === "health" ? (
+            <HealthPage onNavigate={navigate} />
           ) : route.id === "projects" ? (
             <ProjectsPage onNavigate={navigate} />
           ) : route.id === "settings" ? (
