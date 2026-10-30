@@ -3,7 +3,7 @@
 //! token lives in Windows Credential Manager; only Google hosts are called.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
@@ -27,6 +27,12 @@ const ALLOWED_HOSTS: &[&str] = &[
 const KEYRING_SERVICE: &str = "lifeos-app";
 const KEYRING_USER: &str = "google-refresh-token";
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(300);
+/// Per-connection limits for the loopback listener (threat model T9).
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+const MAX_REQUEST_LINE: u64 = 8 * 1024;
+/// Caps on what Google may send back (threat model T6/T9).
+const MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+pub const MAX_ROWS: usize = 20_000;
 pub const SHEET_TAB: &str = "Applications";
 
 #[derive(Debug, thiserror::Error)]
@@ -45,6 +51,8 @@ pub enum GoogleError {
     Rejected(u16),
     #[error("could not reach Google; showing the last saved copy")]
     Network,
+    #[error("the Sheet is too large to load (over 10 MB or 20,000 rows)")]
+    TooLarge,
     #[error("refused to contact an unexpected host")]
     HostNotAllowed,
     #[error("Windows Credential Manager error: {0}")]
@@ -66,6 +74,27 @@ impl GoogleConfig {
             && !self.client_secret.trim().is_empty()
             && valid_sheet_id(&self.sheet_id)
     }
+}
+
+/// Desktop OAuth client IDs look like `123-abc.apps.googleusercontent.com`.
+pub fn valid_client_id(id: &str) -> bool {
+    id.len() <= 200
+        && id
+            .strip_suffix(".apps.googleusercontent.com")
+            .and_then(|head| head.split_once('-'))
+            .is_some_and(|(num, rest)| {
+                !num.is_empty()
+                    && num.bytes().all(|b| b.is_ascii_digit())
+                    && !rest.is_empty()
+                    && rest
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+            })
+}
+
+/// Client secrets are short printable ASCII.
+pub fn valid_client_secret(secret: &str) -> bool {
+    (1..=100).contains(&secret.len()) && secret.bytes().all(|b| b.is_ascii_graphic())
 }
 
 /// Sheet IDs are base64url-like; anything else could alter the request path.
@@ -162,8 +191,44 @@ async fn post_form(url: &str, form: &[(&str, &str)]) -> Result<reqwest::Response
     }
 }
 
+/// Reads a JSON body, refusing anything over `MAX_RESPONSE_BYTES`.
+async fn read_json<T: serde::de::DeserializeOwned>(
+    mut res: reqwest::Response,
+) -> Result<T, GoogleError> {
+    let cap = MAX_RESPONSE_BYTES;
+    if res.content_length().is_some_and(|n| n > cap as u64) {
+        return Err(GoogleError::TooLarge);
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = res.chunk().await.map_err(|_| GoogleError::Network)? {
+        if body.len() + chunk.len() > cap {
+            return Err(GoogleError::TooLarge);
+        }
+        body.extend_from_slice(&chunk);
+    }
+    serde_json::from_slice(&body).map_err(|_| GoogleError::Network)
+}
+
+/// Asks Google to revoke a token. A 400 means it is already invalid.
+async fn revoke(token: &str) -> bool {
+    matches!(
+        post_form(REVOKE_URL, &[("token", token)]).await,
+        Ok(_) | Err(GoogleError::Rejected(400))
+    )
+}
+
+/// Credential Manager account name. Debug runs with a test data folder use
+/// their own entry, so end-to-end tests never read the owner's real token.
+fn keyring_user() -> &'static str {
+    if crate::commands::test_data_dir().is_some() {
+        "e2e-refresh-token"
+    } else {
+        KEYRING_USER
+    }
+}
+
 fn entry() -> Result<keyring::Entry, GoogleError> {
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+    keyring::Entry::new(KEYRING_SERVICE, keyring_user())
         .map_err(|e| GoogleError::Keyring(e.to_string()))
 }
 
@@ -216,13 +281,63 @@ pub async fn connect(config: &GoogleConfig) -> Result<(), GoogleError> {
         ],
     )
     .await?;
-    let token: TokenResponse = res.json().await.map_err(|_| GoogleError::Network)?;
+    let token: TokenResponse = read_json(res).await?;
     let refresh = token
         .refresh_token
         .ok_or_else(|| GoogleError::Login("Google did not return a refresh token".into()))?;
-    entry()?
+    let entry = entry()?;
+    // Reconnecting replaces the grant; the old token should not stay valid.
+    if let Ok(old) = entry.get_password() {
+        revoke(&old).await;
+    }
+    entry
         .set_password(&refresh)
         .map_err(|e| GoogleError::Keyring(e.to_string()))
+}
+
+/// What one request to the loopback listener means for the sign-in.
+#[derive(Debug)]
+pub enum Redirect {
+    /// Not our redirect (favicon, probes, a forged state): answer and keep waiting.
+    Ignore,
+    /// Google's redirect with our state: the sign-in ends here.
+    Done(Result<String, GoogleError>),
+}
+
+/// Only a `GET /?...` carrying the expected state can end the sign-in, so a
+/// local process or web page that finds the port cannot cancel it.
+pub fn classify(request_line: &str, expected_state: &str) -> Redirect {
+    if !request_line.starts_with("GET /?") {
+        return Redirect::Ignore;
+    }
+    let state_ok = request_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|t| Url::parse(&format!("http://127.0.0.1{t}")).ok())
+        .is_some_and(|u| {
+            u.query_pairs()
+                .any(|(k, v)| k == "state" && v == expected_state)
+        });
+    if state_ok {
+        Redirect::Done(parse_redirect(request_line, expected_state))
+    } else {
+        Redirect::Ignore
+    }
+}
+
+fn reply(stream: &mut std::net::TcpStream, status: &str, body: &str) {
+    let _ = stream.write_all(
+        format!(
+            "HTTP/1.1 {status}
+Content-Type: text/plain; charset=utf-8
+Content-Length: {}
+Connection: close
+
+{body}",
+            body.len()
+        )
+        .as_bytes(),
+    );
 }
 
 fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String, GoogleError> {
@@ -231,38 +346,36 @@ fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String, GoogleEr
         .map_err(|e| GoogleError::Login(e.to_string()))?;
     let deadline = Instant::now() + LOGIN_TIMEOUT;
     loop {
+        if Instant::now() > deadline {
+            return Err(GoogleError::LoginAborted);
+        }
         match listener.accept() {
             Ok((mut stream, _)) => {
-                let _ = stream.set_nonblocking(false);
-                let mut line = String::new();
-                BufReader::new(&stream)
-                    .read_line(&mut line)
-                    .map_err(|e| GoogleError::Login(e.to_string()))?;
-                // Ignore stray requests such as /favicon.ico.
-                if !line.contains("state=") {
-                    let _ =
-                        stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+                // A silent or endless connection must not stall the sign-in.
+                if stream.set_nonblocking(false).is_err()
+                    || stream.set_read_timeout(Some(REQUEST_TIMEOUT)).is_err()
+                {
                     continue;
                 }
-                let result = parse_redirect(&line, state);
-                let body = if result.is_ok() {
-                    "Life OS is connected to Google. You can close this tab."
-                } else {
-                    "Sign-in did not complete. Return to Life OS and try again."
-                };
-                let _ = stream.write_all(
-                    format!(
-                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                        body.len()
-                    )
-                    .as_bytes(),
-                );
-                return result;
+                let mut line = String::new();
+                let read = BufReader::new((&stream).take(MAX_REQUEST_LINE)).read_line(&mut line);
+                if read.is_err() {
+                    continue;
+                }
+                match classify(&line, state) {
+                    Redirect::Ignore => reply(&mut stream, "404 Not Found", ""),
+                    Redirect::Done(result) => {
+                        let body = if result.is_ok() {
+                            "Life OS is connected to Google. You can close this tab."
+                        } else {
+                            "Sign-in did not complete. Return to Life OS and try again."
+                        };
+                        reply(&mut stream, "200 OK", body);
+                        return result;
+                    }
+                }
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                if Instant::now() > deadline {
-                    return Err(GoogleError::LoginAborted);
-                }
                 std::thread::sleep(Duration::from_millis(200));
             }
             Err(e) => return Err(GoogleError::Login(e.to_string())),
@@ -270,14 +383,16 @@ fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String, GoogleEr
     }
 }
 
-/// Revokes the token with Google (best effort) and removes it locally.
-pub async fn disconnect() -> Result<(), GoogleError> {
+/// Removes the token locally and asks Google to revoke it. Returns `false`
+/// when Google could not be told, so the owner can revoke it by hand.
+pub async fn disconnect() -> Result<bool, GoogleError> {
     let entry = entry()?;
-    if let Ok(token) = entry.get_password() {
-        let _ = post_form(REVOKE_URL, &[("token", &token)]).await;
-    }
+    let revoked = match entry.get_password() {
+        Ok(token) => revoke(&token).await,
+        Err(_) => true,
+    };
     match entry.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(revoked),
         Err(e) => Err(GoogleError::Keyring(e.to_string())),
     }
 }
@@ -296,7 +411,7 @@ async fn access_token(config: &GoogleConfig) -> Result<String, GoogleError> {
         ],
     )
     .await?;
-    let token: TokenResponse = res.json().await.map_err(|_| GoogleError::Network)?;
+    let token: TokenResponse = read_json(res).await?;
     Ok(token.access_token)
 }
 
@@ -334,7 +449,10 @@ pub async fn fetch_sheet(config: &GoogleConfig) -> Result<Vec<Vec<String>>, Goog
     if !res.status().is_success() {
         return Err(GoogleError::Rejected(res.status().as_u16()));
     }
-    let body: ValueRange = res.json().await.map_err(|_| GoogleError::Network)?;
+    let body: ValueRange = read_json(res).await?;
+    if body.values.len() > MAX_ROWS {
+        return Err(GoogleError::TooLarge);
+    }
     Ok(body.values)
 }
 
@@ -416,5 +534,56 @@ mod tests {
         assert!(c.is_complete());
         c.client_secret = " ".into();
         assert!(!c.is_complete());
+    }
+
+    #[test]
+    fn only_our_redirect_ends_the_sign_in() {
+        let done = |line: &str| matches!(classify(line, "abc"), Redirect::Done(_));
+        assert!(done("GET /?state=abc&code=1 HTTP/1.1"));
+        assert!(done("GET /?state=abc&error=access_denied HTTP/1.1"));
+        // Probes, favicons and forged states are answered and ignored.
+        assert!(!done("GET /favicon.ico HTTP/1.1"));
+        assert!(!done("GET /?state=evil&code=1 HTTP/1.1"));
+        assert!(!done("GET /?code=1 HTTP/1.1"));
+        assert!(!done("POST /?state=abc&code=1 HTTP/1.1"));
+        assert!(!done("\u{0}\u{1}garbage"));
+        assert!(!done(""));
+    }
+
+    #[test]
+    fn listener_ignores_a_silent_connection_and_still_signs_in() {
+        use std::net::TcpStream;
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let waiter = std::thread::spawn(move || wait_for_code(&listener, "abc"));
+        // Opens and says nothing: must time out without blocking the sign-in.
+        let _silent = TcpStream::connect(addr).expect("silent");
+        // A forged redirect must not cancel it either.
+        let mut forged = TcpStream::connect(addr).expect("forged");
+        forged
+            .write_all(b"GET /?state=evil&code=x HTTP/1.1\r\n\r\n")
+            .expect("write");
+        let mut real = TcpStream::connect(addr).expect("real");
+        real.write_all(b"GET /?state=abc&code=good HTTP/1.1\r\n\r\n")
+            .expect("write");
+        assert_eq!(waiter.join().expect("join").expect("code"), "good");
+    }
+
+    #[test]
+    fn client_id_and_secret_are_validated() {
+        assert!(valid_client_id(
+            "123456789012-abcdef0123456789.apps.googleusercontent.com"
+        ));
+        assert!(!valid_client_id("123.apps.googleusercontent.com"));
+        assert!(!valid_client_id("abc-def.apps.googleusercontent.com"));
+        assert!(!valid_client_id(
+            "123-abc.apps.googleusercontent.com.evil.com"
+        ));
+        assert!(!valid_client_id("123-ABC.apps.googleusercontent.com"));
+        assert!(valid_client_secret("GOCSPX-example_Secret-123"));
+        assert!(!valid_client_secret(""));
+        assert!(!valid_client_secret("has space"));
+        assert!(!valid_client_secret("line\nbreak"));
+        assert!(!valid_client_secret(&"x".repeat(101)));
     }
 }

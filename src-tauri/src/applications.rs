@@ -108,9 +108,24 @@ pub fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
+/// Largest saved copy the app will read (threat model T6).
+const MAX_CACHE_BYTES: u64 = 20 * 1024 * 1024;
+
 pub fn load(dir: &Path) -> Option<Cache> {
-    let text = fs::read_to_string(dir.join(CACHE_FILE)).ok()?;
+    let path = dir.join(CACHE_FILE);
+    if fs::metadata(&path).ok()?.len() > MAX_CACHE_BYTES {
+        return None;
+    }
+    let text = fs::read_to_string(path).ok()?;
     serde_json::from_str(&text).ok()
+}
+
+/// Forgets the saved copy (on Disconnect); the Sheet itself is untouched.
+pub fn clear(dir: &Path) -> std::io::Result<()> {
+    match fs::remove_file(dir.join(CACHE_FILE)) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
 }
 
 pub fn save(dir: &Path, cache: &Cache) -> std::io::Result<()> {
@@ -180,6 +195,23 @@ mod tests {
     fn corrupt_cache_is_ignored() {
         let dir = tempfile::tempdir().expect("temp dir");
         fs::write(dir.path().join(CACHE_FILE), "{ nope").expect("write");
+        assert_eq!(load(dir.path()), None);
+    }
+
+    #[test]
+    fn oversized_cache_is_ignored() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let file = fs::File::create(dir.path().join(CACHE_FILE)).expect("create");
+        file.set_len(MAX_CACHE_BYTES + 1).expect("grow");
+        assert_eq!(load(dir.path()), None);
+    }
+
+    #[test]
+    fn clear_forgets_the_saved_copy_and_tolerates_none() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        clear(dir.path()).expect("nothing to clear");
+        save(dir.path(), &Cache::default()).expect("save");
+        clear(dir.path()).expect("clear");
         assert_eq!(load(dir.path()), None);
     }
 }
