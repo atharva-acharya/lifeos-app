@@ -1,5 +1,12 @@
 name: Release
 
+# Three jobs (ADR 0007, threat model T22):
+#   gates   - CodeQL (Rust) and the owner's local e2e run passed on this commit
+#   build   - builds the installers with no secrets and no write access
+#   publish - signs the update package and publishes; it runs none of the
+#             repository's code or dependencies, so the update-signing key is
+#             never exposed to build scripts.
+
 on:
   push:
     tags: ["v*.*.*"]
@@ -12,46 +19,50 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish release
-    runs-on: windows-latest
-    timeout-minutes: 60
-    environment: release
+  gates:
+    name: Release gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
       checks: read
       statuses: read
     steps:
       # CodeQL for Rust is not a required PR check (it is slow), so a release
       # only goes out once it has passed on the exact commit being tagged.
       - name: Require CodeQL (rust) to have passed on this commit
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
         run: |
-          result=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CodeQL%20(rust)" --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last | .conclusion')
+          result=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CodeQL%20(rust)" \
+            --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last | .conclusion')
           echo "CodeQL (rust) on $SHA: ${result:-not run}"
           [ "$result" = "success" ]
 
       # The end-to-end suite needs WebView2, which hosted runners cannot start,
-      # so it runs on the owner's PC (`pnpm e2e:gate`) and records a commit
-      # status. No release without it passing on this exact commit.
-      - name: Require the local end-to-end suite to have passed on this commit
-        shell: bash
+      # so the owner runs it (`pnpm e2e:gate`) and it records a commit status.
+      # Only a status the owner created counts.
+      - name: Require the owner's end-to-end run to have passed on this commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           state=$(gh api "repos/$REPO/commits/$SHA/statuses" \
-            --jq '[.[] | select(.context == "e2e (local)")] | first | .state')
-          echo "e2e (local) on $SHA: ${state:-not run}"
+            --jq "[.[] | select(.context == \"e2e (local)\" and .creator.login == \"$OWNER\")] | first | .state")
+          echo "e2e (local) by $OWNER on $SHA: ${state:-not run}"
           [ "$state" = "success" ]
 
+  build:
+    name: Build installers
+    needs: gates
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      tauri-cli: ${{ steps.cli.outputs.version }}
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -76,28 +87,88 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      - name: Tauri CLI version (the publish job signs with the same one)
+        id: cli
+        shell: bash
+        run: echo "version=$(node -p "require('@tauri-apps/cli/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # Update signing happens in the publish job, so no key is needed here.
       - name: Build installers
-        env:
-          # Signs the update packages; the app only installs updates signed
-          # with this key (public half in tauri.conf.json, ADR 0007).
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm tauri build -- --locked
+        shell: bash
+        run: pnpm tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}' -- --locked
 
       # Authenticode signing via SignPath is added here once the project is
       # accepted into its open-source programme (ADR 0005).
 
       - name: Collect artefacts
         shell: bash
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           mkdir -p dist-release
-          cp src-tauri/target/release/bundle/nsis/*.exe src-tauri/target/release/bundle/nsis/*.exe.sig dist-release/
+          cp src-tauri/target/release/bundle/nsis/*.exe dist-release/
           cp src-tauri/target/release/bundle/msi/*.msi dist-release/
           # GitHub replaces spaces in asset names with dots; match it so SHA256SUMS.txt checks.
           for f in dist-release/*' '*; do mv "$f" "${f// /.}"; done
-          # Update manifest the app reads from releases/latest/download/latest.json.
+          ls -l dist-release
+
+      - name: SBOM (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist-release/sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Changelog
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: dist-release/CHANGES.md
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: dist-release/
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: Sign and publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: dist-release
+
+      # Only the pinned Tauri CLI runs here, installed without install scripts;
+      # no repository code or other dependencies, so the key stays contained.
+      - name: Sign the update package (bound to this version)
+        env:
+          TAG: ${{ github.ref_name }}
+          CLI_VERSION: ${{ needs.build.outputs.tauri-cli }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          npm install --prefix "$RUNNER_TEMP/signer" --no-save --ignore-scripts --no-audit --no-fund \
+            "@tauri-apps/cli@$CLI_VERSION"
+          exe=$(ls dist-release/*-setup.exe)
+          "$RUNNER_TEMP/signer/node_modules/.bin/tauri" signer sign --app-version "${TAG#v}" "$exe"
+          test -s "$exe.sig"
+
+      - name: Update manifest (latest.json)
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
           exe=$(ls dist-release/*-setup.exe)
           EXE_NAME=$(basename "$exe") SIGNATURE=$(cat "$exe.sig") node -e '
             const { TAG, EXE_NAME, SIGNATURE, GITHUB_REPOSITORY } = process.env;
@@ -115,21 +186,12 @@ jobs:
             process.stdout.write(JSON.stringify(manifest, null, 2) + "\n");
           ' > dist-release/latest.json
           cat dist-release/latest.json
-          ls -l dist-release
-
-      - name: SBOM (CycloneDX)
-        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
-        with:
-          path: .
-          format: cyclonedx-json
-          output-file: dist-release/sbom.cdx.json
-          upload-artifact: false
-          upload-release-assets: false
 
       - name: Checksums
-        shell: bash
         working-directory: dist-release
-        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: |
+          mv CHANGES.md "$RUNNER_TEMP/CHANGES.md"
+          sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
 
       - name: Build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -140,23 +202,13 @@ jobs:
             dist-release/latest.json
             dist-release/sbom.cdx.json
 
-      - name: Changelog
-        id: changelog
-        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
-        with:
-          config: cliff.toml
-          args: --latest --strip header
-        env:
-          OUTPUT: CHANGES.md
-
       - name: Publish GitHub release
-        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           {
-            cat CHANGES.md
+            cat "$RUNNER_TEMP/CHANGES.md"
             echo
             echo "## Verify"
             echo
@@ -165,5 +217,6 @@ jobs:
             echo '```'
             echo
             echo "The installer is not yet code-signed, so Windows SmartScreen may warn. Check the SHA-256 and attestation above."
-          } > notes.md
-          gh release create "$TAG" dist-release/* --title "Life OS $TAG" --notes-file notes.md --verify-tag
+          } > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" dist-release/* --repo "$GITHUB_REPOSITORY" \
+            --title "Life OS $TAG" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag

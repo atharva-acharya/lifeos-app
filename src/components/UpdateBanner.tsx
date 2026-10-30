@@ -44,7 +44,7 @@ export function UpdateBanner() {
           onClick={() => {
             setInstalling(true);
             setError(null);
-            installUpdate().catch((err: unknown) => {
+            installUpdate(update.version).catch((err: unknown) => {
               setInstalling(false);
               setError(typeof err === "string" ? err : "The update could not be installed.");
             });

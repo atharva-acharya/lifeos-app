@@ -193,7 +193,7 @@ export function checkForUpdate(): Promise<UpdateInfo | null> {
   return invoke<UpdateInfo | null>("check_for_update");
 }
 
-/** Downloads, verifies and installs the update; the app then restarts. */
-export function installUpdate(): Promise<undefined> {
-  return invoke<undefined>("install_update");
+/** Downloads, verifies and installs `version` (the one shown); the app then restarts. */
+export function installUpdate(version: string): Promise<undefined> {
+  return invoke<undefined>("install_update", { version });
 }

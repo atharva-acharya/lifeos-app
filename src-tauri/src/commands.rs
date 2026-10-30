@@ -323,11 +323,12 @@ pub async fn check_for_update(
     updates::check(&app, &pending).await
 }
 
-/// Installs the update found by the last check and restarts the app.
+/// Installs the update the owner was shown (`version`) and restarts the app.
 #[tauri::command]
 pub async fn install_update(
     app: AppHandle,
     pending: tauri::State<'_, Pending>,
+    version: String,
 ) -> Result<(), String> {
-    updates::install(&app, &pending).await
+    updates::install(&app, &pending, &version).await
 }

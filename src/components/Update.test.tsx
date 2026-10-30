@@ -26,7 +26,7 @@ describe("UpdateBanner", () => {
     render(<UpdateBanner />);
     expect(await screen.findByText("Life OS 0.3.1 is available.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Install and restart" }));
-    expect(invoke).toHaveBeenCalledWith("install_update");
+    expect(invoke).toHaveBeenCalledWith("install_update", { version: "0.3.1" });
   });
 
   it("does not check when updates are switched off", async () => {

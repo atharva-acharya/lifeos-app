@@ -40,9 +40,9 @@ export function UpdateSettings({
       });
   };
 
-  const install = () => {
+  const install = (version: string) => {
     setState({ kind: "installing" });
-    installUpdate().catch((err: unknown) => {
+    installUpdate(version).catch((err: unknown) => {
       setState({ kind: "error", message: message(err) });
     });
   };
@@ -95,7 +95,13 @@ export function UpdateSettings({
         )}
       </div>
       {state.kind === "found" ? (
-        <button type="button" className="button" onClick={install}>
+        <button
+          type="button"
+          className="button"
+          onClick={() => {
+            install(state.update.version);
+          }}
+        >
           Install and restart
         </button>
       ) : (
