@@ -17,7 +17,8 @@ export function progress(value: number, goal: number): number {
   return Math.min(1, value / goal);
 }
 
-/** Concentric activity rings in the style of Apple Health. */
+/** Concentric activity rings in the style of Apple Health. The legend
+ * carries every value as text, so the drawing itself is decorative. */
 export function Rings({ rings, size = 168 }: { rings: Ring[]; size?: number }) {
   const centre = size / 2;
   return (

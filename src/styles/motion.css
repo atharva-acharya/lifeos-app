@@ -12,6 +12,7 @@
     background-color var(--dur-fast) var(--ease-standard),
     color var(--dur-fast) var(--ease-standard),
     box-shadow var(--dur-fast) var(--ease-standard),
+    opacity var(--dur-base) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
 
@@ -26,9 +27,9 @@
 }
 
 /* Cards, notices and table rows ease in when they first appear. */
+/* (Kanban cards keep the interaction transitions above, which include opacity.) */
 .card,
-.notice,
-.kanban__card {
+.notice {
   transition:
     opacity var(--dur-base) var(--ease-standard),
     transform var(--dur-base) var(--ease-spring);

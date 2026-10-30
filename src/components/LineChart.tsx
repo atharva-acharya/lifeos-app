@@ -32,6 +32,11 @@ export function niceRange(
   if (min === max) {
     min -= 1;
     max += 1;
+  } else if (max - min < 0.01) {
+    // Tiny spans would round every tick to the same label.
+    const mid = (min + max) / 2;
+    min = mid - 0.005;
+    max = mid + 0.005;
   }
   const raw = (max - min) / steps;
   const pow = 10 ** Math.floor(Math.log10(raw));
@@ -62,7 +67,11 @@ export function linePath(
   return d;
 }
 
-/** Small SVG line chart (trends such as weight). No chart library. */
+/**
+ * Small SVG line chart (trends such as weight). No chart library.
+ * Dot tooltips are mouse-only: like JobCharts, callers hide the plot from
+ * screen readers (`aria-hidden`) and add an `sr-only` table of the values.
+ */
 export function LineChart({ labels, lines, target, unit = "", height = 220 }: LineChartProps) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const all = lines
@@ -120,7 +129,7 @@ export function LineChart({ labels, lines, target, unit = "", height = 220 }: Li
             />
             {l.dots &&
               l.values.map((v, i) =>
-                v === null ? null : (
+                v === null || !Number.isFinite(v) ? null : (
                   <circle
                     key={i}
                     className="line-chart__dot"

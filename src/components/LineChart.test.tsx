@@ -12,6 +12,11 @@ describe("niceRange", () => {
     expect(niceRange(4200, 11800).lo).toBe(4000);
   });
 
+  it("never repeats a tick on tiny ranges", () => {
+    const { ticks } = niceRange(80.0001, 80.0003);
+    expect(new Set(ticks).size).toBe(ticks.length);
+  });
+
   it("copes with flat and empty data", () => {
     expect(niceRange(81, 81)).toMatchObject({ lo: 80, hi: 82 });
     expect(niceRange(Infinity, -Infinity)).toEqual({ lo: 0, hi: 1, ticks: [0, 1] });

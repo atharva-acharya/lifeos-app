@@ -54,6 +54,9 @@ export function DiagnosticsSettings() {
             "Loading…"
           )}
         </p>
+        <p className="sr-only" role="status">
+          {copied === "copied" ? "Diagnostics copied to the clipboard." : ""}
+        </p>
         {copied === "failed" && (
           <p className="setting__error" role="alert">
             Could not copy to the clipboard. Please try again.
