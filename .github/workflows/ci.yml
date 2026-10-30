@@ -60,7 +60,9 @@ jobs:
   web:
     name: Web (format, lint, types, tests)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # Run unless detection positively said docs-only, so a failed detection
+    # job can never turn required checks into passing skips.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -81,7 +83,9 @@ jobs:
   rust:
     name: Rust (fmt, clippy, tests)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # Run unless detection positively said docs-only, so a failed detection
+    # job can never turn required checks into passing skips.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -104,7 +108,9 @@ jobs:
   build:
     name: Build app
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # Run unless detection positively said docs-only, so a failed detection
+    # job can never turn required checks into passing skips.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
