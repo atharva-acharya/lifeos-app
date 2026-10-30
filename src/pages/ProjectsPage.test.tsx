@@ -24,6 +24,7 @@ const ACTIVE: Project = {
     { date: null, text: "Newest undated line" },
     { date: "2026-01-13", text: "Hypervisor running." },
   ],
+  logTotal: 2,
 };
 
 const PAUSED: Project = {
@@ -42,6 +43,7 @@ const PAUSED: Project = {
   nextStep: "Order seeds",
   lastLog: null,
   log: [],
+  logTotal: 0,
 };
 
 const DONE: Project = {
@@ -57,6 +59,7 @@ const DONE: Project = {
   nextStep: null,
   lastLog: { date: "2025-12-01", text: "Finished." },
   log: [{ date: "2025-12-01", text: "Finished." }],
+  logTotal: 1,
 };
 
 function ready(over: Partial<Projects> = {}) {
@@ -234,7 +237,9 @@ describe("ProjectsPage edge states", () => {
   it("renders markup-looking project data as text", async () => {
     const evil = "<img src=x onerror=alert(1)>";
     ready({
-      projects: [{ ...ACTIVE, name: evil, nextStep: evil, log: [{ date: null, text: evil }] }],
+      projects: [
+        { ...ACTIVE, name: evil, nextStep: evil, log: [{ date: null, text: evil }], logTotal: 1 },
+      ],
     });
     render(<ProjectsPage onNavigate={vi.fn()} />);
     expect((await screen.findAllByText(evil, { exact: false })).length).toBeGreaterThan(0);

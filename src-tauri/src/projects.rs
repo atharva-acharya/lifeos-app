@@ -10,6 +10,8 @@ use crate::vault::note::LogEntry;
 
 /// At most this many projects are sent to the UI.
 const MAX_PROJECTS: i64 = 200;
+/// At most this many log entries (newest first) are sent per project.
+const MAX_LOG_SENT: i64 = 100;
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,8 +42,10 @@ pub struct ProjectView {
     pub current: Option<usize>,
     pub next_step: Option<String>,
     pub last_log: Option<LogEntry>,
-    /// Newest first.
+    /// Newest first, at most 100.
     pub log: Vec<LogEntry>,
+    /// Entries stored for the note, which may exceed `log.len()`.
+    pub log_total: i64,
 }
 
 struct Row {
@@ -54,10 +58,13 @@ struct Row {
     updated: Option<String>,
 }
 
+/// Whitespace trimmed from a status, in Rust and in the SQL ordering alike.
+const STATUS_WS: [char; 4] = [' ', '\t', '\n', '\r'];
+
 /// Same rule as Today's resume: no status, `active` or `in progress`.
 fn is_active(status: Option<&str>) -> bool {
     status.is_none_or(|s| {
-        let s = s.trim();
+        let s = s.trim_matches(STATUS_WS);
         s.eq_ignore_ascii_case("active") || s.eq_ignore_ascii_case("in progress")
     })
 }
@@ -67,7 +74,7 @@ pub fn projects(index: &Index) -> rusqlite::Result<Projects> {
     let rows: Vec<Row> = conn
         .prepare(
             "SELECT path, project, status, step, steps_total, next_step, updated FROM project
-             ORDER BY (status IS NULL OR lower(trim(status)) IN ('active', 'in progress')) DESC,
+             ORDER BY (status IS NULL OR lower(trim(status, ' ' || char(9) || char(10) || char(13))) IN ('active', 'in progress')) DESC,
                       updated IS NULL, updated DESC, path
              LIMIT ?1",
         )?
@@ -86,8 +93,10 @@ pub fn projects(index: &Index) -> rusqlite::Result<Projects> {
 
     let mut steps_query =
         conn.prepare("SELECT text, done FROM project_steps WHERE path = ?1 ORDER BY position")?;
-    let mut log_query =
-        conn.prepare("SELECT date, text FROM project_log WHERE path = ?1 ORDER BY position DESC")?;
+    let mut log_query = conn.prepare(
+        "SELECT date, text FROM project_log WHERE path = ?1 ORDER BY position DESC LIMIT ?2",
+    )?;
+    let mut total_query = conn.prepare("SELECT COUNT(*) FROM project_log WHERE path = ?1")?;
 
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
@@ -100,13 +109,15 @@ pub fn projects(index: &Index) -> rusqlite::Result<Projects> {
             })?
             .collect::<Result<_, _>>()?;
         let log: Vec<LogEntry> = log_query
-            .query_map(params![row.path], |r| {
+            .query_map(params![row.path, MAX_LOG_SENT], |r| {
                 Ok(LogEntry {
                     date: r.get(0)?,
                     text: r.get(1)?,
                 })
             })?
             .collect::<Result<_, _>>()?;
+
+        let log_total: i64 = total_query.query_row(params![row.path], |r| r.get(0))?;
 
         let (done, total, current) = if steps.is_empty() {
             // No checklist: the front matter is all there is.
@@ -144,6 +155,7 @@ pub fn projects(index: &Index) -> rusqlite::Result<Projects> {
             next_step,
             last_log: log.first().cloned(),
             log,
+            log_total,
         });
     }
 
@@ -339,9 +351,10 @@ mod tests {
         let index = vault_with(&[("Projects/long.md", &text)]);
         let p = projects(&index).expect("projects");
         let v = find(&p, "long");
-        assert_eq!(v.log.len(), 1000);
+        assert_eq!(v.log_total, 1000);
+        assert_eq!(v.log.len(), 100);
         assert_eq!(v.log[0].text, "entry 1004");
-        assert_eq!(v.log[999].text, "entry 5");
+        assert_eq!(v.log[99].text, "entry 905");
     }
 
     #[test]
@@ -529,6 +542,55 @@ mod edge_tests {
         assert_eq!(v.last_log.as_ref(), v.log.first());
     }
 
+    #[test]
+    fn sends_only_the_newest_hundred_entries_with_the_true_total() {
+        let (_d, index) = vault_with(&[("Projects/n.md", &long_log(150))]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!(v.log.len(), 100);
+        assert_eq!(v.log_total, 150);
+        assert_eq!(v.log[0].text, "e149");
+        assert_eq!(v.log[99].text, "e50");
+        let (_d, index) = vault_with(&[("Projects/n.md", &long_log(3))]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!((v.log.len(), v.log_total), (3, 3));
+    }
+
+    #[test]
+    fn at_most_200_steps_per_note() {
+        let mut note = String::from(
+            "---
+type: project
+---
+## Steps
+",
+        );
+        for i in 0..210 {
+            writeln!(note, "- [ ] s{i}").expect("write");
+        }
+        let (_d, index) = vault_with(&[("Projects/n.md", &note)]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!((v.steps.len(), v.total), (200, 200));
+        assert_eq!(v.steps[199].text, "s199");
+    }
+
+    #[test]
+    fn tab_padded_status_is_active_and_sorts_with_active() {
+        let (_d, index) = vault_with(&[
+            (
+                "Projects/a-paused.md",
+                &proj("status: paused\nupdated: 2026-09-09\n"),
+            ),
+            (
+                "Projects/b-tab.md",
+                &proj("status: \"\tactive\"\nupdated: 2020-01-01\n"),
+            ),
+        ]);
+        let p = projects(&index).expect("projects");
+        assert_eq!(names(&p), ["b-tab", "a-paused"]);
+        assert!(p.projects[0].active);
+        assert_eq!(p.projects[0].status.as_deref(), Some("\tactive"));
+    }
+
     fn long_log(n: usize) -> String {
         let mut note = String::from("---\ntype: project\n---\n## Log\n");
         for i in 0..n {
@@ -541,18 +603,18 @@ mod edge_tests {
     fn exactly_one_thousand_entries_are_all_kept() {
         let (_d, index) = vault_with(&[("Projects/n.md", &long_log(1000))]);
         let v = &projects(&index).expect("projects").projects[0];
-        assert_eq!(v.log.len(), 1000);
+        assert_eq!((v.log_total, v.log.len()), (1000, 100));
         assert_eq!(v.log[0].text, "e999");
-        assert_eq!(v.log[999].text, "e0");
+        assert_eq!(v.log[99].text, "e900");
     }
 
     #[test]
     fn one_thousand_and_one_drops_only_the_oldest() {
         let (_d, index) = vault_with(&[("Projects/n.md", &long_log(1001))]);
         let v = &projects(&index).expect("projects").projects[0];
-        assert_eq!(v.log.len(), 1000);
+        assert_eq!((v.log_total, v.log.len()), (1000, 100));
         assert_eq!(v.log[0].text, "e1000");
-        assert_eq!(v.log[999].text, "e1");
+        assert_eq!(v.log[99].text, "e901");
     }
 
     #[test]
@@ -595,7 +657,9 @@ mod edge_tests {
         let json = serde_json::to_value(projects(&index).expect("projects")).expect("json");
         assert!(json.get("parseErrors").is_some());
         let v = &json["projects"][0];
-        for k in ["nextStep", "lastLog", "log", "steps", "current", "active"] {
+        for k in [
+            "nextStep", "lastLog", "log", "logTotal", "steps", "current", "active",
+        ] {
             assert!(v.get(k).is_some(), "{k}");
         }
     }

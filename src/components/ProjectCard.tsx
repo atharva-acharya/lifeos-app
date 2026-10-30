@@ -25,16 +25,18 @@ export function ProjectCard({ project: p }: { project: Project }) {
         {p.updated && <span className="muted">Updated {p.updated}</span>}
       </div>
 
-      <div
-        className="progress"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={p.total}
-        aria-valuenow={p.done}
-        aria-label={`${String(p.done)} of ${String(p.total)} steps done`}
-      >
-        <span style={{ width: `${String(pct)}%` }} />
-      </div>
+      {p.total > 0 && (
+        <div
+          className="progress"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={p.total}
+          aria-valuenow={p.done}
+          aria-label={`${String(p.done)} of ${String(p.total)} steps done`}
+        >
+          <span style={{ width: `${String(pct)}%` }} />
+        </div>
+      )}
       <p className="muted">{stepSummary(p)}</p>
 
       <div className="project__resume" role="group" aria-label={`Resume ${p.name}`}>
@@ -74,7 +76,10 @@ export function ProjectCard({ project: p }: { project: Project }) {
 
       {p.log.length > 0 && (
         <details className="project__log">
-          <summary>Log ({p.log.length})</summary>
+          <summary>Log ({p.logTotal})</summary>
+          {p.logTotal > p.log.length && (
+            <p className="muted">Showing the newest {String(p.log.length)}</p>
+          )}
           <ul>
             {p.log.map((e, i) => (
               <li key={`${String(i)}-${e.text}`}>

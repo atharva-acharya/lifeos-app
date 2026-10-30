@@ -134,7 +134,7 @@ test("Projects shows progress and where to resume", async () => {
   const resume = card.getByRole("group", { name: "Resume home-lab" });
   await expect(resume).toContainText("Set up log forwarding");
   // The Today test may have appended a newer line; the older one is in the log.
-  await card.getByText(/^Log \(/).click();
+  await card.locator("summary").click();
   await expect(card.getByText("Hypervisor running.").last()).toBeVisible();
 
   const current = card.locator('li[aria-current="step"]');
@@ -148,11 +148,14 @@ test("Projects shows progress and where to resume", async () => {
   await expect(page.getByRole("region", { name: "Active" }).locator(".breathing")).toHaveCount(1);
 
   // Reduced motion switches the animation off.
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect
-    .poll(() => current.evaluate((el) => getComputedStyle(el).animationName))
-    .toBe("none");
-  await page.emulateMedia({ reducedMotion: null });
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect
+      .poll(() => current.evaluate((el) => getComputedStyle(el).animationName))
+      .toBe("none");
+  } finally {
+    await page.emulateMedia({ reducedMotion: null });
+  }
 
   await expect(page.getByText(/project notes? could not be read/)).toHaveCount(0);
 });

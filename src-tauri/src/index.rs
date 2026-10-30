@@ -15,6 +15,7 @@ pub const SCHEMA_VERSION: i32 = 4;
 
 /// Most log entries kept per project note (the newest).
 const MAX_LOG_ENTRIES: usize = 1000;
+const MAX_STEPS: usize = 200;
 
 const SCHEMA: &str = "
 CREATE TABLE notes (
@@ -289,7 +290,7 @@ fn store(tx: &Transaction<'_>, file: &FileInfo, size: i64) -> Result<bool, Index
                     pr.last_log
                 ],
             )?;
-            for (i, (done, text)) in pr.steps.iter().enumerate() {
+            for (i, (done, text)) in pr.steps.iter().take(MAX_STEPS).enumerate() {
                 tx.execute(
                     "INSERT INTO project_steps VALUES (?1, ?2, ?3, ?4)",
                     params![p, i64::try_from(i).unwrap_or(i64::MAX), done, text],

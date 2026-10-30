@@ -16,6 +16,7 @@ const BASE: Project = {
   nextStep: null,
   lastLog: null,
   log: [],
+  logTotal: 0,
 };
 
 describe("ProjectCard", () => {
@@ -23,7 +24,7 @@ describe("ProjectCard", () => {
     render(<ProjectCard project={BASE} />);
     expect(screen.getByText("No steps yet")).toBeInTheDocument();
     expect(screen.getByText("No log entries yet")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Log \(/)).not.toBeInTheDocument();
     expect(screen.queryByText("Next")).not.toBeInTheDocument();
@@ -117,7 +118,7 @@ describe("ProjectCard edge cases", () => {
     const { container } = render(<ProjectCard project={{ ...BASE, done: 9, total: 4 }} />);
     expect(container.querySelector(".progress > span")).toHaveStyle({ width: "100%" });
     const empty = render(<ProjectCard project={BASE} />);
-    expect(empty.container.querySelector(".progress > span")).toHaveStyle({ width: "0%" });
+    expect(empty.container.querySelector(".progress")).toBeNull();
   });
 
   it("shows the status text, defaulting to active, as a pill", () => {
@@ -143,6 +144,7 @@ describe("ProjectCard edge cases", () => {
             { date: null, text: evil },
             { date: "2026-01-01", text: evil },
           ],
+          logTotal: 2,
         }}
       />,
     );
@@ -160,6 +162,7 @@ describe("ProjectCard edge cases", () => {
             { date: "2026-02-01", text: "b" },
             { date: null, text: "a" },
           ],
+          logTotal: 2,
         }}
       />,
     );
@@ -167,6 +170,16 @@ describe("ProjectCard edge cases", () => {
     expect(container.querySelector("time")).toHaveAttribute("datetime", "2026-02-01");
     expect(screen.getByText("Log (2)")).toBeInTheDocument();
     expect(container.querySelectorAll("time")).toHaveLength(1);
+  });
+
+  it("shows the true log total and a note when the list is trimmed", () => {
+    const { rerender } = render(
+      <ProjectCard project={{ ...BASE, log: [{ date: null, text: "a" }], logTotal: 250 }} />,
+    );
+    expect(screen.getByText("Log (250)")).toBeInTheDocument();
+    expect(screen.getByText("Showing the newest 1")).toBeInTheDocument();
+    rerender(<ProjectCard project={{ ...BASE, log: [{ date: null, text: "a" }], logTotal: 1 }} />);
+    expect(screen.queryByText(/^Showing the newest/)).not.toBeInTheDocument();
   });
 
   it("gives a card with spaces in its path a valid accessible name", () => {

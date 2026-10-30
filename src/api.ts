@@ -285,8 +285,10 @@ export interface Project {
   current: number | null;
   nextStep: string | null;
   lastLog: ProjectLogEntry | null;
-  /** Newest first. */
+  /** Newest first, at most 100. */
   log: ProjectLogEntry[];
+  /** Entries stored for the note; may exceed `log.length`. */
+  logTotal: number;
 }
 
 export interface Projects {

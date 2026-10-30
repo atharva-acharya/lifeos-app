@@ -406,7 +406,9 @@ pub fn log_entries(body: &str) -> Vec<LogEntry> {
         {
             let item = item.trim();
             if !item.is_empty() {
-                out.push(split_log_item(item));
+                let mut entry = split_log_item(item);
+                entry.text = clip(&entry.text);
+                out.push(entry);
             }
         }
     }
@@ -472,6 +474,13 @@ fn is_separator(row: &str) -> bool {
         .all(|c| !c.is_empty() && c.chars().all(|ch| matches!(ch, '-' | ':' | ' ')))
 }
 
+/// Longest log entry or step text kept, in characters.
+pub const MAX_TEXT_CHARS: usize = 500;
+
+fn clip(text: &str) -> String {
+    text.chars().take(MAX_TEXT_CHARS).collect()
+}
+
 pub fn checklist(body: &str) -> Vec<(bool, String)> {
     let has_heading = body
         .lines()
@@ -493,7 +502,7 @@ pub fn checklist(body: &str) -> Vec<(bool, String)> {
         if let Some(rest) = item {
             let done = rest.starts_with(['x', 'X']);
             if let Some(text) = rest.get(1..).and_then(|r| r.strip_prefix("] ")) {
-                out.push((done, text.trim().to_owned()));
+                out.push((done, clip(text.trim())));
             }
         }
     }
@@ -726,6 +735,28 @@ mod tests {
         assert_eq!(got[9], (None, "ééééééééééé accents"));
         assert_eq!(got[10], (None, "2026-01-08"));
         assert_eq!(got.len(), 11);
+    }
+
+    #[test]
+    fn log_and_step_text_is_capped_at_500_chars() {
+        let long = "é".repeat(600);
+        let e = log_entries(&format!(
+            "## Log
+- 2026-01-02: {long}
+- {long}
+"
+        ));
+        assert_eq!(e[0].text.chars().count(), 500);
+        assert_eq!(e[1].text.chars().count(), 500);
+        let c = checklist(&format!(
+            "## Steps
+- [ ] {long}
+- [x] {}
+",
+            "a".repeat(500)
+        ));
+        assert_eq!(c[0].1.chars().count(), 500);
+        assert_eq!(c[1].1.len(), 500);
     }
 
     #[test]
