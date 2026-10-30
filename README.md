@@ -6,7 +6,7 @@ A Windows desktop app for a Markdown + YAML "Life OS" note vault (Obsidian-compa
 
 ![Today page with synthetic demo data](docs/images/today.png)
 
-![Job charts with synthetic demo data](docs/images/job-charts.jpg)
+![Job charts with synthetic demo data](docs/images/job-charts.png)
 
 ## Highlights
 

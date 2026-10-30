@@ -1,36 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { getApplications, localDate, type Application, type ApplicationsView } from "../api";
-import { parseApplied, perWeek, replyRates } from "../jobStats";
+import { parseApplied, perWeek, replyRates, type SourceRate, type WeekCount } from "../jobStats";
 import type { RouteId } from "../routes";
+import { BarChart, type Series } from "./BarChart";
 
-const AXIS = { fill: "var(--text-muted)", fontSize: 12 };
-const TOOLTIP = {
-  contentStyle: {
-    background: "var(--bg-sidebar)",
-    border: "1px solid var(--border)",
-    borderRadius: 8,
-    color: "var(--text)",
-  },
-  cursor: { fill: "var(--bg-hover)" },
-};
+const WEEKLY: Series<WeekCount>[] = [
+  { key: "count", name: "Applications", color: "var(--c-read)", value: (w) => w.count },
+];
 
-function reducedMotion(): boolean {
-  return typeof window.matchMedia === "function"
-    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    : false;
-}
+const REPLIES: Series<SourceRate>[] = [
+  { key: "positive", name: "Moved on", color: "var(--c-done)", value: (s) => s.positivePct },
+  { key: "rejected", name: "Rejected", color: "var(--c-danger)", value: (s) => s.rejectedPct },
+];
 
-function PerWeek({ rows, animate }: { rows: Application[]; animate: boolean }) {
+function PerWeek({ rows }: { rows: Application[] }) {
   // Keyed on today's date so the window moves on if the app stays open overnight.
   const today = localDate();
   const weeks = useMemo(() => perWeek(rows, parseApplied(today) ?? new Date()), [rows, today]);
@@ -49,21 +32,7 @@ function PerWeek({ rows, animate }: { rows: Application[]; animate: boolean }) {
         </span>
       </header>
       <div className="chart__plot" aria-hidden="true">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={weeks} margin={{ top: 8, right: 8, bottom: 0, left: -24 }}>
-            <CartesianGrid vertical={false} stroke="var(--border)" />
-            <XAxis dataKey="label" tick={AXIS} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} tick={AXIS} tickLine={false} axisLine={false} />
-            <Tooltip {...TOOLTIP} />
-            <Bar
-              dataKey="count"
-              name="Applications"
-              fill="var(--c-read)"
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={animate}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        <BarChart data={weeks} label={(w) => w.label} series={WEEKLY} />
       </div>
       <table className="sr-only">
         <caption>Applications per week</caption>
@@ -86,7 +55,7 @@ function PerWeek({ rows, animate }: { rows: Application[]; animate: boolean }) {
   );
 }
 
-function ReplyRate({ rows, animate }: { rows: Application[]; animate: boolean }) {
+function ReplyRate({ rows }: { rows: Application[] }) {
   const { sources, unmatched } = useMemo(() => replyRates(rows), [rows]);
 
   return (
@@ -98,37 +67,7 @@ function ReplyRate({ rows, animate }: { rows: Application[]; animate: boolean })
         <span className="muted">Share of applications that got any reply</span>
       </header>
       <div className="chart__plot" aria-hidden="true">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={sources} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-            <CartesianGrid vertical={false} stroke="var(--border)" />
-            <XAxis dataKey="source" tick={AXIS} tickLine={false} axisLine={false} />
-            <YAxis
-              unit="%"
-              domain={[0, 100]}
-              ticks={[0, 25, 50, 75, 100]}
-              tick={AXIS}
-              tickLine={false}
-              axisLine={false}
-            />
-            <Tooltip {...TOOLTIP} formatter={(v) => `${String(v)}%`} />
-            <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
-            <Bar
-              dataKey="positivePct"
-              name="Moved on"
-              stackId="r"
-              fill="var(--c-done)"
-              isAnimationActive={animate}
-            />
-            <Bar
-              dataKey="rejectedPct"
-              name="Rejected"
-              stackId="r"
-              fill="var(--c-danger)"
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={animate}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+        <BarChart data={sources} label={(r) => r.source} series={REPLIES} max={100} unit="%" />
       </div>
       <table className="table chart__table">
         <thead>
@@ -163,15 +102,14 @@ function ReplyRate({ rows, animate }: { rows: Application[]; animate: boolean })
 }
 
 export function JobCharts({ rows }: { rows: Application[] }) {
-  const animate = !reducedMotion();
   // "Reply only" rows alone give nothing to chart.
   if (replyRates(rows).sources.length === 0) {
     return <p className="muted">No applications in the saved copy yet.</p>;
   }
   return (
     <div className="charts">
-      <PerWeek rows={rows} animate={animate} />
-      <ReplyRate rows={rows} animate={animate} />
+      <PerWeek rows={rows} />
+      <ReplyRate rows={rows} />
     </div>
   );
 }

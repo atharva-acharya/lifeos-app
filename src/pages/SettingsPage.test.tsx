@@ -85,4 +85,23 @@ describe("SettingsPage", () => {
     expect(await screen.findByRole("button", { name: "Disconnect" })).toBeInTheDocument();
     expect(screen.getAllByText("Connected")).toHaveLength(2);
   });
+
+  it("shows the real status when Disconnect could not reach Google", async () => {
+    const google = {
+      clientId: "id",
+      sheetId: SHEET,
+      hasSecret: true,
+      configured: true,
+      connected: true,
+    };
+    invoke
+      .mockResolvedValueOnce({ vaultPath: VAULT, google })
+      .mockRejectedValueOnce("Disconnected here, but Google could not be reached.")
+      .mockResolvedValueOnce({ vaultPath: VAULT, google: { ...google, connected: false } });
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText(/Google could not be reached/)).toBeInTheDocument();
+    expect(await screen.findByText("Ready to connect")).toBeInTheDocument();
+    expect(invoke).toHaveBeenLastCalledWith("get_settings");
+  });
 });

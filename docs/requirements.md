@@ -79,7 +79,7 @@ A personal Windows desktop app over an existing Markdown + YAML note system (an 
 
 ## 6. Engineering
 
-- **Stack:** Tauri 2 (Rust core) + TypeScript + React + Vite; SQLite via Rust; charts via a maintained library; tests with Vitest (UI) and `cargo test` (core); Playwright for end-to-end.
+- **Stack:** Tauri 2 (Rust core) + TypeScript + React + Vite; SQLite via Rust; charts as in-house SVG components (ADR 0001); tests with Vitest (UI) and `cargo test` (core); Playwright for end-to-end.
 - **Repository:** public GitHub. Trunk-based: short-lived feature branches, pull requests into `main`, `main` protected (checks must pass).
 - **CI on every pull request:** format check, lint (ESLint, Clippy), type-check, unit tests, build; security: CodeQL, Semgrep, dependency audit (`npm audit`, `cargo audit`), secret scanning, Dependabot.
 - **Release on version tag:** build a signed Windows installer, SBOM (CycloneDX), changelog from commit messages (Conventional Commits), GitHub Release with checksums.
