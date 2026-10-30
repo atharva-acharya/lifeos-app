@@ -371,3 +371,232 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod edge_tests {
+    use super::*;
+    use std::fmt::Write as _;
+    use std::fs;
+
+    fn vault_with(files: &[(&str, &str)]) -> (tempfile::TempDir, Index) {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for (path, text) in files {
+            let full = dir.path().join(path);
+            fs::create_dir_all(full.parent().expect("parent")).expect("mkdir");
+            fs::write(full, text).expect("write");
+        }
+        let mut index = Index::open_in_memory().expect("open");
+        index.sync(dir.path()).expect("sync");
+        (dir, index)
+    }
+
+    fn names(p: &Projects) -> Vec<&str> {
+        p.projects.iter().map(|v| v.name.as_str()).collect()
+    }
+
+    fn proj(extra: &str) -> String {
+        format!("---\ntype: project\n{extra}---\n")
+    }
+
+    #[test]
+    fn null_updated_sorts_last_within_its_group_and_ties_break_by_path() {
+        let (_d, index) = vault_with(&[
+            ("Projects/b-none.md", &proj("")),
+            ("Projects/a-none.md", &proj("")),
+            ("Projects/old.md", &proj("updated: 2020-01-01\n")),
+            ("Projects/new.md", &proj("updated: 2026-05-05\n")),
+            ("Projects/p-none.md", &proj("status: paused\n")),
+            (
+                "Projects/p-dated.md",
+                &proj("status: paused\nupdated: 2019-01-01\n"),
+            ),
+        ]);
+        let p = projects(&index).expect("projects");
+        assert_eq!(
+            names(&p),
+            ["new", "old", "a-none", "b-none", "p-dated", "p-none"]
+        );
+    }
+
+    #[test]
+    fn odd_status_spacing_and_case() {
+        let (_d, index) = vault_with(&[
+            ("Projects/a.md", &proj("status: \"  IN   PROGRESS \"\n")),
+            ("Projects/b.md", &proj("status: \"  IN PROGRESS \"\n")),
+            ("Projects/c.md", &proj("status: \" Active\"\n")),
+            ("Projects/d.md", &proj("status: ACTIVE\n")),
+            ("Projects/e.md", &proj("status: in-progress\n")),
+            ("Projects/f.md", &proj("status: inactive\n")),
+        ]);
+        let p = projects(&index).expect("projects");
+        let active = |n: &str| p.projects.iter().find(|v| v.name == n).expect(n).active;
+        // Inner double spaces are not collapsed by the rule.
+        assert!(!active("a"));
+        assert!(active("b"));
+        assert!(active("c"));
+        assert!(active("d"));
+        assert!(!active("e"));
+        assert!(!active("f"));
+        // SQL ordering agrees with `active`: all active entries come first.
+        let flags: Vec<bool> = p.projects.iter().map(|v| v.active).collect();
+        let first_inactive = flags.iter().position(|a| !a).unwrap_or(flags.len());
+        assert!(flags[first_inactive..].iter().all(|a| !a));
+    }
+
+    #[test]
+    fn name_falls_back_to_file_stem_and_unicode_names_survive() {
+        let (_d, index) = vault_with(&[
+            ("Projects/Hello World.md", &proj("")),
+            ("Projects/日本語.md", &proj("")),
+            ("Projects/named.md", &proj("project: Shown Name\n")),
+            ("Projects/sub/nested.md", &proj("")),
+        ]);
+        let p = projects(&index).expect("projects");
+        let mut n = names(&p);
+        n.sort_unstable();
+        assert_eq!(n, ["Hello World", "Shown Name", "nested", "日本語"]);
+    }
+
+    #[test]
+    fn parse_errors_count_only_under_projects_dir() {
+        let (_d, index) = vault_with(&[
+            ("Projects/bad1.md", &proj("steps_total: lots\n")),
+            ("Projects/sub/bad2.md", &proj("step: many\n")),
+            ("Projects/ok.md", &proj("")),
+            ("Other/bad3.md", &proj("steps_total: lots\n")),
+            ("Fitness/bad4.md", "---\ntype: workout\ndate: nope\n---\n"),
+        ]);
+        let p = projects(&index).expect("projects");
+        assert_eq!(p.parse_errors, 2, "only Projects/ errors count");
+        assert_eq!(names(&p), ["ok"]);
+    }
+
+    #[test]
+    fn fallback_edge_values() {
+        let (_d, index) = vault_with(&[
+            ("Projects/zero.md", &proj("step: 3\nsteps_total: 0\n")),
+            ("Projects/negtotal.md", &proj("step: 2\nsteps_total: -5\n")),
+            (
+                "Projects/exact.md",
+                &proj("step: 4\nsteps_total: 4\nnext_step: Stale\n"),
+            ),
+            (
+                "Projects/mid.md",
+                &proj("step: 2\nsteps_total: 4\nnext_step: \"Go: next\"\n"),
+            ),
+            ("Projects/stepsonly.md", &proj("step: 2\n")),
+        ]);
+        let p = projects(&index).expect("projects");
+        let get = |n: &str| p.projects.iter().find(|v| v.name == n).expect(n);
+        assert_eq!((get("zero").done, get("zero").total), (0, 0));
+        assert_eq!((get("negtotal").done, get("negtotal").total), (0, 0));
+        assert_eq!((get("exact").done, get("exact").total), (4, 4));
+        assert_eq!(get("exact").next_step, None);
+        assert_eq!(get("mid").next_step.as_deref(), Some("Go: next"));
+        assert_eq!(get("mid").current, None);
+        assert_eq!((get("stepsonly").done, get("stepsonly").total), (0, 0));
+    }
+
+    #[test]
+    fn checklist_wins_over_contradicting_front_matter() {
+        let note = "---\ntype: project\nstep: 7\nsteps_total: 9\nnext_step: Front\n---\n## Steps\n- [x] a\n- [ ] b\n";
+        let (_d, index) = vault_with(&[("Projects/c.md", note)]);
+        let p = projects(&index).expect("projects");
+        let v = &p.projects[0];
+        assert_eq!((v.done, v.total, v.current), (1, 2, Some(1)));
+        assert_eq!(v.next_step.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn all_steps_checked_hides_front_matter_next_step() {
+        let note = "---\ntype: project\nnext_step: Front\n---\n## Steps\n- [x] a\n- [X] b\n";
+        let (_d, index) = vault_with(&[("Projects/c.md", note)]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!((v.done, v.total, v.current), (2, 2, None));
+        assert_eq!(v.next_step, None);
+    }
+
+    #[test]
+    fn tracker_note_with_colons_in_next_step_and_log() {
+        let note = "---\ntype: project\nproject: tracker\nstatus: active\nstep: 4\nsteps_total: 7\nnext_step: \"Phase 3: PR D\"\nupdated: 2026-10-30\n---\n# T\n## Steps\n- [x] one\n- [x] two\n- [x] three\n- [x] four\n- [ ] five\n- [ ] six\n- [ ] seven\n## Log\n- 2026-10-29: first\n- 2026-10-30: second: with colon\n";
+        let (_d, index) = vault_with(&[("Projects/tracker.md", note)]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!((v.steps.len(), v.done, v.total), (7, 4, 7));
+        assert_eq!(v.current, Some(4));
+        assert_eq!(v.next_step.as_deref(), Some("five"));
+        assert_eq!(v.log[0].text, "second: with colon");
+        assert_eq!(v.log[0].date.as_deref(), Some("2026-10-30"));
+        assert_eq!(v.last_log.as_ref(), v.log.first());
+    }
+
+    fn long_log(n: usize) -> String {
+        let mut note = String::from("---\ntype: project\n---\n## Log\n");
+        for i in 0..n {
+            writeln!(note, "- e{i}").expect("write");
+        }
+        note
+    }
+
+    #[test]
+    fn exactly_one_thousand_entries_are_all_kept() {
+        let (_d, index) = vault_with(&[("Projects/n.md", &long_log(1000))]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!(v.log.len(), 1000);
+        assert_eq!(v.log[0].text, "e999");
+        assert_eq!(v.log[999].text, "e0");
+    }
+
+    #[test]
+    fn one_thousand_and_one_drops_only_the_oldest() {
+        let (_d, index) = vault_with(&[("Projects/n.md", &long_log(1001))]);
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!(v.log.len(), 1000);
+        assert_eq!(v.log[0].text, "e1000");
+        assert_eq!(v.log[999].text, "e1");
+    }
+
+    #[test]
+    fn editing_a_note_replaces_its_log_and_deleting_cascades() {
+        let (dir, mut index) = vault_with(&[(
+            "Projects/n.md",
+            "---\ntype: project\n---\n## Log\n- a\n- b\n",
+        )]);
+        let path = dir.path().join("Projects/n.md");
+        fs::write(&path, "---\ntype: project\n---\n## Log\n- only now\n").expect("write");
+        index.sync(dir.path()).expect("sync");
+        let v = &projects(&index).expect("projects").projects[0];
+        assert_eq!(v.log.len(), 1);
+        assert_eq!(v.log[0].text, "only now");
+        fs::remove_file(&path).expect("rm");
+        index.sync(dir.path()).expect("sync");
+        let n: i64 = index
+            .conn()
+            .query_row("SELECT COUNT(*) FROM project_log", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn empty_and_malformed_notes_do_not_break_the_listing() {
+        let (_d, index) = vault_with(&[
+            ("Projects/empty.md", ""),
+            ("Projects/nofm.md", "# just text\n- [ ] not a project\n"),
+            ("Projects/unterminated.md", "---\ntype: project\n"),
+            ("Projects/badyaml.md", "---\n: : [\n---\n"),
+            ("Projects/ok.md", &proj("")),
+        ]);
+        let p = projects(&index).expect("projects");
+        assert!(names(&p).contains(&"ok"));
+    }
+
+    #[test]
+    fn serialises_with_camel_case_keys() {
+        let (_d, index) = vault_with(&[("Projects/a.md", &proj("next_step: Go\n"))]);
+        let json = serde_json::to_value(projects(&index).expect("projects")).expect("json");
+        assert!(json.get("parseErrors").is_some());
+        let v = &json["projects"][0];
+        for k in ["nextStep", "lastLog", "log", "steps", "current", "active"] {
+            assert!(v.get(k).is_some(), "{k}");
+        }
+    }
+}

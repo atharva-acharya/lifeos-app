@@ -1179,3 +1179,191 @@ type: plan
         }
     }
 }
+
+#[cfg(test)]
+mod log_entry_edge_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn pairs(body: &str) -> Vec<(Option<String>, String)> {
+        log_entries(body)
+            .into_iter()
+            .map(|e| (e.date, e.text))
+            .collect()
+    }
+
+    fn one(item: &str) -> (Option<String>, String) {
+        pairs(&format!("## Log\n- {item}\n")).remove(0)
+    }
+
+    #[test]
+    fn multibyte_text_around_the_date_boundary_is_safe() {
+        // A multibyte char straddles byte 10: no split, no panic.
+        assert_eq!(one("2026-01-0é x"), (None, "2026-01-0é x".to_owned()));
+        // A multibyte char right after the date is not a separator.
+        assert_eq!(one("2026-01-02é"), (None, "2026-01-02é".to_owned()));
+        assert_eq!(
+            one("2026-01-02:é日本"),
+            (Some("2026-01-02".into()), "é日本".to_owned())
+        );
+        assert_eq!(
+            one("2026-01-02 日本語"),
+            (Some("2026-01-02".into()), "日本語".to_owned())
+        );
+        // Emoji and combining marks.
+        assert_eq!(
+            one("🎉🎉🎉🎉🎉 party"),
+            (None, "🎉🎉🎉🎉🎉 party".to_owned())
+        );
+        assert_eq!(
+            one("e\u{301}e\u{301}e\u{301}e\u{301}e\u{301}"),
+            (None, "e\u{301}e\u{301}e\u{301}e\u{301}e\u{301}".to_owned())
+        );
+    }
+
+    #[test]
+    fn separators_and_whitespace_variants() {
+        assert_eq!(
+            one("2026-01-02\ttabbed"),
+            (Some("2026-01-02".into()), "tabbed".to_owned())
+        );
+        assert_eq!(
+            one("2026-01-02\u{a0}nbsp"),
+            (Some("2026-01-02".into()), "nbsp".to_owned())
+        );
+        assert_eq!(
+            one("2026-01-02:   spaced out  "),
+            (Some("2026-01-02".into()), "spaced out".to_owned())
+        );
+        // " -x" is whitespace then "-x": the date still splits, "-x" stays text.
+        assert_eq!(
+            one("2026-01-02 -x"),
+            (Some("2026-01-02".into()), "-x".to_owned())
+        );
+        // A hyphen with no spaces is not a separator.
+        assert_eq!(one("2026-01-02-x"), (None, "2026-01-02-x".to_owned()));
+        assert_eq!(
+            one("2026-01-02 – dash"),
+            (Some("2026-01-02".into()), "dash".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_date_with_no_text_stays_whole() {
+        assert_eq!(one("2026-01-02:"), (None, "2026-01-02:".to_owned()));
+        // Whitespace is a valid separator, so a lone "-" becomes the text.
+        assert_eq!(
+            one("2026-01-02 - "),
+            (Some("2026-01-02".into()), "-".to_owned())
+        );
+        assert_eq!(one("2026-01-02"), (None, "2026-01-02".to_owned()));
+    }
+
+    #[test]
+    fn invalid_dates_stay_text() {
+        for bad in [
+            "2026-13-40: x",
+            "2026-00-10: x",
+            "2026-01-00: x",
+            "2026-01-32: x",
+            "20260102: x",
+            "2026/01/02: x",
+            "2026-1-2: x",
+        ] {
+            assert_eq!(one(bad), (None, bad.to_owned()), "{bad}");
+        }
+    }
+
+    #[test]
+    fn dates_across_year_and_week_boundaries_are_kept() {
+        let e = pairs(
+            "## Log\n- 2025-12-31: old year\n- 2026-01-01: new year\n- 2024-02-29: leap\n- 2026-12-31: end\n",
+        );
+        let dates: Vec<_> = e.iter().map(|x| x.0.as_deref().expect("date")).collect();
+        assert_eq!(
+            dates,
+            ["2025-12-31", "2026-01-01", "2024-02-29", "2026-12-31"]
+        );
+    }
+
+    #[test]
+    fn bullets_and_headings_edge_cases() {
+        // Empty bullets (with `*` too), bare markers and no-space markers are skipped.
+        let body = "## Log\n-\n- \n*\n* \n-   \n-nospace\n*nospace\n- ok\n";
+        assert_eq!(pairs(body), vec![(None, "ok".to_owned())]);
+        // Indented bullets count; star bullets with dates split.
+        assert_eq!(
+            pairs("## Log\n    * 2026-01-02: nested\n"),
+            vec![(Some("2026-01-02".into()), "nested".to_owned())]
+        );
+        // Heading case/spacing; `##Log` is not a heading, so nothing is in the section.
+        assert_eq!(pairs("  ## lOg  \n- a\n").len(), 1);
+        assert!(pairs("##Log\n- a\n").is_empty());
+        // A different `##` heading ends the section; a later `## Log` reopens it.
+        assert_eq!(
+            pairs("## Log\n- a\n## Log Archive\n- b\n## LOG\n- c\n")
+                .iter()
+                .map(|p| p.1.as_str())
+                .collect::<Vec<_>>(),
+            ["a", "c"]
+        );
+        // A `###` subheading does not end the section.
+        assert_eq!(pairs("## Log\n- a\n### Sub\n- b\n").len(), 2);
+        // Bullets before the heading are ignored.
+        assert!(pairs("- a\n# Title\n- b\n").is_empty());
+        // CRLF line endings.
+        assert_eq!(
+            pairs("## Log\r\n- 2026-01-02: crlf\r\n"),
+            vec![(Some("2026-01-02".into()), "crlf".to_owned())]
+        );
+        // Empty body.
+        assert!(pairs("").is_empty());
+    }
+
+    #[test]
+    fn markup_in_log_text_is_kept_verbatim() {
+        assert_eq!(
+            one("2026-01-02: <script>alert(1)</script> [x](javascript:y)"),
+            (
+                Some("2026-01-02".into()),
+                "<script>alert(1)</script> [x](javascript:y)".to_owned()
+            )
+        );
+    }
+
+    #[test]
+    fn project_note_keeps_log_order_and_last_log_agrees() {
+        let note = "---\ntype: project\n---\n## Log\n- 2026-01-02: a\n- b\n";
+        let Ok(Note::Project(p)) = parse(note) else {
+            panic!("project")
+        };
+        assert_eq!(p.log.len(), 2);
+        assert_eq!(p.last_log.as_deref(), Some("b"));
+        assert_eq!(p.log[1].text, "b");
+    }
+
+    proptest! {
+        #[test]
+        fn log_entries_never_panics_and_never_returns_empty_text(body in r"\PC{0,300}") {
+            for e in log_entries(&body) {
+                prop_assert!(!e.text.is_empty());
+                if let Some(d) = e.date { prop_assert!(is_iso_date(&d)); }
+            }
+        }
+
+        #[test]
+        fn log_entries_survive_dates_followed_by_arbitrary_text(tail in r"\PC{0,40}", d in "[0-9]{4}-[0-9]{2}-[0-9]{2}") {
+            let _ = log_entries(&format!("## Log\n- {d}{tail}\n"));
+            let _ = log_entries(&format!("## Log\n* {tail}{d}\n"));
+        }
+
+        #[test]
+        fn dated_round_trip(text in "[A-Za-z0-9][A-Za-z0-9 ,.]{0,40}[A-Za-z0-9]", m in 1u8..=12, d in 1u8..=28) {
+            let date = format!("2026-{m:02}-{d:02}");
+            let e = log_entries(&format!("## Log\n- {date}: {text}\n"));
+            prop_assert_eq!(e.len(), 1);
+            prop_assert_eq!(e[0].date.as_deref(), Some(date.as_str()));
+            prop_assert_eq!(&e[0].text, &text);
+        }
+    }
+}

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { Project } from "../api";
 
 function stepSummary(p: Project): string {
@@ -13,7 +14,7 @@ function stepSummary(p: Project): string {
 
 export function ProjectCard({ project: p }: { project: Project }) {
   const pct = p.total > 0 ? Math.min(100, Math.round((p.done / p.total) * 100)) : 0;
-  const headingId = `project-${p.path}`;
+  const headingId = useId();
   return (
     <section className="card project" aria-labelledby={headingId}>
       <div className="project__head">

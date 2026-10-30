@@ -183,3 +183,90 @@ describe("ProjectsPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("boom");
   });
 });
+
+describe("ProjectsPage edge states", () => {
+  it("shows the parse-error notice with the singular form", async () => {
+    ready({ parseErrors: 1 });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    expect(await screen.findByRole("status")).toHaveTextContent("1 project note could not");
+  });
+
+  it("shows the notice alongside the empty state, and no notice at zero", async () => {
+    ready({ projects: [], parseErrors: 3 });
+    const { unmount } = render(<ProjectsPage onNavigate={vi.fn()} />);
+    expect(await screen.findByText(/No project notes yet/)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("3 project notes");
+    unmount();
+    ready();
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    await screen.findByRole("heading", { name: "home-lab" });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("does not show a summary or project UI when there is no vault", async () => {
+    invoke.mockResolvedValue({ status: "noVault" });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    await screen.findByRole("button", { name: "Open settings" });
+    expect(screen.queryByText(/active of/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Active" })).not.toBeInTheDocument();
+    expect(document.querySelector(".breathing")).toBeNull();
+  });
+
+  it("says there are no active projects when every project is paused", async () => {
+    ready({ projects: [PAUSED, DONE] });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    expect(await screen.findByText("No active projects.")).toBeInTheDocument();
+    expect(screen.getByText("0 active of 2 projects")).toBeInTheDocument();
+    expect(document.querySelector(".breathing")).toBeNull();
+  });
+
+  it("breathes once per active project and never on paused or done ones", async () => {
+    const second: Project = { ...ACTIVE, path: "Projects/second.md", name: "second" };
+    ready({ projects: [ACTIVE, second, PAUSED, DONE] });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    await screen.findByRole("heading", { name: "second" });
+    expect(document.querySelectorAll(".breathing")).toHaveLength(2);
+    for (const name of ["garden-planner", "reading-list"]) {
+      expect(cardOf(name).querySelector(".breathing")).toBeNull();
+    }
+  });
+
+  it("renders markup-looking project data as text", async () => {
+    const evil = "<img src=x onerror=alert(1)>";
+    ready({
+      projects: [{ ...ACTIVE, name: evil, nextStep: evil, log: [{ date: null, text: evil }] }],
+    });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    expect((await screen.findAllByText(evil, { exact: false })).length).toBeGreaterThan(0);
+    expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("has a focusable log summary that toggles", async () => {
+    ready({ projects: [ACTIVE] });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    const summary = await screen.findByText("Log (2)");
+    expect(summary.tagName).toBe("SUMMARY");
+    fireEvent.click(summary);
+    expect(summary.closest("details")).toHaveAttribute("open");
+  });
+
+  it("keeps the Open settings button a real focusable button", async () => {
+    invoke.mockResolvedValue({ status: "noVault" });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    const btn = await screen.findByRole("button", { name: "Open settings" });
+    btn.focus();
+    expect(btn).toHaveFocus();
+  });
+
+  it("reloads when the index updates", async () => {
+    ready({ projects: [] });
+    render(<ProjectsPage onNavigate={vi.fn()} />);
+    await screen.findByText(/No project notes yet/);
+    const call = (listen.mock.calls as unknown[][]).find((c) => c[0] === "index-updated");
+    const handler = call?.[1] as (() => void) | undefined;
+    expect(handler).toBeDefined();
+    ready();
+    handler?.();
+    expect(await screen.findByRole("heading", { name: "home-lab" })).toBeInTheDocument();
+  });
+});
