@@ -131,13 +131,19 @@ pub async fn choose_health_folder(app: AppHandle) -> Result<SettingsView, String
 
 /// Forgets the Health folder. The folder itself is never touched.
 #[tauri::command]
-pub fn clear_health_folder(app: AppHandle) -> Result<SettingsView, String> {
+pub async fn clear_health_folder(app: AppHandle) -> Result<SettingsView, String> {
     let dir = config_dir(&app)?;
-    let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
-    current.health_path = None;
-    settings::save(&dir, &current).map_err(|e| e.to_string())?;
-    app.state::<HealthState>().clear();
-    Ok(current.into())
+    // Settings are files; keep that off the UI thread. Clearing bumps the
+    // generation, so an import still running cannot bring the folder back.
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
+        current.health_path = None;
+        settings::save(&dir, &current).map_err(|e| e.to_string())?;
+        app.state::<HealthState>().clear();
+        Ok(current.into())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[derive(Debug, Serialize)]
@@ -394,7 +400,7 @@ pub async fn get_health(
     date: String,
     now_ms: i64,
 ) -> Result<HealthResponse, String> {
-    if !crate::vault::note::is_iso_date(&date) {
+    if !crate::vault::note::is_iso_date(&date) || crate::fitness::shift_days(&date, 0) != date {
         return Err("date must look like 2026-10-29".to_owned());
     }
     let dir = config_dir(&app)?;

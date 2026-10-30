@@ -137,8 +137,9 @@ function writeFitnessNotes(vault: string): void {
  * A synthetic Health Auto Export folder, dated relative to today: two
  * overlapping files (the second sharing three days with the first), ten days
  * of readings in all, and one Apple Health workout. Today has 9,120 steps,
- * 410 kcal and 7 h 12 min of sleep. Every file is touched to now, so the
- * export counts as fresh.
+ * 410 kcal and 7 h 12 min of sleep. The newer file is touched to now and the
+ * older one to an hour before, so the export counts as fresh and the newer
+ * file wins on the shared days.
  */
 function writeHealthExport(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -205,18 +206,23 @@ function writeHealthExport(dir: string): void {
   };
   writeFileSync(join(dir, "export-older.json"), JSON.stringify(exportFor(3, 9, [run])));
   writeFileSync(join(dir, "export-newer.json"), JSON.stringify(exportFor(0, 5, [run])));
-  const now = new Date();
-  for (const name of ["export-older.json", "export-newer.json"]) {
-    utimesSync(join(dir, name), now, now);
-  }
+  setHealthExportAge(dir, 0);
 }
 
-/** Sets the modification time of every file in the Health folder to `ageMs` ago. */
+/**
+ * Sets the modification times in the Health folder: the newer export is
+ * `ageMs` old and the older one an hour older, so the newer file wins on the
+ * days they share.
+ */
 export function ageHealthExport(dir: string, ageMs: number): void {
-  const then = new Date(Date.now() - ageMs);
-  for (const name of ["export-older.json", "export-newer.json"]) {
-    utimesSync(join(dir, name), then, then);
-  }
+  setHealthExportAge(dir, ageMs);
+}
+
+function setHealthExportAge(dir: string, ageMs: number): void {
+  const newer = new Date(Date.now() - ageMs);
+  const older = new Date(Date.now() - ageMs - 60 * 60 * 1000);
+  utimesSync(join(dir, "export-older.json"), older, older);
+  utimesSync(join(dir, "export-newer.json"), newer, newer);
 }
 
 /** Starts the debug build against a copy of the synthetic vault in a throwaway data folder. */

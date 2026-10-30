@@ -2,16 +2,20 @@
 //! Health Auto Export JSON files (threat model T16, T17), plus the view the
 //! UI draws. Nothing here ever writes to the export folder.
 
+use std::collections::hash_map::RandomState;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt;
 use std::fs;
+use std::hash::{BuildHasher, Hash};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
 
 use rusqlite::{OptionalExtension, params};
+use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
+use serde_json::value::RawValue;
 
 use crate::fitness::{shift_days, workouts as vault_workouts};
 use crate::index::Index;
@@ -23,8 +27,16 @@ pub const MAX_FILE_BYTES: u64 = 32 * 1024 * 1024;
 pub const MAX_FILES: usize = 2000;
 /// Deepest sub-folder searched below the chosen folder.
 pub const MAX_DEPTH: usize = 3;
-/// Most points read per metric, and workouts, per file.
+/// Most points kept per kind of metric in one file (all entries of the kind
+/// together).
 pub const MAX_POINTS: usize = 200_000;
+/// Most points kept over all files; older files beyond it are not read.
+pub const MAX_TOTAL_POINTS: usize = 2_000_000;
+/// Most workouts kept per file and over all files.
+pub const MAX_FILE_WORKOUTS: usize = 10_000;
+pub const MAX_TOTAL_WORKOUTS: usize = 10_000;
+/// Most entries read from a file's `metrics` list.
+pub const MAX_METRICS: usize = 64;
 /// Files looked at while walking; further ones are only counted.
 const MAX_CANDIDATES: usize = 100_000;
 const WINDOW_DAYS: i64 = 90;
@@ -183,98 +195,634 @@ fn read_file(canonical_folder: &Path, file: &FileEntry) -> Result<Vec<u8>, Strin
 // ---------------------------------------------------------------------------
 // Parsing: typed, lenient about values, strict about layout
 
-fn lenient_number<'de, D: Deserializer<'de>>(d: D) -> Result<Option<f64>, D::Error> {
-    Ok(match Option::<Value>::deserialize(d)? {
-        Some(Value::Number(n)) => n.as_f64(),
-        _ => None,
-    })
+//
+// The caps are applied while the JSON is read (threat model T16): a list
+// keeps at most its cap and every further item is skipped without being
+// built, so a file of millions of tiny items never costs more memory than
+// the items that are kept. Points without a real calendar date can never be
+// used, so they are not kept and do not count against a cap.
+
+/// A JSON value reduced to what the importer can use; arrays and objects
+/// are walked and dropped.
+enum Leaf {
+    Num(f64),
+    Text(String),
+    Other,
 }
 
-fn lenient_text<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
-    Ok(match Option::<Value>::deserialize(d)? {
-        Some(Value::String(s)) => Some(s),
-        _ => None,
-    })
+impl Leaf {
+    fn num(self) -> Option<f64> {
+        match self {
+            Leaf::Num(n) => Some(n),
+            _ => None,
+        }
+    }
+    fn text(self) -> Option<String> {
+        match self {
+            Leaf::Text(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct RawExport {
-    data: Option<RawData>,
+fn skip_seq<'de, A: SeqAccess<'de>>(mut seq: A) -> Result<(), A::Error> {
+    while seq.next_element::<IgnoredAny>()?.is_some() {}
+    Ok(())
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct RawData {
-    #[serde(default)]
-    metrics: Option<Vec<RawMetric>>,
-    #[serde(default)]
-    workouts: Option<Vec<RawWorkout>>,
+fn skip_map<'de, A: MapAccess<'de>>(mut map: A) -> Result<(), A::Error> {
+    while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
+    Ok(())
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct RawMetric {
-    #[serde(default, deserialize_with = "lenient_text")]
-    name: Option<String>,
-    #[serde(default, deserialize_with = "lenient_text")]
-    units: Option<String>,
-    #[serde(default)]
-    data: Option<Vec<RawPoint>>,
+#[allow(clippy::cast_precision_loss)]
+fn int_to_f64(v: i64) -> f64 {
+    v as f64
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RawPoint {
-    #[serde(default, deserialize_with = "lenient_text")]
-    date: Option<String>,
-    #[serde(default, deserialize_with = "lenient_number")]
+#[allow(clippy::cast_precision_loss)]
+fn uint_to_f64(v: u64) -> f64 {
+    v as f64
+}
+
+struct LeafVisitor;
+
+impl<'de> Visitor<'de> for LeafVisitor {
+    type Value = Leaf;
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("any JSON value")
+    }
+    fn visit_bool<E: de::Error>(self, _: bool) -> Result<Leaf, E> {
+        Ok(Leaf::Other)
+    }
+    fn visit_i64<E: de::Error>(self, v: i64) -> Result<Leaf, E> {
+        Ok(Leaf::Num(int_to_f64(v)))
+    }
+    fn visit_u64<E: de::Error>(self, v: u64) -> Result<Leaf, E> {
+        Ok(Leaf::Num(uint_to_f64(v)))
+    }
+    fn visit_f64<E: de::Error>(self, v: f64) -> Result<Leaf, E> {
+        Ok(Leaf::Num(v))
+    }
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Leaf, E> {
+        Ok(Leaf::Text(v.to_owned()))
+    }
+    fn visit_unit<E: de::Error>(self) -> Result<Leaf, E> {
+        Ok(Leaf::Other)
+    }
+    fn visit_none<E: de::Error>(self) -> Result<Leaf, E> {
+        Ok(Leaf::Other)
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Leaf, A::Error> {
+        skip_seq(seq).map(|()| Leaf::Other)
+    }
+    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Leaf, A::Error> {
+        skip_map(map).map(|()| Leaf::Other)
+    }
+}
+
+impl<'de> Deserialize<'de> for Leaf {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(LeafVisitor)
+    }
+}
+
+/// `{qty, units}` inside a workout.
+#[derive(Debug, Default, Clone)]
+struct QtyUnits {
     qty: Option<f64>,
-    #[serde(default, deserialize_with = "lenient_number")]
+    units: Option<String>,
+}
+
+/// A workout field that is either a plain value or a `{qty, units}` object.
+enum Lenient {
+    Other,
+    Object(QtyUnits),
+}
+
+impl Lenient {
+    fn into_object(self) -> Option<QtyUnits> {
+        match self {
+            Lenient::Object(q) => Some(q),
+            Lenient::Other => None,
+        }
+    }
+}
+
+struct LenientVisitor;
+
+impl<'de> Visitor<'de> for LenientVisitor {
+    type Value = Lenient;
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("any JSON value")
+    }
+    fn visit_bool<E: de::Error>(self, _: bool) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_i64<E: de::Error>(self, _: i64) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_u64<E: de::Error>(self, _: u64) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_f64<E: de::Error>(self, _: f64) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_str<E: de::Error>(self, _: &str) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_unit<E: de::Error>(self) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_none<E: de::Error>(self) -> Result<Lenient, E> {
+        Ok(Lenient::Other)
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Lenient, A::Error> {
+        skip_seq(seq).map(|()| Lenient::Other)
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Lenient, A::Error> {
+        let mut out = QtyUnits::default();
+        while let Some(key) = map.next_key::<Key>()? {
+            match key {
+                Key::Qty => out.qty = map.next_value::<Leaf>()?.num(),
+                Key::Units => out.units = map.next_value::<Leaf>()?.text(),
+                _ => {
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+        Ok(Lenient::Object(out))
+    }
+}
+
+impl<'de> Deserialize<'de> for Lenient {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(LenientVisitor)
+    }
+}
+
+/// Every object key the importer looks at; anything else is `Other`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum Key {
+    Data,
+    Metrics,
+    Workouts,
+    Name,
+    Units,
+    Id,
+    Start,
+    Date,
+    Qty,
+    TotalSleep,
+    Asleep,
+    Core,
+    Deep,
+    Rem,
+    Awake,
+    Duration,
+    ActiveEnergyBurned,
+    ActiveEnergy,
+    Distance,
+    Other,
+}
+
+struct KeyVisitor;
+
+impl Visitor<'_> for KeyVisitor {
+    type Value = Key;
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a key")
+    }
+    fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
+        Ok(match v {
+            "data" => Key::Data,
+            "metrics" => Key::Metrics,
+            "workouts" => Key::Workouts,
+            "name" => Key::Name,
+            "units" => Key::Units,
+            "id" => Key::Id,
+            "start" => Key::Start,
+            "date" => Key::Date,
+            "qty" => Key::Qty,
+            "totalSleep" => Key::TotalSleep,
+            "asleep" => Key::Asleep,
+            "core" => Key::Core,
+            "deep" => Key::Deep,
+            "rem" => Key::Rem,
+            "awake" => Key::Awake,
+            "duration" => Key::Duration,
+            "activeEnergyBurned" => Key::ActiveEnergyBurned,
+            "activeEnergy" => Key::ActiveEnergy,
+            "distance" => Key::Distance,
+            _ => Key::Other,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for Key {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_identifier(KeyVisitor)
+    }
+}
+
+/// Rejects a repeated key (other than unknown ones), as the earlier derived
+/// parser did.
+#[derive(Default)]
+struct SeenKeys(u32);
+
+impl SeenKeys {
+    fn mark<E: de::Error>(&mut self, key: Key) -> Result<(), E> {
+        if key == Key::Other {
+            return Ok(());
+        }
+        let bit = 1u32 << (key as u8);
+        if self.0 & bit != 0 {
+            return Err(E::custom("duplicate key"));
+        }
+        self.0 |= bit;
+        Ok(())
+    }
+}
+
+/// One measurement of a metric. Only points with a real calendar date exist.
+#[derive(Debug, Default)]
+struct Point {
+    date: String,
+    qty: Option<f64>,
     total_sleep: Option<f64>,
-    #[serde(default, deserialize_with = "lenient_number")]
     asleep: Option<f64>,
-    #[serde(default, deserialize_with = "lenient_number")]
     core: Option<f64>,
-    #[serde(default, deserialize_with = "lenient_number")]
     deep: Option<f64>,
-    #[serde(default, deserialize_with = "lenient_number")]
     rem: Option<f64>,
-    #[serde(default, deserialize_with = "lenient_number")]
     awake: Option<f64>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RawWorkout {
-    #[serde(default, deserialize_with = "lenient_text")]
-    id: Option<String>,
-    #[serde(default, deserialize_with = "lenient_text")]
-    name: Option<String>,
-    #[serde(default, deserialize_with = "lenient_text")]
-    start: Option<String>,
-    #[serde(default, deserialize_with = "lenient_number")]
-    duration: Option<f64>,
-    #[serde(default)]
-    active_energy_burned: Option<Value>,
-    #[serde(default)]
-    active_energy: Option<Value>,
-    #[serde(default)]
-    distance: Option<Value>,
+struct PointSeed;
+
+impl<'de> DeserializeSeed<'de> for PointSeed {
+    type Value = Option<Point>;
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        d.deserialize_map(self)
+    }
 }
 
-/// A parsed export with the per-metric point cap applied.
+impl<'de> Visitor<'de> for PointSeed {
+    type Value = Option<Point>;
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a data point")
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        let mut p = Point::default();
+        let mut date = None;
+        let mut seen = SeenKeys::default();
+        while let Some(key) = map.next_key::<Key>()? {
+            seen.mark(key)?;
+            match key {
+                Key::Date => date = map.next_value::<Leaf>()?.text(),
+                Key::Qty => p.qty = map.next_value::<Leaf>()?.num(),
+                Key::TotalSleep => p.total_sleep = map.next_value::<Leaf>()?.num(),
+                Key::Asleep => p.asleep = map.next_value::<Leaf>()?.num(),
+                Key::Core => p.core = map.next_value::<Leaf>()?.num(),
+                Key::Deep => p.deep = map.next_value::<Leaf>()?.num(),
+                Key::Rem => p.rem = map.next_value::<Leaf>()?.num(),
+                Key::Awake => p.awake = map.next_value::<Leaf>()?.num(),
+                _ => {
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+        Ok(date.filter(|d| local_date(d).is_some()).map(|date| {
+            p.date = date;
+            p
+        }))
+    }
+}
+
+/// The points of one metric entry, added to `out` until `*count` reaches the
+/// cap; the count is shared by every entry of the same kind in the file.
+struct PointsSeed<'a> {
+    out: &'a mut Vec<Point>,
+    count: &'a mut usize,
+}
+
+impl<'de> DeserializeSeed<'de> for PointsSeed<'_> {
+    type Value = ();
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        d.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for PointsSeed<'_> {
+    type Value = ();
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a list of points")
+    }
+    fn visit_unit<E: de::Error>(self) -> Result<(), E> {
+        Ok(())
+    }
+    fn visit_none<E: de::Error>(self) -> Result<(), E> {
+        Ok(())
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
+        while *self.count < MAX_POINTS {
+            match seq.next_element_seed(PointSeed)? {
+                None => return Ok(()),
+                Some(None) => {}
+                Some(Some(p)) => {
+                    self.out.push(p);
+                    *self.count += 1;
+                }
+            }
+        }
+        skip_seq(seq)
+    }
+}
+
+#[derive(Debug)]
+struct Metric {
+    kind: Kind,
+    units: Option<String>,
+    points: Vec<Point>,
+}
+
+/// A workout with a real start date; the name is already cleaned.
+#[derive(Debug)]
+struct Workout {
+    id: Option<String>,
+    name: Option<String>,
+    start: String,
+    duration: Option<f64>,
+    energy: Option<QtyUnits>,
+    distance: Option<QtyUnits>,
+}
+
+struct WorkoutSeed;
+
+impl<'de> DeserializeSeed<'de> for WorkoutSeed {
+    type Value = Option<Workout>;
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<Self::Value, D::Error> {
+        d.deserialize_map(self)
+    }
+}
+
+impl<'de> Visitor<'de> for WorkoutSeed {
+    type Value = Option<Workout>;
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a workout")
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+        let (mut id, mut name, mut start, mut duration) = (None, None, None, None);
+        let (mut burned, mut active, mut distance) = (None, None, None);
+        let mut seen = SeenKeys::default();
+        while let Some(key) = map.next_key::<Key>()? {
+            seen.mark(key)?;
+            match key {
+                Key::Id => id = map.next_value::<Leaf>()?.text(),
+                Key::Name => name = map.next_value::<Leaf>()?.text().map(|n| clean_name(&n)),
+                Key::Start => start = map.next_value::<Leaf>()?.text(),
+                Key::Duration => duration = map.next_value::<Leaf>()?.num(),
+                Key::ActiveEnergyBurned => burned = map.next_value::<Lenient>()?.into_object(),
+                Key::ActiveEnergy => active = map.next_value::<Lenient>()?.into_object(),
+                Key::Distance => distance = map.next_value::<Lenient>()?.into_object(),
+                _ => {
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+        Ok(start
+            .filter(|s| local_date(s).is_some())
+            .map(|start| Workout {
+                id,
+                name,
+                start,
+                duration,
+                energy: burned.or(active),
+                distance,
+            }))
+    }
+}
+
+struct WorkoutsSeed<'a>(&'a mut Vec<Workout>);
+
+impl<'de> DeserializeSeed<'de> for WorkoutsSeed<'_> {
+    type Value = ();
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        d.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for WorkoutsSeed<'_> {
+    type Value = ();
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a list of workouts")
+    }
+    fn visit_unit<E: de::Error>(self) -> Result<(), E> {
+        Ok(())
+    }
+    fn visit_none<E: de::Error>(self) -> Result<(), E> {
+        Ok(())
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
+        while self.0.len() < MAX_FILE_WORKOUTS {
+            match seq.next_element_seed(WorkoutSeed)? {
+                None => return Ok(()),
+                Some(None) => {}
+                Some(Some(w)) => self.0.push(w),
+            }
+        }
+        skip_seq(seq)
+    }
+}
+
+/// Points kept so far per kind, for the per-file cap.
+type Counts = [usize; KIND_COUNT];
+
+struct MetricSeed<'a> {
+    metrics: &'a mut Vec<Metric>,
+    counts: &'a mut Counts,
+}
+
+impl<'de> DeserializeSeed<'de> for MetricSeed<'_> {
+    type Value = ();
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        d.deserialize_map(self)
+    }
+}
+
+impl<'de> Visitor<'de> for MetricSeed<'_> {
+    type Value = ();
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a metric")
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
+        let (mut name, mut units): (Option<String>, Option<String>) = (None, None);
+        // The data may come before the name, so it is held unparsed and only
+        // read for a known name. Unknown metrics are never built.
+        let mut data: Option<&'de RawValue> = None;
+        let mut seen = SeenKeys::default();
+        while let Some(key) = map.next_key::<Key>()? {
+            seen.mark(key)?;
+            match key {
+                Key::Name => name = map.next_value::<Leaf>()?.text(),
+                Key::Units => units = map.next_value::<Leaf>()?.text(),
+                Key::Data => data = Some(map.next_value::<&'de RawValue>()?),
+                _ => {
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+        let (Some(kind), Some(raw)) = (name.as_deref().and_then(kind_of), data) else {
+            return Ok(());
+        };
+        let mut points = Vec::new();
+        let mut de = serde_json::Deserializer::from_str(raw.get());
+        PointsSeed {
+            out: &mut points,
+            count: &mut self.counts[kind as usize],
+        }
+        .deserialize(&mut de)
+        .map_err(de::Error::custom)?;
+        self.metrics.push(Metric {
+            kind,
+            units,
+            points,
+        });
+        Ok(())
+    }
+}
+
+struct MetricsSeed<'a> {
+    metrics: &'a mut Vec<Metric>,
+    counts: &'a mut Counts,
+}
+
+impl<'de> DeserializeSeed<'de> for MetricsSeed<'_> {
+    type Value = ();
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        d.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for MetricsSeed<'_> {
+    type Value = ();
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a list of metrics")
+    }
+    fn visit_unit<E: de::Error>(self) -> Result<(), E> {
+        Ok(())
+    }
+    fn visit_none<E: de::Error>(self) -> Result<(), E> {
+        Ok(())
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
+        for _ in 0..MAX_METRICS {
+            let seed = MetricSeed {
+                metrics: &mut *self.metrics,
+                counts: &mut *self.counts,
+            };
+            if seq.next_element_seed(seed)?.is_none() {
+                return Ok(());
+            }
+        }
+        skip_seq(seq)
+    }
+}
+
+/// A parsed export with every cap applied.
 #[derive(Debug, Default)]
 pub struct Export {
-    metrics: Vec<RawMetric>,
-    workouts: Vec<RawWorkout>,
+    metrics: Vec<Metric>,
+    workouts: Vec<Workout>,
 }
 
 impl Export {
     /// Number of points kept for the metric called `name` (all copies).
     pub fn point_count(&self, name: &str) -> usize {
+        let kind = kind_of(name);
         self.metrics
             .iter()
-            .filter(|m| m.name.as_deref() == Some(name))
-            .map(|m| m.data.as_ref().map_or(0, Vec::len))
+            .filter(|m| Some(m.kind) == kind)
+            .map(|m| m.points.len())
             .sum()
+    }
+
+    /// Number of workouts kept.
+    pub fn workout_count(&self) -> usize {
+        self.workouts.len()
+    }
+
+    fn total_points(&self) -> usize {
+        self.metrics.iter().map(|m| m.points.len()).sum()
+    }
+}
+
+struct DataSeed<'a>(&'a mut Export);
+
+impl<'de> DeserializeSeed<'de> for DataSeed<'_> {
+    type Value = ();
+    fn deserialize<D: Deserializer<'de>>(self, d: D) -> Result<(), D::Error> {
+        d.deserialize_any(self)
+    }
+}
+
+impl<'de> Visitor<'de> for DataSeed<'_> {
+    type Value = ();
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("the data object")
+    }
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<(), A::Error> {
+        // An empty list is tolerated; anything in it is not the layout.
+        match seq.next_element::<IgnoredAny>()? {
+            None => Ok(()),
+            Some(_) => Err(de::Error::custom("unexpected list")),
+        }
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
+        let mut counts: Counts = [0; KIND_COUNT];
+        let mut seen = SeenKeys::default();
+        while let Some(key) = map.next_key::<Key>()? {
+            seen.mark(key)?;
+            match key {
+                Key::Metrics => map.next_value_seed(MetricsSeed {
+                    metrics: &mut self.0.metrics,
+                    counts: &mut counts,
+                })?,
+                Key::Workouts => map.next_value_seed(WorkoutsSeed(&mut self.0.workouts))?,
+                _ => {
+                    map.next_value::<IgnoredAny>()?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+struct RootSeed<'a>(&'a mut Export);
+
+impl<'de> Visitor<'de> for RootSeed<'_> {
+    type Value = ();
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("an export object")
+    }
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
+        let mut found = false;
+        while let Some(key) = map.next_key::<Key>()? {
+            if key == Key::Data {
+                if found {
+                    return Err(de::Error::custom("duplicate key"));
+                }
+                found = true;
+                map.next_value_seed(DataSeed(&mut *self.0))?;
+            } else {
+                map.next_value::<IgnoredAny>()?;
+            }
+        }
+        if found {
+            Ok(())
+        } else {
+            Err(de::Error::custom("no data"))
+        }
     }
 }
 
@@ -282,24 +830,20 @@ impl Export {
 pub fn parse_export(bytes: &[u8]) -> Result<Export, String> {
     // Some editors and tools prefix UTF-8 files with a byte order mark.
     let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-    let raw: RawExport = serde_json::from_slice(bytes).map_err(|e| {
-        match e.classify() {
-            serde_json::error::Category::Data => "unexpected layout",
-            serde_json::error::Category::Io => "could not be read",
-            _ => "not valid JSON",
-        }
-        .to_owned()
-    })?;
-    let data = raw.data.ok_or_else(|| "unexpected layout".to_owned())?;
-    let mut metrics = data.metrics.unwrap_or_default();
-    for m in &mut metrics {
-        if let Some(points) = &mut m.data {
-            points.truncate(MAX_POINTS);
-        }
-    }
-    let mut workouts = data.workouts.unwrap_or_default();
-    workouts.truncate(MAX_POINTS);
-    Ok(Export { metrics, workouts })
+    let mut export = Export::default();
+    let mut de = serde_json::Deserializer::from_slice(bytes);
+    (&mut de)
+        .deserialize_map(RootSeed(&mut export))
+        .and_then(|()| de.end())
+        .map_err(|e| {
+            match e.classify() {
+                serde_json::error::Category::Data => "unexpected layout",
+                serde_json::error::Category::Io => "could not be read",
+                _ => "not valid JSON",
+            }
+            .to_owned()
+        })?;
+    Ok(export)
 }
 
 // ---------------------------------------------------------------------------
@@ -339,17 +883,6 @@ fn distance_km(qty: Option<f64>, units: Option<&str>) -> Option<f64> {
     within(Some(km), 0.0, 5000.0)
 }
 
-/// `{qty, units}` object inside a workout.
-fn qty_units(v: Option<&Value>) -> (Option<f64>, Option<String>) {
-    let Some(Value::Object(o)) = v else {
-        return (None, None);
-    };
-    (
-        o.get("qty").and_then(Value::as_f64),
-        o.get("units").and_then(Value::as_str).map(str::to_owned),
-    )
-}
-
 /// The local date: the first ten characters of the timestamp, if they are a
 /// real calendar date (so no 2026-02-30).
 fn local_date(ts: &str) -> Option<&str> {
@@ -359,8 +892,38 @@ fn local_date(ts: &str) -> Option<&str> {
 }
 
 fn clean_name(s: &str) -> String {
-    let cleaned: String = s.chars().filter(|c| !c.is_control()).collect();
+    let cleaned: String = s
+        .chars()
+        .filter(|c| !c.is_control() && !is_format_char(*c))
+        .collect();
     cleaned.trim().chars().take(MAX_NAME_CHARS).collect()
+}
+
+/// Unicode format characters (category Cf): zero-width and bidirectional
+/// controls that can reorder or hide text.
+fn is_format_char(c: char) -> bool {
+    matches!(c,
+        '\u{00AD}'
+        | '\u{0600}'..='\u{0605}'
+        | '\u{061C}'
+        | '\u{06DD}'
+        | '\u{070F}'
+        | '\u{0890}'..='\u{0891}'
+        | '\u{08E2}'
+        | '\u{180E}'
+        | '\u{200B}'..='\u{200F}'
+        | '\u{202A}'..='\u{202E}'
+        | '\u{2060}'..='\u{2064}'
+        | '\u{2066}'..='\u{206F}'
+        | '\u{FEFF}'
+        | '\u{FFF9}'..='\u{FFFB}'
+        | '\u{110BD}'
+        | '\u{110CD}'
+        | '\u{13430}'..='\u{1343F}'
+        | '\u{1BCA0}'..='\u{1BCA3}'
+        | '\u{1D173}'..='\u{1D17A}'
+        | '\u{E0001}'
+        | '\u{E0020}'..='\u{E007F}')
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +991,7 @@ pub struct Imported {
     pub workouts: Vec<HealthWorkout>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Kind {
     Steps,
     Energy,
@@ -438,6 +1001,8 @@ enum Kind {
     Sleep,
     Workout,
 }
+
+const KIND_COUNT: usize = 7;
 
 fn kind_of(name: &str) -> Option<Kind> {
     Some(match name {
@@ -459,25 +1024,21 @@ impl Imported {
     /// Adds one file's points. Files must arrive newest first: a point or
     /// workout already seen (same metric and timestamp, or same workout)
     /// belongs to a newer file and is not counted again.
-    fn ingest(&mut self, export: &Export, seen: &mut HashSet<(Kind, String)>) {
+    fn ingest(&mut self, export: &Export, seen: &mut Seen) {
         for metric in &export.metrics {
-            let Some(kind) = metric.name.as_deref().and_then(kind_of) else {
-                continue;
-            };
+            let kind = metric.kind;
             let units = metric.units.as_deref();
-            for p in metric.data.iter().flatten() {
-                let Some(ts) = p.date.as_deref() else {
-                    continue;
-                };
+            for p in &metric.points {
+                let ts = p.date.as_str();
                 let Some(date) = local_date(ts) else { continue };
                 // Only a usable value claims the timestamp, so an out-of-range
                 // value in a newer file does not hide a valid older one.
-                let key = (kind, ts.to_owned());
-                if seen.contains(&key) {
+                let key = seen.key(&(kind, ts));
+                if seen.0.contains(&key) {
                     continue;
                 }
                 if self.add_point(kind, date, ts, p, units) {
-                    seen.insert(key);
+                    seen.0.insert(key);
                 }
             }
         }
@@ -492,7 +1053,7 @@ impl Imported {
         kind: Kind,
         date: &str,
         ts: &str,
-        p: &RawPoint,
+        p: &Point,
         units: Option<&str>,
     ) -> bool {
         let day = self.days.entry(date.to_owned()).or_default();
@@ -564,10 +1125,11 @@ impl Imported {
         used
     }
 
-    fn add_workout(&mut self, w: &RawWorkout, seen: &mut HashSet<(Kind, String)>) {
-        let Some(start) = w.start.as_deref() else {
+    fn add_workout(&mut self, w: &Workout, seen: &mut Seen) {
+        if self.workouts.len() >= MAX_TOTAL_WORKOUTS {
             return;
-        };
+        }
+        let start = w.start.as_str();
         let Some(date) = local_date(start) else {
             return;
         };
@@ -578,22 +1140,22 @@ impl Imported {
             .filter(|n| !n.is_empty())
             .unwrap_or_else(|| "Workout".to_owned());
         let key = match w.id.as_deref().filter(|i| !i.is_empty()) {
-            Some(id) => format!("id:{id}"),
-            None => format!("{name}|{start}"),
+            Some(id) => seen.key(&(Kind::Workout, 0u8, id, "")),
+            None => seen.key(&(Kind::Workout, 1u8, name.as_str(), start)),
         };
-        if !seen.insert((Kind::Workout, key)) {
+        if !seen.0.insert(key) {
             return;
         }
-        let (e_qty, e_units) =
-            qty_units(w.active_energy_burned.as_ref().or(w.active_energy.as_ref()));
-        let (d_qty, d_units) = qty_units(w.distance.as_ref());
+        let energy = w.energy.clone().unwrap_or_default();
+        let distance = w.distance.clone().unwrap_or_default();
         self.workouts.push(HealthWorkout {
             date: date.to_owned(),
             start: start.to_owned(),
             name,
             duration_min: within(w.duration, 0.0, 86_400.0).map(|s| round_i64(s / 60.0)),
-            active_energy: energy_kcal(e_qty, e_units.as_deref()).map(round_i64),
-            distance_km: distance_km(d_qty, d_units.as_deref()).map(|k| round_to(k, 2)),
+            active_energy: energy_kcal(energy.qty, energy.units.as_deref()).map(round_i64),
+            distance_km: distance_km(distance.qty, distance.units.as_deref())
+                .map(|k| round_to(k, 2)),
         });
     }
 }
@@ -608,28 +1170,96 @@ fn round_to(v: f64, places: i32) -> f64 {
     (v * f).round() / f
 }
 
+/// Timestamps and workout keys already counted, as 64-bit hashes (keyed per
+/// import) so the set stays small.
+struct Seen(HashSet<u64>, RandomState);
+
+impl Seen {
+    fn new() -> Self {
+        Self(HashSet::new(), RandomState::new())
+    }
+    fn key<T: Hash + ?Sized>(&self, parts: &T) -> u64 {
+        self.1.hash_one(parts)
+    }
+}
+
+/// One file's parse result, kept while the file's size and time are unchanged.
+#[derive(Clone)]
+struct CachedFile {
+    len: u64,
+    mtime_ms: i64,
+    parsed: Result<Arc<Export>, String>,
+}
+
+type FileCache = HashMap<String, CachedFile>;
+
 /// Reads every listed file (newest first) into one `Imported`. A bad file
 /// is recorded and skipped, never fatal. `canonical_folder` must be canonical.
 pub fn import(canonical_folder: &Path, listing: &Listing) -> Imported {
+    import_cached(canonical_folder, listing, &FileCache::new()).0
+}
+
+/// As `import`, but a file whose size and time match `cache` is not read
+/// again. Returns the files that can be reused next time.
+fn import_cached(
+    canonical_folder: &Path,
+    listing: &Listing,
+    cache: &FileCache,
+) -> (Imported, FileCache) {
     let mut out = Imported {
         file_count: listing.files.len(),
         skipped_files: listing.skipped,
-        newest_file_ms: listing.files.iter().map(|f| f.mtime_ms).max(),
         ..Imported::default()
     };
-    let mut seen = HashSet::new();
-    for file in &listing.files {
+    let mut next = FileCache::new();
+    let mut seen = Seen::new();
+    let mut points = 0usize;
+    for (i, file) in listing.files.iter().enumerate() {
+        if points >= MAX_TOTAL_POINTS {
+            // Enough data from the newer files; the rest are not even opened.
+            out.skipped_files += listing.files.len() - i;
+            break;
+        }
         let name = file.rel.rsplit('/').next().unwrap_or(&file.rel);
-        let result = read_file(canonical_folder, file).and_then(|bytes| parse_export(&bytes));
-        match result {
-            Ok(export) => out.ingest(&export, &mut seen),
+        let hit = cache
+            .get(&file.rel)
+            .filter(|c| c.len == file.len && c.mtime_ms == file.mtime_ms);
+        let parsed = if let Some(c) = hit {
+            c.parsed.clone()
+        } else {
+            match read_file(canonical_folder, file) {
+                Ok(bytes) => parse_export(&bytes).map(Arc::new),
+                // Not cached: a file that could not be read may be readable later.
+                Err(reason) => {
+                    out.bad_files.push(BadFile {
+                        name: clean_name(name),
+                        reason,
+                    });
+                    continue;
+                }
+            }
+        };
+        next.insert(
+            file.rel.clone(),
+            CachedFile {
+                len: file.len,
+                mtime_ms: file.mtime_ms,
+                parsed: parsed.clone(),
+            },
+        );
+        match parsed {
+            Ok(export) => {
+                out.newest_file_ms = out.newest_file_ms.max(Some(file.mtime_ms));
+                points += export.total_points();
+                out.ingest(&export, &mut seen);
+            }
             Err(reason) => out.bad_files.push(BadFile {
                 name: clean_name(name),
                 reason,
             }),
         }
     }
-    out
+    (out, next)
 }
 
 // ---------------------------------------------------------------------------
@@ -637,21 +1267,46 @@ pub fn import(canonical_folder: &Path, listing: &Listing) -> Imported {
 
 type Signature = (PathBuf, Vec<(String, u64, i64)>, usize);
 
-/// The last import, kept until the folder's file list changes.
 #[derive(Default)]
-pub struct HealthState(Mutex<Option<(Signature, Arc<Imported>)>>);
+struct Inner {
+    /// Bumped by `clear`; an import started before it is not stored.
+    generation: u64,
+    folder: Option<PathBuf>,
+    /// The last merged import, valid while the folder's file list is the same.
+    result: Option<(Signature, Arc<Imported>)>,
+    files: FileCache,
+}
+
+/// The last import and the parsed files behind it.
+#[derive(Default)]
+pub struct HealthState(Mutex<Inner>);
 
 impl HealthState {
-    pub fn clear(&self) {
-        *self
-            .0
+    fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
+        self.0
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Forgets everything, and makes any import already running discard its
+    /// result instead of storing it.
+    pub fn clear(&self) {
+        let mut guard = self.lock();
+        let generation = guard.generation.wrapping_add(1);
+        *guard = Inner {
+            generation,
+            ..Inner::default()
+        };
     }
 
     /// Imports `folder`, or returns the cached import if nothing changed.
+    /// The folder is checked again on every call, so a root replaced by a
+    /// link or junction is refused. Listing, reading and parsing happen
+    /// without the lock held; only new or changed files are read.
     pub fn load(&self, folder: &Path) -> io::Result<Arc<Imported>> {
-        let canonical = fs::canonicalize(folder)?;
+        let checked = crate::settings::validate_health_folder(folder)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
+        let canonical = fs::canonicalize(checked)?;
         let listing = list(&canonical)?;
         let signature: Signature = (
             canonical.clone(),
@@ -662,17 +1317,28 @@ impl HealthState {
                 .collect(),
             listing.skipped,
         );
-        let mut guard = self
-            .0
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some((sig, imported)) = guard.as_ref()
-            && *sig == signature
-        {
-            return Ok(Arc::clone(imported));
+        let (generation, cache) = {
+            let guard = self.lock();
+            if let Some((sig, imported)) = guard.result.as_ref()
+                && *sig == signature
+            {
+                return Ok(Arc::clone(imported));
+            }
+            let cache = if guard.folder.as_ref() == Some(&canonical) {
+                guard.files.clone()
+            } else {
+                FileCache::new()
+            };
+            (guard.generation, cache)
+        };
+        let (imported, files) = import_cached(&canonical, &listing, &cache);
+        let imported = Arc::new(imported);
+        let mut guard = self.lock();
+        if guard.generation == generation {
+            guard.folder = Some(canonical);
+            guard.result = Some((signature, Arc::clone(&imported)));
+            guard.files = files;
         }
-        let imported = Arc::new(import(&canonical, &listing));
-        *guard = Some((signature, Arc::clone(&imported)));
         Ok(imported)
     }
 }
@@ -904,7 +1570,8 @@ pub fn health(
     });
     merged.truncate(MAX_WORKOUTS);
 
-    let last_export = imported.newest_file_ms;
+    // A file dated in the future (clock skew) counts as just written.
+    let last_export = imported.newest_file_ms.map(|t| t.min(now_ms));
     Ok(Health {
         last_export,
         latest_data: imported.days.keys().next_back().cloned(),

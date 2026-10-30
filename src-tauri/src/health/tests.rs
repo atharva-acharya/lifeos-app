@@ -1,6 +1,6 @@
 use super::*;
 use proptest::prelude::*;
-use serde_json::json;
+use serde_json::{Value, json};
 use std::time::{Duration, SystemTime};
 
 const HOUR_MS: i64 = 3_600_000;
@@ -779,7 +779,7 @@ proptest! {
         match parse_export(&bytes) {
             Ok(export) => {
                 let mut imported = Imported::default();
-                imported.ingest(&export, &mut HashSet::new());
+                imported.ingest(&export, &mut Seen::new());
                 assert_sane(&imported);
                 let view = health(&imported, None, TODAY, 0).expect("health");
                 prop_assert_eq!(view.days.len(), 90);
@@ -1315,14 +1315,23 @@ fn staleness_flips_just_after_exactly_48_hours() {
 }
 
 #[test]
-fn staleness_uses_the_newest_file_even_if_it_is_bad() {
+fn staleness_ignores_files_that_did_not_parse() {
     let got = import_files(&[
         ("old.json", 1_000 * HOUR_MS, "{\"data\":{}}".into()),
         ("new.json", 1_100 * HOUR_MS, "garbage".into()),
     ]);
     let v = health(&got, None, TODAY, 1_101 * HOUR_MS).expect("health");
+    assert!(v.stale);
+    assert_eq!(v.last_export, Some(1_000 * HOUR_MS));
+    assert_eq!(v.bad_file_count, 1);
+}
+
+#[test]
+fn the_last_export_time_is_never_in_the_future() {
+    let got = import_files(&[("a.json", 1_100 * HOUR_MS, "{\"data\":{}}".into())]);
+    let v = health(&got, None, TODAY, 1_000 * HOUR_MS).expect("health");
+    assert_eq!(v.last_export, Some(1_000 * HOUR_MS));
     assert!(!v.stale);
-    assert_eq!(v.last_export, Some(1_100 * HOUR_MS));
 }
 
 #[test]
@@ -1395,6 +1404,259 @@ fn the_fitness_plan_note_wins_over_other_plans() {
     ]);
     let v = health(&Imported::default(), Some(&index), TODAY, 0).expect("health");
     assert_eq!(v.goals.steps, 2222);
+}
+
+// --- T16: caps applied while parsing, per-file cache -------------------------
+
+const STAMP: &str = "2026-10-01 00:00:00 +0100";
+
+/// A file whose one metric entry has `n` copies of `point` in its data list.
+fn repeated_points(name: &str, point: &str, n: usize) -> String {
+    let mut text = format!(r#"{{"data":{{"metrics":[{{"name":"{name}","units":"count","data":["#);
+    for i in 0..n {
+        if i > 0 {
+            text.push(',');
+        }
+        text.push_str(point);
+    }
+    text.push_str("]}]}}");
+    text
+}
+
+#[test]
+fn a_file_of_empty_points_keeps_nothing_and_parses_fast() {
+    // Close to the 32 MB file limit: about ten million `{}` points.
+    let text = repeated_points("step_count", "{}", 10_000_000);
+    assert!(text.len() as u64 <= MAX_FILE_BYTES);
+    let started = std::time::Instant::now();
+    let export = parse_export(text.as_bytes()).expect("parses");
+    assert_eq!(export.point_count("step_count"), 0);
+    assert!(started.elapsed() < Duration::from_secs(20));
+}
+
+#[test]
+fn points_with_array_values_are_skipped_not_built() {
+    let point = format!(r#"{{"date":"{STAMP}","qty":[0,0,0,0,0,0,0,0]}}"#);
+    let text = repeated_points("step_count", &point, 300_000);
+    let export = parse_export(text.as_bytes()).expect("parses");
+    assert_eq!(export.point_count("step_count"), MAX_POINTS);
+    let got = import_files(&[("a.json", HOUR_MS, text)]);
+    assert!(got.days.is_empty());
+}
+
+#[test]
+fn the_point_cap_is_per_kind_across_all_entries_of_the_file() {
+    let entry = |name: &str| {
+        let mut points = Vec::new();
+        for _ in 0..(MAX_POINTS / 2 + 10) {
+            points.push(json!({"date": STAMP, "qty": 1}));
+        }
+        json!({"name": name, "units": "count", "data": points})
+    };
+    let text = export(&json!([
+        entry("step_count"),
+        entry("step_count"),
+        entry("weight_body_mass")
+    ]));
+    let export = parse_export(text.as_bytes()).expect("parses");
+    assert_eq!(export.point_count("step_count"), MAX_POINTS);
+    assert_eq!(export.point_count("weight_body_mass"), MAX_POINTS / 2 + 10);
+}
+
+#[test]
+fn only_the_first_metric_entries_are_read() {
+    let entries: Vec<Value> = (0..MAX_METRICS + 20)
+        .map(|_| json!({"name": "step_count", "units": "count", "data": [{"date": STAMP, "qty": 1}]}))
+        .collect();
+    let export = parse_export(export(&Value::Array(entries)).as_bytes()).expect("parses");
+    assert_eq!(export.point_count("step_count"), MAX_METRICS);
+}
+
+#[test]
+fn only_the_first_workouts_of_a_file_are_read() {
+    let ws: Vec<Value> = (0..MAX_FILE_WORKOUTS + 5)
+        .map(|i| json!({"id": i.to_string(), "start": "2026-10-01 08:00:00"}))
+        .collect();
+    let text = json!({"data": {"workouts": ws}}).to_string();
+    let export = parse_export(text.as_bytes()).expect("parses");
+    assert_eq!(export.workout_count(), MAX_FILE_WORKOUTS);
+}
+
+#[test]
+fn unknown_metrics_are_never_built_and_data_may_come_before_the_name() {
+    let text = r#"{"data":{"metrics":[
+        {"name":"mystery","units":"x","data":[{"date":"2026-10-01 00:00:00 +0100","qty":1}]},
+        {"name":"mystery2","data":{"not":"a list"}},
+        {"data":[{"date":"2026-10-02 00:00:00 +0100","qty":7}],"units":"count","name":"step_count"}
+    ]}}"#;
+    let export = parse_export(text.as_bytes()).expect("parses");
+    assert_eq!(export.point_count("mystery"), 0);
+    assert_eq!(export.point_count("step_count"), 1);
+    // A known metric still needs a list for its data.
+    let bad = r#"{"data":{"metrics":[{"name":"step_count","data":{"x":1}}]}}"#;
+    assert!(parse_export(bad.as_bytes()).is_err());
+}
+
+#[test]
+fn repeated_keys_in_a_point_or_metric_are_a_bad_file() {
+    for text in [
+        r#"{"data":{"metrics":[{"name":"a","name":"b"}]}}"#,
+        r#"{"data":{"metrics":[{"name":"step_count","data":[{"qty":1,"qty":2}]}]}}"#,
+        r#"{"data":{"metrics":[],"metrics":[]}}"#,
+    ] {
+        assert_eq!(
+            parse_export(text.as_bytes()).err().as_deref(),
+            Some("unexpected layout"),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn the_energy_object_is_read_as_quantity_and_units() {
+    let w = json!({"data": {"workouts": [
+        {"id": "a", "start": "2026-10-01 08:00:00", "duration": 600,
+         "activeEnergyBurned": {"qty": 100, "units": "kcal", "extra": [1, 2]},
+         "distance": {"qty": 1, "units": "km"}},
+        {"id": "b", "start": "2026-10-01 09:00:00", "activeEnergyBurned": [1], "activeEnergy": {"qty": 5, "units": "kcal"},
+         "distance": "far"},
+    ]}});
+    let got = import_files(&[("w.json", HOUR_MS, w.to_string())]);
+    let by_start = |s: &str| {
+        got.workouts
+            .iter()
+            .find(|w| w.start.starts_with(s))
+            .expect("workout")
+    };
+    assert_eq!(by_start("2026-10-01 08").active_energy, Some(100));
+    assert_eq!(by_start("2026-10-01 08").distance_km, Some(1.0));
+    assert_eq!(by_start("2026-10-01 09").active_energy, Some(5));
+    assert_eq!(by_start("2026-10-01 09").distance_km, None);
+}
+
+#[test]
+fn more_than_the_overall_point_cap_stops_reading_older_files() {
+    // Ten newest files each hold MAX_POINTS dated points of one kind; with
+    // a total of ten times that, a handful of older files are never opened.
+    let big = repeated_points("step_count", r#"{"date":"2026-10-01","qty":1}"#, MAX_POINTS);
+    let dir = tempfile::tempdir().expect("temp dir");
+    let files = MAX_TOTAL_POINTS / MAX_POINTS + 3;
+    for i in 0..files {
+        let path = dir.path().join(format!("f{i:02}.json"));
+        fs::write(&path, &big).expect("write");
+        set_mtime(&path, (1_000 + i64::try_from(i).expect("small")) * HOUR_MS);
+    }
+    let got = import_dir(dir.path());
+    assert_eq!(got.file_count, files);
+    assert_eq!(got.skipped_files, 3);
+}
+
+#[test]
+fn workouts_are_capped_over_all_files() {
+    let file = |from: usize| {
+        let ws: Vec<Value> = (from..from + MAX_FILE_WORKOUTS)
+            .map(|i| json!({"id": i.to_string(), "start": "2026-10-01 08:00:00"}))
+            .collect();
+        json!({"data": {"workouts": ws}}).to_string()
+    };
+    let got = import_files(&[
+        ("a.json", 2 * HOUR_MS, file(0)),
+        ("b.json", HOUR_MS, file(MAX_FILE_WORKOUTS)),
+    ]);
+    assert_eq!(got.workouts.len(), MAX_TOTAL_WORKOUTS);
+}
+
+#[test]
+fn unchanged_files_are_not_read_again() {
+    let dir = folder_with(&[(
+        "a.json",
+        2 * HOUR_MS,
+        one_metric(
+            "step_count",
+            "count",
+            &json!([{"date": "2026-10-01", "qty": 5}]),
+        ),
+    )]);
+    let state = HealthState::default();
+    let first = state.load(dir.path()).expect("load");
+    assert_eq!(first.days["2026-10-01"].steps, Some(5.0));
+
+    // Same size and time, different content: only a re-read would notice.
+    let a = dir.path().join("a.json");
+    fs::write(
+        &a,
+        one_metric(
+            "step_count",
+            "count",
+            &json!([{"date": "2026-10-01", "qty": 9}]),
+        ),
+    )
+    .expect("write");
+    set_mtime(&a, 2 * HOUR_MS);
+    // A new file changes the listing, so the merge runs again.
+    fs::write(
+        dir.path().join("b.json"),
+        one_metric(
+            "step_count",
+            "count",
+            &json!([{"date": "2026-10-02", "qty": 6}]),
+        ),
+    )
+    .expect("write");
+    let second = state.load(dir.path()).expect("load");
+    assert_eq!(second.days.len(), 2);
+    assert_eq!(second.days["2026-10-01"].steps, Some(5.0));
+
+    // A changed time is read again.
+    set_mtime(&a, 3 * HOUR_MS);
+    let third = state.load(dir.path()).expect("load");
+    assert_eq!(third.days["2026-10-01"].steps, Some(9.0));
+}
+
+#[test]
+fn clearing_discards_the_cache_and_bumps_the_generation() {
+    let dir = folder_with(&[("a.json", HOUR_MS, "{\"data\":{}}".into())]);
+    let state = HealthState::default();
+    state.load(dir.path()).expect("load");
+    let before = state.lock().generation;
+    assert_eq!(state.lock().files.len(), 1);
+    state.clear();
+    let guard = state.lock();
+    assert_eq!(guard.generation, before + 1);
+    assert!(guard.files.is_empty());
+    assert!(guard.result.is_none());
+}
+
+#[test]
+fn a_missing_or_non_folder_root_is_refused_on_every_load() {
+    let dir = folder_with(&[("a.json", HOUR_MS, "{\"data\":{}}".into())]);
+    let state = HealthState::default();
+    state.load(dir.path()).expect("load");
+    assert!(state.load(&dir.path().join("a.json")).is_err());
+    assert!(state.load(&dir.path().join("gone")).is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn a_root_replaced_by_a_junction_is_refused() {
+    let real = folder_with(&[("a.json", HOUR_MS, "{\"data\":{}}".into())]);
+    let parent = tempfile::tempdir().expect("temp dir");
+    let root = parent.path().join("health");
+    fs::create_dir(&root).expect("mkdir");
+    let state = HealthState::default();
+    state.load(&root).expect("a plain folder loads");
+    fs::remove_dir(&root).expect("remove");
+    junction(&root, real.path());
+    assert!(state.load(&root).is_err());
+}
+
+#[test]
+fn zero_width_and_bidi_controls_are_removed_from_names() {
+    assert_eq!(
+        clean_name("a\u{200B}b\u{202E}c\u{2066}d\u{2069}e\u{FEFF}f\u{200F}g\u{061C}h"),
+        "abcdefgh"
+    );
+    assert_eq!(clean_name("Zürich ☃ run"), "Zürich ☃ run");
 }
 
 // --- hardening: properties --------------------------------------------------
