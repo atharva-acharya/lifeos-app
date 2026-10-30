@@ -114,9 +114,9 @@ fn by_category(
     sign: i64,
 ) -> rusqlite::Result<Vec<CategoryLine>> {
     conn.prepare(
-        "SELECT COALESCE(category, ?2) AS c, SUM(amount) * ?3 AS s FROM ledger
+        "SELECT MIN(COALESCE(category, ?2)) AS c, SUM(amount) * ?3 AS s FROM ledger
          WHERE date LIKE ?1 AND amount * ?3 > 0
-         GROUP BY lower(c) ORDER BY s DESC, c",
+         GROUP BY lower(COALESCE(category, ?2)) ORDER BY s DESC, c",
     )?
     .query_map(params![like, UNCATEGORISED, sign], |r| {
         Ok(CategoryLine {

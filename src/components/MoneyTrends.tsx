@@ -169,6 +169,29 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
               </li>
             ))}
           </ul>
+          <table className="sr-only">
+            <caption>Spending by category and month</caption>
+            <thead>
+              <tr>
+                <th scope="col">Month</th>
+                {top.map((name) => (
+                  <th key={name} scope="col">
+                    {name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {trend.map((t) => (
+                <tr key={t.month}>
+                  <th scope="row">{t.month}</th>
+                  {top.map((name) => (
+                    <td key={name}>{pounds(amountOf(t.spending, name))}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
 

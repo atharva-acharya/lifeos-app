@@ -80,5 +80,9 @@ describe("MoneyTrends", () => {
     expect(within(mom).getByText("-£50.00")).toHaveClass("money__in");
     expect(within(mom).getByText("±£0.00")).toBeInTheDocument();
     expect(screen.getByText("Income by source")).toBeInTheDocument();
+
+    const byCategory = screen.getByRole("table", { name: "Spending by category and month" });
+    expect(within(byCategory).getByRole("row", { name: /2026-09/ })).toHaveTextContent("£200.00");
+    expect(within(byCategory).getByRole("row", { name: /2026-10/ })).toHaveTextContent("£260.00");
   });
 });
