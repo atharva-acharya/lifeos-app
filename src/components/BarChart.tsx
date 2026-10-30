@@ -33,6 +33,12 @@ export function niceScale(max: number, steps = 4): { top: number; ticks: number[
   return { top, ticks };
 }
 
+/** Shortens `text` to about `px` wide at the 12 px axis font. */
+export function fit(text: string, px: number): string {
+  const max = Math.max(3, Math.floor(px / 7));
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
 /** Small SVG bar chart (stacked when given several series). No chart library. */
 export function BarChart<T>({
   data,
@@ -129,7 +135,7 @@ export function BarChart<T>({
                   y={height - 6}
                   textAnchor="middle"
                 >
-                  {label(d)}
+                  {fit(label(d), slot * every - 4)}
                 </text>
               )}
             </g>

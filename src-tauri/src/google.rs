@@ -3,7 +3,7 @@
 //! token lives in Windows Credential Manager; only Google hosts are called.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::time::{Duration, Instant};
 
@@ -246,6 +246,9 @@ pub async fn connect(config: &GoogleConfig) -> Result<(), GoogleError> {
     if !config.is_complete() {
         return Err(GoogleError::NotConfigured);
     }
+    // Reconnecting: end the old grant first. Revoking afterwards would also
+    // cancel the new token, because Google revokes the whole grant.
+    disconnect().await?;
     let listener =
         TcpListener::bind("127.0.0.1:0").map_err(|e| GoogleError::Login(e.to_string()))?;
     let port = listener
@@ -285,12 +288,7 @@ pub async fn connect(config: &GoogleConfig) -> Result<(), GoogleError> {
     let refresh = token
         .refresh_token
         .ok_or_else(|| GoogleError::Login("Google did not return a refresh token".into()))?;
-    let entry = entry()?;
-    // Reconnecting replaces the grant; the old token should not stay valid.
-    if let Ok(old) = entry.get_password() {
-        revoke(&old).await;
-    }
-    entry
+    entry()?
         .set_password(&refresh)
         .map_err(|e| GoogleError::Keyring(e.to_string()))
 }
@@ -326,18 +324,35 @@ pub fn classify(request_line: &str, expected_state: &str) -> Redirect {
 }
 
 fn reply(stream: &mut std::net::TcpStream, status: &str, body: &str) {
-    let _ = stream.write_all(
-        format!(
-            "HTTP/1.1 {status}
-Content-Type: text/plain; charset=utf-8
-Content-Length: {}
-Connection: close
-
-{body}",
-            body.len()
-        )
-        .as_bytes(),
+    let head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
     );
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(body.as_bytes());
+}
+
+/// Reads the request line with a deadline for the whole line, so a client
+/// that trickles bytes cannot hold the listener.
+fn read_request_line(stream: &std::net::TcpStream) -> Option<String> {
+    let until = Instant::now() + REQUEST_TIMEOUT;
+    let mut line = Vec::new();
+    let mut byte = [0u8; 1];
+    let mut reader = stream.take(MAX_REQUEST_LINE);
+    loop {
+        let left = until.checked_duration_since(Instant::now())?;
+        stream
+            .set_read_timeout(Some(left.max(Duration::from_millis(1))))
+            .ok()?;
+        match reader.read(&mut byte) {
+            Ok(1) if byte[0] == b'\n' => break,
+            Ok(1) => line.push(byte[0]),
+            // Closed early or over the size cap.
+            Ok(_) => return None,
+            Err(_) => return None,
+        }
+    }
+    String::from_utf8(line).ok()
 }
 
 fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String, GoogleError> {
@@ -351,17 +366,13 @@ fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String, GoogleEr
         }
         match listener.accept() {
             Ok((mut stream, _)) => {
-                // A silent or endless connection must not stall the sign-in.
-                if stream.set_nonblocking(false).is_err()
-                    || stream.set_read_timeout(Some(REQUEST_TIMEOUT)).is_err()
-                {
+                // A silent, slow or endless connection must not stall the sign-in.
+                if stream.set_nonblocking(false).is_err() {
                     continue;
                 }
-                let mut line = String::new();
-                let read = BufReader::new((&stream).take(MAX_REQUEST_LINE)).read_line(&mut line);
-                if read.is_err() {
+                let Some(line) = read_request_line(&stream) else {
                     continue;
-                }
+                };
                 match classify(&line, state) {
                     Redirect::Ignore => reply(&mut stream, "404 Not Found", ""),
                     Redirect::Done(result) => {
@@ -585,5 +596,28 @@ mod tests {
         assert!(!valid_client_secret("has space"));
         assert!(!valid_client_secret("line\nbreak"));
         assert!(!valid_client_secret(&"x".repeat(101)));
+    }
+
+    #[test]
+    fn a_trickling_client_is_dropped_after_the_request_limit() {
+        use std::net::TcpStream;
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let writer = std::thread::spawn(move || {
+            let mut slow = TcpStream::connect(addr).expect("connect");
+            for _ in 0..20 {
+                if slow.write_all(b"G").is_err() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(500));
+            }
+        });
+        let (stream, _) = listener.accept().expect("accept");
+        let started = Instant::now();
+        assert_eq!(read_request_line(&stream), None);
+        let took = started.elapsed();
+        assert!(took >= REQUEST_TIMEOUT && took < REQUEST_TIMEOUT + Duration::from_secs(2));
+        drop(stream);
+        writer.join().expect("join");
     }
 }

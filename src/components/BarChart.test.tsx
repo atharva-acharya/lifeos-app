@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { BarChart, niceScale, type Series } from "./BarChart";
+import { BarChart, fit, niceScale, type Series } from "./BarChart";
 
 interface Row {
   name: string;
@@ -22,6 +22,14 @@ describe("niceScale", () => {
   it("gives a default axis when there is no data", () => {
     expect(niceScale(0)).toEqual({ top: 4, ticks: [0, 1, 2, 3, 4] });
     expect(niceScale(Number.NaN).top).toBe(4);
+  });
+});
+
+describe("fit", () => {
+  it("shortens labels that do not fit their slot", () => {
+    expect(fit("Indeed", 100)).toBe("Indeed");
+    expect(fit("LinkedIn Easy Apply", 70)).toBe("LinkedIn…");
+    expect(fit("Anything", 0)).toBe("An…");
   });
 });
 

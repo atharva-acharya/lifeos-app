@@ -150,6 +150,10 @@ pub fn save_google_config(
     let dir = config_dir(&app)?;
     let mut current = settings::load(&dir).map_err(|e| e.to_string())?;
     let previous = current.google.take().unwrap_or_default();
+    // A different Sheet: the saved copy belongs to the old one.
+    if previous.sheet_id != sheet_id {
+        applications::clear(&cache_dir(&app)?).map_err(|e| e.to_string())?;
+    }
     // The grant belongs to one client; switching needs a fresh sign-in.
     if google::is_connected() && !previous.client_id.is_empty() && previous.client_id != client_id {
         return Err("disconnect Google before changing the client ID".to_owned());
@@ -249,7 +253,10 @@ pub async fn refresh_applications(app: AppHandle) -> Result<ApplicationsView, St
                 rows,
                 missing_columns,
             };
-            applications::save(&cache_dir(&app)?, &cache).map_err(|e| e.to_string())?;
+            // Disconnect may have run while the Sheet was loading; it wins.
+            if google::is_connected() {
+                applications::save(&cache_dir(&app)?, &cache).map_err(|e| e.to_string())?;
+            }
             None
         }
         Err(e) => Some(e.to_string()),

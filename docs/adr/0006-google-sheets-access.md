@@ -17,7 +17,7 @@ Phase 2 shows job applications live from the owner's Google Sheet (requirements 
 - **Hosts allowed:** `accounts.google.com`, `oauth2.googleapis.com`, `sheets.googleapis.com`. Requests to any other host are refused in code.
 - **Offline-first:** the last successful fetch is saved as `applications.json` in local app data with its timestamp; the Jobs page always renders from the cache and shows when it was last updated. Refresh on page open (if older than 15 minutes) and on demand.
 - **Columns by header name**, not position, so reordering the Sheet does not break the app; unknown columns are ignored and missing ones reported.
-- **Disconnect** revokes the token with Google, deletes it from Credential Manager and deletes the saved copy. If Google cannot be reached, the owner is told to remove access at myaccount.google.com/permissions. Reconnecting revokes the previous token.
+- **Disconnect** revokes the token with Google, deletes it from Credential Manager and deletes the saved copy. If Google cannot be reached, the owner is told to remove access at myaccount.google.com/permissions. Connecting first ends any previous grant; revoking afterwards would also cancel the new token, because Google revokes the whole grant.
 
 ## Alternatives
 

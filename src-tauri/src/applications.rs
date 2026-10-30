@@ -120,12 +120,16 @@ pub fn load(dir: &Path) -> Option<Cache> {
     serde_json::from_str(&text).ok()
 }
 
-/// Forgets the saved copy (on Disconnect); the Sheet itself is untouched.
+/// Forgets the saved copy (on Disconnect or a new Sheet); the Sheet itself
+/// is untouched.
 pub fn clear(dir: &Path) -> std::io::Result<()> {
-    match fs::remove_file(dir.join(CACHE_FILE)) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
-        _ => Ok(()),
+    for name in [CACHE_FILE.to_owned(), format!("{CACHE_FILE}.tmp")] {
+        match fs::remove_file(dir.join(name)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e),
+            _ => {}
+        }
     }
+    Ok(())
 }
 
 pub fn save(dir: &Path, cache: &Cache) -> std::io::Result<()> {

@@ -17,7 +17,9 @@ test.beforeAll(async () => {
 
 test.afterEach(() => {
   // Uncaught errors (for example from the frozen Object.prototype) blank the page.
-  expect(running().errors).toEqual([]);
+  const { errors } = running();
+  const seen = errors.splice(0);
+  expect(seen).toEqual([]);
 });
 
 test.afterAll(async () => {
