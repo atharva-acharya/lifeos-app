@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useWidth } from "./useWidth";
 
 /** One stacked part of each bar; `color` is a CSS colour or token. */
 export interface Series<T> {
@@ -48,23 +48,7 @@ export function BarChart<T>({
   unit = "",
   height = 240,
 }: BarChartProps<T>) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(FALLBACK_WIDTH);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      if (el.clientWidth > 0) setWidth(el.clientWidth);
-    };
-    measure();
-    if (typeof ResizeObserver !== "function") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
+  const [ref, width] = useWidth<HTMLDivElement>(FALLBACK_WIDTH);
 
   const totals = data.map((d) => series.reduce((n, s) => n + s.value(d), 0));
   const { top, ticks } =

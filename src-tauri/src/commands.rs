@@ -7,6 +7,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use crate::applications::{self, Cache};
+use crate::diagnostics::{self, Diagnostics};
 use crate::google::{self, GoogleConfig};
 use crate::jobs::{self, Jobs};
 use crate::live::LiveState;
@@ -214,7 +215,7 @@ pub struct ApplicationsView {
     pub error: Option<String>,
 }
 
-fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
     match test_data_dir() {
         Some(dir) => Ok(dir),
         None => app.path().app_local_data_dir().map_err(|e| e.to_string()),
@@ -281,4 +282,21 @@ pub fn get_jobs(state: tauri::State<'_, LiveState>) -> Result<JobsResponse, Stri
             })
             .map_err(|e| e.to_string()),
     }
+}
+
+/// Records a UI error in the local log; nothing is sent anywhere.
+#[tauri::command]
+pub fn log_error(app: AppHandle, message: String) -> Result<(), String> {
+    diagnostics::append(&cache_dir(&app)?, applications::now_ms(), "ui", &message)
+        .map_err(|e| e.to_string())
+}
+
+/// App version, OS and the newest log entries, for "Copy diagnostics".
+#[tauri::command]
+pub fn get_diagnostics(app: AppHandle) -> Result<Diagnostics, String> {
+    Ok(Diagnostics {
+        version: app.package_info().version.to_string(),
+        os: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
+        log: diagnostics::tail(&cache_dir(&app)?, 50),
+    })
 }

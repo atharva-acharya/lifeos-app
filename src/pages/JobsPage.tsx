@@ -9,6 +9,7 @@ import {
 } from "../api";
 import { ApplicationsTab } from "../components/ApplicationsTab";
 import { ChartsTab } from "../components/JobCharts";
+import { withTransition } from "../motion";
 import type { RouteId } from "../routes";
 
 type Tab = "applications" | "pipeline" | "outreach" | "charts";
@@ -243,7 +244,9 @@ export function JobsPage({ onNavigate }: { onNavigate: (id: RouteId) => void }) 
             aria-controls={`panel-${t.id}`}
             className="tabs__tab"
             onClick={() => {
-              setTab(t.id);
+              withTransition(() => {
+                setTab(t.id);
+              });
             }}
           >
             {t.label}

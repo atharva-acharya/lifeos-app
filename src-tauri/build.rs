@@ -8,6 +8,8 @@ const COMMANDS: &[&str] = &[
     "get_applications",
     "refresh_applications",
     "get_jobs",
+    "log_error",
+    "get_diagnostics",
 ];
 
 fn main() {
