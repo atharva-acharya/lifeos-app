@@ -10,6 +10,9 @@ const COMMANDS: &[&str] = &[
     "get_jobs",
     "log_error",
     "get_diagnostics",
+    "set_auto_update",
+    "check_for_update",
+    "install_update",
 ];
 
 fn main() {

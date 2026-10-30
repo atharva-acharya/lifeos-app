@@ -22,6 +22,7 @@ jobs:
       id-token: write
       attestations: write
       checks: read
+      statuses: read
     steps:
       # CodeQL for Rust is not a required PR check (it is slow), so a release
       # only goes out once it has passed on the exact commit being tagged.
@@ -35,6 +36,21 @@ jobs:
           result=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CodeQL%20(rust)" --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last | .conclusion')
           echo "CodeQL (rust) on $SHA: ${result:-not run}"
           [ "$result" = "success" ]
+
+      # The end-to-end suite needs WebView2, which hosted runners cannot start,
+      # so it runs on the owner's PC (`pnpm e2e:gate`) and records a commit
+      # status. No release without it passing on this exact commit.
+      - name: Require the local end-to-end suite to have passed on this commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          state=$(gh api "repos/$REPO/commits/$SHA/statuses" \
+            --jq '[.[] | select(.context == "e2e (local)")] | first | .state')
+          echo "e2e (local) on $SHA: ${state:-not run}"
+          [ "$state" = "success" ]
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,6 +77,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build installers
+        env:
+          # Signs the update packages; the app only installs updates signed
+          # with this key (public half in tauri.conf.json, ADR 0007).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build -- --locked
 
       # Authenticode signing via SignPath is added here once the project is
@@ -72,10 +93,28 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           mkdir -p dist-release
-          cp src-tauri/target/release/bundle/nsis/*.exe dist-release/
+          cp src-tauri/target/release/bundle/nsis/*.exe src-tauri/target/release/bundle/nsis/*.exe.sig dist-release/
           cp src-tauri/target/release/bundle/msi/*.msi dist-release/
           # GitHub replaces spaces in asset names with dots; match it so SHA256SUMS.txt checks.
           for f in dist-release/*' '*; do mv "$f" "${f// /.}"; done
+          # Update manifest the app reads from releases/latest/download/latest.json.
+          exe=$(ls dist-release/*-setup.exe)
+          EXE_NAME=$(basename "$exe") SIGNATURE=$(cat "$exe.sig") node -e '
+            const { TAG, EXE_NAME, SIGNATURE, GITHUB_REPOSITORY } = process.env;
+            const manifest = {
+              version: TAG.replace(/^v/, ""),
+              notes: "See the release notes on GitHub.",
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "windows-x86_64": {
+                  signature: SIGNATURE,
+                  url: `https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${EXE_NAME}`,
+                },
+              },
+            };
+            process.stdout.write(JSON.stringify(manifest, null, 2) + "\n");
+          ' > dist-release/latest.json
+          cat dist-release/latest.json
           ls -l dist-release
 
       - name: SBOM (CycloneDX)
@@ -98,6 +137,7 @@ jobs:
           subject-path: |
             dist-release/*.exe
             dist-release/*.msi
+            dist-release/latest.json
             dist-release/sbom.cdx.json
 
       - name: Changelog

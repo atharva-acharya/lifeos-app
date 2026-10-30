@@ -787,3 +787,38 @@
   justify-self: end;
   font-variant-numeric: tabular-nums;
 }
+
+.setting__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  cursor: pointer;
+}
+
+.setting__check input {
+  accent-color: var(--c-read);
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+.update-banner p {
+  flex: 1;
+  margin: 0;
+}
+
+.button--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.button--quiet:hover:not(:disabled) {
+  color: var(--text);
+}

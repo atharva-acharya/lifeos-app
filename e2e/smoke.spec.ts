@@ -109,6 +109,23 @@ test("an uncaught error is logged locally and shown in Diagnostics", async () =>
   await expect(page.getByText("1 recent error logged")).toBeVisible();
 });
 
+test("an update signed with the wrong key is offered but refused", async () => {
+  const { page } = running();
+  // The start-up check found the local test server's version 9.9.9.
+  const banner = page.getByLabel("Update available");
+  await expect(banner).toContainText("Life OS 9.9.9 is available.");
+  await banner.getByRole("button", { name: "Install and restart" }).click();
+  await expect(banner.getByRole("alert")).toContainText("failed its security check", {
+    timeout: 15_000,
+  });
+  await banner.getByRole("button", { name: "Dismiss" }).click();
+  // Settings can check again; nothing was installed, so the version is unchanged.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByText("Version 9.9.9 is available.")).toBeVisible();
+  await expect(page.getByText("Version 0.2.0")).toBeVisible();
+});
+
 test("the page cannot reach the network or load remote scripts", async () => {
   const { page } = running();
   const blocked = await page.evaluate(async () => {
