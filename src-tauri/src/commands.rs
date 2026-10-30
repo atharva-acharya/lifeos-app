@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::applications::{self, Cache};
 use crate::diagnostics::{self, Diagnostics};
+use crate::fitness::{self, Fitness};
 use crate::google::{self, GoogleConfig};
 use crate::jobs::{self, Jobs};
 use crate::live::LiveState;
@@ -282,6 +283,33 @@ pub fn get_jobs(state: tauri::State<'_, LiveState>) -> Result<JobsResponse, Stri
         Some(result) => result
             .map(|jobs| JobsResponse::Ready {
                 jobs: Box::new(jobs),
+            })
+            .map_err(|e| e.to_string()),
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", tag = "status")]
+pub enum FitnessResponse {
+    NoVault,
+    Ready { fitness: Box<Fitness> },
+}
+
+/// Weight, steps, protein, workouts and lift progress, with the 90-day
+/// window ending on `date` (the owner's local date, YYYY-MM-DD).
+#[tauri::command]
+pub fn get_fitness(
+    state: tauri::State<'_, LiveState>,
+    date: String,
+) -> Result<FitnessResponse, String> {
+    if !crate::vault::note::is_iso_date(&date) {
+        return Err("date must look like 2026-10-29".to_owned());
+    }
+    match state.with_index(|index| fitness::fitness(index, &date)) {
+        None => Ok(FitnessResponse::NoVault),
+        Some(result) => result
+            .map(|fitness| FitnessResponse::Ready {
+                fitness: Box::new(fitness),
             })
             .map_err(|e| e.to_string()),
     }

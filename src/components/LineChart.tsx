@@ -9,6 +9,8 @@ export interface Line {
   values: (number | null)[];
   /** Draw a dot on each reading (the raw series, not an average). */
   dots?: boolean;
+  /** Dashed stroke, for a planned line such as a sloping target. */
+  dashed?: boolean;
 }
 
 export interface LineChartProps {
@@ -122,10 +124,10 @@ export function LineChart({ labels, lines, target, unit = "", height = 220 }: Li
         {lines.map((l) => (
           <g key={l.key}>
             <path
-              className="line-chart__line"
+              className={`line-chart__line${l.dashed ? " line-chart__line--dashed" : ""}`}
               d={linePath(l.values, x, y)}
               stroke={l.color}
-              pathLength={1}
+              pathLength={l.dashed ? undefined : 1}
             />
             {l.dots &&
               l.values.map((v, i) =>

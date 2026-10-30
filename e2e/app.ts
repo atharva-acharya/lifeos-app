@@ -81,6 +81,56 @@ export interface RunningApp {
   close: () => Promise<void>;
 }
 
+/** `YYYY-MM-DD` for the local date `daysAgo` days before today. */
+export function localDateAgo(daysAgo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toLocaleDateString("en-CA");
+}
+
+/**
+ * Synthetic training data dated relative to today, so the Fitness page's
+ * 90-day window always has readings: 20 daily notes with weight trending
+ * down, steps and protein, and two workouts.
+ */
+function writeFitnessNotes(vault: string): void {
+  mkdirSync(join(vault, "Daily"), { recursive: true });
+  mkdirSync(join(vault, "Fitness", "Log"), { recursive: true });
+  for (let i = 0; i < 20; i++) {
+    const date = localDateAgo(i);
+    const note = [
+      "---",
+      "type: daily",
+      `date: ${date}`,
+      `weight: ${(82 + i * 0.1).toFixed(1)}`,
+      `steps: ${String(6000 + i * 150)}`,
+      `protein_g: ${String(150 + (i % 3) * 15)}`,
+      "---",
+      "",
+    ];
+    writeFileSync(join(vault, "Daily", `e2e-${date}.md`), note.join("\n"));
+  }
+  const workout = (daysAgo: number, day: string, week: number, lines: string[]) => {
+    const date = localDateAgo(daysAgo);
+    const note = [
+      "---",
+      "type: workout",
+      `date: ${date}`,
+      `day: ${day}`,
+      `week: ${String(week)}`,
+      "deload: false",
+      "duration_min: 60",
+      "exercises:",
+      ...lines.map((l) => `  - ${l}`),
+      "---",
+      "",
+    ];
+    writeFileSync(join(vault, "Fitness", "Log", `e2e-${date}.md`), note.join("\n"));
+  };
+  workout(2, "Pull A", 4, ["Deadlift 3 x 5 @ 130", "Barbell row 3 x 8 @ 70"]);
+  workout(9, "Pull A", 3, ["Deadlift 3 x 5 @ 125"]);
+}
+
 /** Starts the debug build against a copy of the synthetic vault in a throwaway data folder. */
 export async function launchApp(): Promise<RunningApp> {
   const work = mkdtempSync(join(tmpdir(), "lifeos-e2e-"));
@@ -88,6 +138,7 @@ export async function launchApp(): Promise<RunningApp> {
   const data = join(work, "data");
   cpSync(FIXTURE_VAULT, vault, { recursive: true });
   mkdirSync(data);
+  writeFitnessNotes(vault);
   writeFileSync(join(data, "settings.json"), JSON.stringify({ vaultPath: vault }));
   // A saved copy of the Sheet (synthetic, Sheet-style values), so the Jobs
   // tabs work without Google. One row is dated today for the weekly chart.

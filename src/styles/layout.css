@@ -723,6 +723,10 @@
   stroke-dasharray: 1;
 }
 
+.line-chart__line--dashed {
+  stroke-dasharray: 4 4;
+}
+
 .line-chart__dot {
   stroke: var(--bg-card);
   stroke-width: 1.5;
@@ -821,4 +825,54 @@
 
 .button--quiet:hover:not(:disabled) {
   color: var(--text);
+}
+
+.fitness {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.fitness__week {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessions {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.session__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.session__lines {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-muted);
 }
