@@ -280,6 +280,8 @@ impl Export {
 
 /// Parses one export file. Never panics; the error is a short fixed reason.
 pub fn parse_export(bytes: &[u8]) -> Result<Export, String> {
+    // Some editors and tools prefix UTF-8 files with a byte order mark.
+    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
     let raw: RawExport = serde_json::from_slice(bytes).map_err(|e| {
         match e.classify() {
             serde_json::error::Category::Data => "unexpected layout",
@@ -348,9 +350,12 @@ fn qty_units(v: Option<&Value>) -> (Option<f64>, Option<String>) {
     )
 }
 
-/// The local date: the first ten characters of the timestamp, if they are one.
+/// The local date: the first ten characters of the timestamp, if they are a
+/// real calendar date (so no 2026-02-30).
 fn local_date(ts: &str) -> Option<&str> {
-    ts.get(..10).filter(|d| is_iso_date(d))
+    ts.get(..10)
+        .filter(|d| is_iso_date(d))
+        .filter(|d| crate::fitness::shift_days(d, 0) == *d)
 }
 
 fn clean_name(s: &str) -> String {
@@ -465,10 +470,15 @@ impl Imported {
                     continue;
                 };
                 let Some(date) = local_date(ts) else { continue };
-                if !seen.insert((kind, ts.to_owned())) {
+                // Only a usable value claims the timestamp, so an out-of-range
+                // value in a newer file does not hide a valid older one.
+                let key = (kind, ts.to_owned());
+                if seen.contains(&key) {
                     continue;
                 }
-                self.add_point(kind, date, ts, p, units);
+                if self.add_point(kind, date, ts, p, units) {
+                    seen.insert(key);
+                }
             }
         }
         for w in &export.workouts {
@@ -476,29 +486,42 @@ impl Imported {
         }
     }
 
-    fn add_point(&mut self, kind: Kind, date: &str, ts: &str, p: &RawPoint, units: Option<&str>) {
+    /// Adds one point to its day; returns whether its value was usable.
+    fn add_point(
+        &mut self,
+        kind: Kind,
+        date: &str,
+        ts: &str,
+        p: &RawPoint,
+        units: Option<&str>,
+    ) -> bool {
         let day = self.days.entry(date.to_owned()).or_default();
+        let mut used = false;
         match kind {
             Kind::Steps => {
                 if let Some(v) = within(p.qty, 0.0, 200_000.0) {
                     add(&mut day.steps, v);
+                    used = true;
                 }
             }
             Kind::Energy => {
                 if let Some(v) = energy_kcal(p.qty, units) {
                     add(&mut day.energy, v);
+                    used = true;
                 }
             }
             Kind::RestingHr => {
                 if let Some(v) = within(p.qty, 20.0, 250.0) {
                     day.hr_sum += v;
                     day.hr_n += 1;
+                    used = true;
                 }
             }
             Kind::Hrv => {
                 if let Some(v) = within(p.qty, 1.0, 500.0) {
                     day.hrv_sum += v;
                     day.hrv_n += 1;
+                    used = true;
                 }
             }
             Kind::Weight => {
@@ -507,6 +530,7 @@ impl Imported {
                     if newer {
                         day.weight = Some((ts.to_owned(), v));
                     }
+                    used = true;
                 }
             }
             Kind::Sleep => {
@@ -527,6 +551,7 @@ impl Imported {
                     s.deep += deep;
                     s.rem += rem;
                     s.awake += awake;
+                    used = true;
                 }
             }
             Kind::Workout => {}
@@ -536,6 +561,7 @@ impl Imported {
         if empty {
             self.days.remove(date);
         }
+        used
     }
 
     fn add_workout(&mut self, w: &RawWorkout, seen: &mut HashSet<(Kind, String)>) {

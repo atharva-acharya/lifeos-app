@@ -258,6 +258,20 @@ fn the_newest_file_wins_on_overlapping_days_and_nothing_is_counted_twice() {
 }
 
 #[test]
+fn an_unusable_newer_value_does_not_hide_a_valid_older_one() {
+    let steps = |qty: f64| {
+        json!({"data": {"metrics": [{"name": "step_count", "units": "count",
+            "data": [{"date": "2026-10-24 00:00:00 +0000", "qty": qty}]}]}})
+        .to_string()
+    };
+    let got = import_files(&[
+        ("old.json", 1_000 * HOUR_MS, steps(4321.0)),
+        ("new.json", 2_000 * HOUR_MS, steps(999_999.0)),
+    ]);
+    assert_eq!(got.days["2026-10-24"].steps, Some(4321.0));
+}
+
+#[test]
 fn bad_files_are_recorded_by_name_and_do_not_stop_the_rest() {
     let dir = fixture_copy();
     let got = import_dir(dir.path());
@@ -850,6 +864,21 @@ fn importing_never_changes_the_folder() {
 // --- hardening: hostile JSON ------------------------------------------------
 
 #[test]
+fn a_byte_order_mark_is_ignored() {
+    let mut bytes = vec![0xEF, 0xBB, 0xBF];
+    bytes.extend_from_slice(br#"{"data":{"metrics":[]}}"#);
+    assert!(parse_export(&bytes).is_ok());
+}
+
+#[test]
+fn impossible_calendar_dates_are_not_days() {
+    assert_eq!(local_date("2026-02-30 00:00:00 +0000"), None);
+    assert_eq!(local_date("2026-04-31 00:00:00 +0000"), None);
+    assert_eq!(local_date("2028-02-29 00:00:00 +0000"), Some("2028-02-29"));
+    assert_eq!(local_date("2027-02-29 00:00:00 +0000"), None);
+}
+
+#[test]
 fn byte_order_mark_empty_truncated_and_non_utf8_files_are_bad_not_fatal() {
     let good = r#"{"data":{"metrics":[]}}"#;
     let mut with_bom = vec![0xEF, 0xBB, 0xBF];
@@ -860,7 +889,6 @@ fn byte_order_mark_empty_truncated_and_non_utf8_files_are_bad_not_fatal() {
     let cases: Vec<(&str, Vec<u8>)> = vec![
         ("empty", Vec::new()),
         ("whitespace", b"   \n\t ".to_vec()),
-        ("bom", with_bom),
         ("truncated", good.as_bytes()[..good.len() - 3].to_vec()),
         ("bad-utf8", bad_utf8),
         ("nul", vec![0; 64]),
@@ -1392,7 +1420,10 @@ proptest! {
         let s = format!("{pre}{d}{post}");
         let got = local_date(&s);
         if pre.is_empty() {
-            prop_assert_eq!(got.is_some(), is_iso_date(&d));
+            prop_assert_eq!(
+                got.is_some(),
+                is_iso_date(&d) && crate::fitness::shift_days(&d, 0) == d
+            );
         } else {
             prop_assert!(got.is_none());
         }
