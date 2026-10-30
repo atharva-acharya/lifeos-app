@@ -73,6 +73,23 @@ describe("LineChart", () => {
     expect(container.textContent).toContain("4 Oct");
   });
 
+  it("draws a dashed line without the draw-in path length", () => {
+    const { container } = render(
+      <LineChart
+        labels={labels}
+        lines={[
+          { key: "w", name: "Weight", color: "red", values: [82, 81, 80, 79] },
+          { key: "t", name: "Target", color: "gold", values: [82, 81.5, 81, 80.5], dashed: true },
+        ]}
+      />,
+    );
+    const paths = container.querySelectorAll(".line-chart__line");
+    expect(paths[0].classList.contains("line-chart__line--dashed")).toBe(false);
+    expect(paths[0].getAttribute("pathLength")).toBe("1");
+    expect(paths[1].classList.contains("line-chart__line--dashed")).toBe(true);
+    expect(paths[1].hasAttribute("pathLength")).toBe(false);
+  });
+
   it("renders an empty chart without crashing", () => {
     const { container } = render(
       <LineChart labels={[]} lines={[{ key: "w", name: "Weight", color: "red", values: [] }]} />,

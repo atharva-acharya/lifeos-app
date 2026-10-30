@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: events, window controls and the app's own settings, Today, Jobs, Google Sheets, diagnostics and update commands (the updater plugin itself is not exposed); no fs, shell, http or path access (threat model T5)",
+  "description": "Main window: events, window controls and the app's own settings, Today, Jobs, Fitness, Google Sheets, diagnostics and update commands (the updater plugin itself is not exposed); no fs, shell, http or path access (threat model T5)",
   "windows": ["main"],
   "permissions": [
     "core:event:default",
@@ -15,6 +15,7 @@
     "allow-get-applications",
     "allow-refresh-applications",
     "allow-get-jobs",
+    "allow-get-fitness",
     "allow-log-error",
     "allow-get-diagnostics",
     "allow-set-auto-update",

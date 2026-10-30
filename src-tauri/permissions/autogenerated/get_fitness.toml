@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-fitness"
+description = "Enables the get_fitness command without any pre-configured scope."
+commands.allow = ["get_fitness"]
+
+[[permission]]
+identifier = "deny-get-fitness"
+description = "Denies the get_fitness command without any pre-configured scope."
+commands.deny = ["get_fitness"]

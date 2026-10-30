@@ -1,6 +1,7 @@
 pub mod applications;
 mod commands;
 pub mod diagnostics;
+pub mod fitness;
 pub mod google;
 pub mod index;
 pub mod jobs;
@@ -54,6 +55,7 @@ pub fn run() {
             commands::get_applications,
             commands::refresh_applications,
             commands::get_jobs,
+            commands::get_fitness,
             commands::log_error,
             commands::get_diagnostics,
             commands::set_auto_update,

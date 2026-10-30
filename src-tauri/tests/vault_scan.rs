@@ -14,9 +14,18 @@ fn reads_every_note_and_skips_hidden_archived_and_non_markdown() {
     assert_eq!(
         paths,
         [
+            "Daily/2025-09-01.md",
+            "Daily/2026-01-10.md",
+            "Daily/2026-01-11.md",
             "Daily/2026-01-12.md",
             "Daily/2026-01-13.md",
+            "Daily/2026-01-14.md",
+            "Daily/2026-01-14x.md",
+            "Fitness/Log/2026-01-06-pull-a.md",
+            "Fitness/Log/2026-01-12-push-a.md",
             "Fitness/Log/2026-01-13-pull-a.md",
+            "Fitness/Log/2026-01-20-pull-a-deload.md",
+            "Fitness/Plan.md",
             "Inbox.md",
             "Jobs/Companies/Example Security Ltd.md",
             "Jobs/Companies/Sample Bank.md",
@@ -38,6 +47,7 @@ fn types_each_note() {
             Some(Note::Company(_)) => "company",
             Some(Note::Weekly(_)) => "weekly",
             Some(Note::Project(_)) => "project",
+            Some(Note::Plan(_)) => "plan",
             Some(Note::Outreach(_)) => "outreach",
             Some(Note::Other) => "other",
             None => "error",
@@ -48,6 +58,7 @@ fn types_each_note() {
     assert_eq!(kind("Jobs/Companies/Example Security Ltd.md"), "company");
     assert_eq!(kind("Weekly/2026-W02.md"), "weekly");
     assert_eq!(kind("Projects/home-lab.md"), "project");
+    assert_eq!(kind("Fitness/Plan.md"), "plan");
     assert_eq!(kind("Inbox.md"), "other");
 }
 

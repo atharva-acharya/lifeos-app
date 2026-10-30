@@ -83,6 +83,10 @@
   animation: line-draw calc(var(--dur-slow) * 2) var(--ease-standard) both;
 }
 
+.line-chart__line--dashed {
+  animation: none;
+}
+
 @keyframes line-draw {
   from {
     stroke-dashoffset: 1;
