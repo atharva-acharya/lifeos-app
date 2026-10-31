@@ -4,6 +4,7 @@ import { averageChange, calendar, rollingAverage, shortLabel, targetLine } from 
 import type { Navigate } from "../routes";
 import { EmptyHint } from "./EmptyHint";
 import { LineChart, type Line } from "./LineChart";
+import { Group, Value } from "./Card";
 
 const DAYS = 90;
 /** Days read before the chart starts, so its first 7-day average is complete. */
@@ -49,7 +50,7 @@ export function FitnessWeight({
     {
       key: "weight",
       name: "Weight",
-      color: "var(--c-read)",
+      color: "var(--cat-body)",
       values: view.weights,
       dots: true,
     },
@@ -66,23 +67,15 @@ export function FitnessWeight({
   }
 
   return (
-    <section className="card chart" aria-labelledby="fitness-weight">
-      <header className="chart__head">
-        <h2 id="fitness-weight" className="kicker">
-          Weight trend
-        </h2>
-        {latest !== null && (
-          <span className="muted">
-            Latest <strong>{latest.toFixed(1)} kg</strong>
-            {view.change !== null && (
-              <>
-                {" "}
-                · 7-day change <strong>{signed(view.change)} kg</strong>
-              </>
-            )}
-          </span>
-        )}
-      </header>
+    <Group title="Weight trend" cardClassName="card--stack chart-card">
+      {latest !== null && (
+        <div className="metric__body">
+          <Value value={latest.toFixed(1)} unit="kg" srPrefix="Latest" />
+          {view.change !== null && (
+            <p className="metric__detail">7-day change {signed(view.change)} kg</p>
+          )}
+        </div>
+      )}
       {readings.length === 0 ? (
         <EmptyHint lead="No weigh-ins in the last 90 days." guide="daily" onNavigate={onNavigate}>
           Weight comes from <code>type: daily</code> notes with <code>weight</code> (kg). Steps and
@@ -125,6 +118,6 @@ export function FitnessWeight({
           one.
         </p>
       )}
-    </section>
+    </Group>
   );
 }

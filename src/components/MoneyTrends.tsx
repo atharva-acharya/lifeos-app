@@ -1,5 +1,6 @@
 import type { CategoryAmount, MonthTotals } from "../api";
 import { pounds } from "../money";
+import { Group, MetricHead } from "./Card";
 import { BarChart, type Series } from "./BarChart";
 import { LineChart, type Line } from "./LineChart";
 
@@ -92,172 +93,180 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
 
   if (!anything) return null;
   return (
-    <div className="charts money__trends">
-      <section className="card chart" aria-labelledby="chart-flows">
-        <header className="chart__head">
-          <h2 id="chart-flows" className="kicker">
-            Income and spending
-          </h2>
-          <span className="muted">£, last {trend.length} months</span>
-        </header>
-        <div aria-hidden="true">
-          <BarChart data={trend} label={(t) => shortMonth(t.month)} series={FLOWS} />
-        </div>
-        <table className="sr-only">
-          <caption>Income and spending by month</caption>
-          <thead>
-            <tr>
-              <th scope="col">Month</th>
-              <th scope="col">Income</th>
-              <th scope="col">Spent</th>
-              <th scope="col">Savings rate</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trend.map((t, i) => (
-              <tr key={t.month}>
-                <th scope="row">{t.month}</th>
-                <td>{pounds(t.income)}</td>
-                <td>{pounds(t.spent)}</td>
-                <td>{rates[i] === null ? "—" : `${String(rates[i])}%`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="card chart" aria-labelledby="chart-savings">
-        <header className="chart__head">
-          <h2 id="chart-savings" className="kicker">
-            Savings rate
-          </h2>
-          <span className="muted">Share of income kept</span>
-        </header>
-        <div aria-hidden="true">
-          <LineChart
-            labels={labels}
-            lines={[
-              {
-                key: "rate",
-                name: "Savings rate",
-                color: "var(--c-done)",
-                values: rates,
-                dots: true,
-              },
-            ]}
-            unit="%"
+    <Group title="Trends" className="money__trends" bare>
+      <div className="grid grid--2">
+        <section className="card chart-card" aria-labelledby="chart-flows">
+          <MetricHead
+            as="h3"
+            id="chart-flows"
+            label="Income and spending"
+            color="var(--cat-money)"
+            aside={<>£, last {trend.length} months</>}
           />
-        </div>
-      </section>
-
-      {categoryLines.length > 0 && (
-        <section className="card chart" aria-labelledby="chart-categories">
-          <header className="chart__head">
-            <h2 id="chart-categories" className="kicker">
-              Spending by category
-            </h2>
-            <span className="muted">£, top {categoryLines.length}</span>
-          </header>
           <div aria-hidden="true">
-            <LineChart labels={labels} lines={categoryLines} />
+            <BarChart
+              data={trend}
+              label={(t) => shortMonth(t.month)}
+              series={FLOWS}
+              layout="grouped"
+            />
           </div>
-          <ul className="bar-chart__legend" aria-hidden="true">
-            {categoryLines.map((l) => (
-              <li key={l.key}>
-                <span className="bar-chart__swatch" style={{ background: l.color }} />
-                {l.name}
-              </li>
-            ))}
-          </ul>
           <table className="sr-only">
-            <caption>Spending by category and month</caption>
+            <caption>Income and spending by month</caption>
             <thead>
               <tr>
                 <th scope="col">Month</th>
-                {top.map((name) => (
-                  <th key={name} scope="col">
-                    {name}
-                  </th>
-                ))}
+                <th scope="col">Income</th>
+                <th scope="col">Spent</th>
+                <th scope="col">Savings rate</th>
               </tr>
             </thead>
             <tbody>
-              {trend.map((t) => (
+              {trend.map((t, i) => (
                 <tr key={t.month}>
                   <th scope="row">{t.month}</th>
-                  {top.map((name) => (
-                    <td key={name}>{pounds(amountOf(t.spending, name))}</td>
-                  ))}
+                  <td>{pounds(t.income)}</td>
+                  <td>{pounds(t.spent)}</td>
+                  <td>{rates[i] === null ? "—" : `${String(rates[i])}%`}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </section>
-      )}
 
-      {hasPair && (
-        <section className="card chart" aria-labelledby="month-on-month">
-          <header className="chart__head">
-            <h2 id="month-on-month" className="kicker">
-              Month on month
-            </h2>
-            <span className="muted">
-              {shortMonth(previous.month)} → {shortMonth(current.month)}
-            </span>
-          </header>
-          {changes.length === 0 ? (
-            <p className="muted">No spending in either month.</p>
-          ) : (
-            <table className="table">
-              <caption className="sr-only">Spending by category, last month and this month</caption>
+        <section className="card chart-card" aria-labelledby="chart-savings">
+          <MetricHead
+            as="h3"
+            id="chart-savings"
+            label="Savings rate"
+            color="var(--cat-money)"
+            aside={"Share of income kept"}
+          />
+          <div aria-hidden="true">
+            <LineChart
+              labels={labels}
+              lines={[
+                {
+                  key: "rate",
+                  name: "Savings rate",
+                  color: "var(--c-done)",
+                  values: rates,
+                  dots: true,
+                },
+              ]}
+              unit="%"
+            />
+          </div>
+        </section>
+
+        {categoryLines.length > 0 && (
+          <section className="card chart-card" aria-labelledby="chart-categories">
+            <MetricHead
+              as="h3"
+              id="chart-categories"
+              label="Spending by category"
+              color="var(--cat-money)"
+              aside={<>£, top {categoryLines.length}</>}
+            />
+            <div aria-hidden="true">
+              <LineChart labels={labels} lines={categoryLines} />
+            </div>
+
+            <table className="sr-only">
+              <caption>Spending by category and month</caption>
               <thead>
                 <tr>
-                  <th scope="col">Category</th>
-                  <th scope="col" className="table__num">
-                    {shortMonth(previous.month)}
-                  </th>
-                  <th scope="col" className="table__num">
-                    {shortMonth(current.month)}
-                  </th>
-                  <th scope="col" className="table__num">
-                    Change
-                  </th>
+                  <th scope="col">Month</th>
+                  {top.map((name) => (
+                    <th key={name} scope="col">
+                      {name}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {changes.map((c) => {
-                  const diff = c.current - c.previous;
-                  return (
-                    <tr key={c.category}>
-                      <th scope="row">{c.category}</th>
-                      <td className="table__num">{pounds(c.previous)}</td>
-                      <td className="table__num">{pounds(c.current)}</td>
-                      <td
-                        className={`table__num${diff > 0 ? " money__up" : diff < 0 ? " money__in" : ""}`}
-                      >
-                        {signedPounds(diff)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {trend.map((t) => (
+                  <tr key={t.month}>
+                    <th scope="row">{t.month}</th>
+                    {top.map((name) => (
+                      <td key={name}>{pounds(amountOf(t.spending, name))}</td>
+                    ))}
+                  </tr>
+                ))}
               </tbody>
             </table>
-          )}
-          {current.incomeBySource.length > 0 && (
-            <>
-              <h3 className="kicker">Income by source</h3>
-              <ul className="rows">
-                {current.incomeBySource.map((s) => (
-                  <li key={s.category} className="row">
-                    <span className="row__main row__title">{s.category}</span>
-                    <span className="money__in">{pounds(s.spent)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
-      )}
-    </div>
+          </section>
+        )}
+
+        {hasPair && (
+          <section className="card chart-card" aria-labelledby="month-on-month">
+            <MetricHead
+              as="h3"
+              id="month-on-month"
+              label="Month on month"
+              color="var(--cat-money)"
+              aside={
+                <>
+                  {shortMonth(previous.month)} → {shortMonth(current.month)}
+                </>
+              }
+            />
+            {changes.length === 0 ? (
+              <p className="muted">No spending in either month.</p>
+            ) : (
+              <table className="table">
+                <caption className="sr-only">
+                  Spending by category, last month and this month
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Category</th>
+                    <th scope="col" className="table__num">
+                      {shortMonth(previous.month)}
+                    </th>
+                    <th scope="col" className="table__num">
+                      {shortMonth(current.month)}
+                    </th>
+                    <th scope="col" className="table__num">
+                      Change
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {changes.map((c) => {
+                    const diff = c.current - c.previous;
+                    return (
+                      <tr key={c.category}>
+                        <th scope="row">{c.category}</th>
+                        <td className="table__num">{pounds(c.previous)}</td>
+                        <td className="table__num">{pounds(c.current)}</td>
+                        <td
+                          className={`table__num${diff > 0 ? " money__up" : diff < 0 ? " money__in" : ""}`}
+                        >
+                          {signedPounds(diff)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            {current.incomeBySource.length > 0 && (
+              <>
+                <h4 className="card__title">Income by source</h4>
+                <ul className="list">
+                  {current.incomeBySource.map((s) => (
+                    <li key={s.category} className="list__row">
+                      <span className="list__main list__title">{s.category}</span>
+                      <span className="list__value money__in">{pounds(s.spent)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
+      </div>
+    </Group>
   );
 }

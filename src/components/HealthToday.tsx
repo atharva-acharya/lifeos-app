@@ -3,6 +3,7 @@ import { shortLabel } from "../fitnessStats";
 import { sleepHours } from "../healthStats";
 import { EmptyHint } from "./EmptyHint";
 import { Rings, type Ring } from "./Rings";
+import { Group } from "./Card";
 
 /** Today's rings (or the latest day that has data) against the daily goals. */
 export function HealthToday({ day, goals }: { day: HealthRingsDay | null; goals: HealthGoals }) {
@@ -32,10 +33,10 @@ export function HealthToday({ day, goals }: { day: HealthRingsDay | null; goals:
     },
   ];
   return (
-    <section className="card" aria-labelledby="health-today">
-      <h2 id="health-today" className="kicker">
-        {day === null || day.isToday ? "Today" : `Latest: ${shortLabel(day.date)}`}
-      </h2>
+    <Group
+      title={day === null || day.isToday ? "Today" : `Latest: ${shortLabel(day.date)}`}
+      cardClassName="card--stack"
+    >
       {day === null ? (
         <EmptyHint lead="No steps, energy or sleep in the exports yet.">
           Turn on Step Count, Active Energy and Sleep Analysis in Health Auto Export.
@@ -50,6 +51,6 @@ export function HealthToday({ day, goals }: { day: HealthRingsDay | null; goals:
           </p>
         </div>
       )}
-    </section>
+    </Group>
   );
 }

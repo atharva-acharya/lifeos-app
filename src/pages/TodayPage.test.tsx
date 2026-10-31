@@ -48,9 +48,9 @@ describe("TodayPage", () => {
   it("shows the day's numbers", async () => {
     mockCommands({ get_today: { status: "ready", today: TODAY } });
     render(<TodayPage onNavigate={vi.fn()} />);
-    expect(await screen.findByText("83.9 kg")).toBeInTheDocument();
-    expect(screen.getByText("−0.2 kg since last")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Applications today")).getByText("4")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Weight")).toHaveTextContent("83.9 kg");
+    expect(screen.getByTitle("Since the last weigh-in")).toHaveTextContent("−0.2 kg");
+    expect(within(screen.getByLabelText("Applied today")).getByText("4")).toBeInTheDocument();
     expect(within(screen.getByLabelText("Gym session")).getByText("Pull A")).toBeInTheDocument();
     expect(screen.getByText("4 / 5")).toBeInTheDocument();
   });
@@ -77,6 +77,20 @@ describe("TodayPage", () => {
     expect(await screen.findByText("Company 2")).toBeInTheDocument();
     expect(screen.queryByText("Company 3")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "2 more in Jobs" }));
+    expect(onNavigate).toHaveBeenCalledWith("jobs");
+  });
+
+  it("opens the page behind each summary card", async () => {
+    mockCommands({ get_today: { status: "ready", today: TODAY } });
+    const onNavigate = vi.fn();
+    render(<TodayPage onNavigate={onNavigate} />);
+    fireEvent.click(
+      within(await screen.findByLabelText("Weight")).getByRole("button", { name: "Open Fitness" }),
+    );
+    expect(onNavigate).toHaveBeenCalledWith("fitness");
+    fireEvent.click(
+      within(screen.getByLabelText("Follow-ups due")).getByRole("button", { name: "Open Jobs" }),
+    );
     expect(onNavigate).toHaveBeenCalledWith("jobs");
   });
 

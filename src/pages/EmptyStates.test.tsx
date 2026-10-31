@@ -30,7 +30,7 @@ describe("Today with nothing in the vault", () => {
     render(<TodayPage onNavigate={onNavigate} />);
     expect(await screen.findByText(/No daily note for/)).toBeInTheDocument();
     expect(screen.getByText(`date: ${DATE}`)).toBeInTheDocument();
-    expect(screen.getByLabelText("Applications today")).toHaveTextContent("—");
+    expect(screen.getByLabelText("Applied today")).toHaveTextContent("—");
     expect(screen.getByLabelText("Gym session")).toHaveTextContent("—");
     expect(screen.queryByText("Rest day")).not.toBeInTheDocument();
     expect(screen.getByText(/Follow-ups come from/)).toHaveTextContent("type: company");

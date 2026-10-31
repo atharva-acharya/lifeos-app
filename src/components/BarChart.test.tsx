@@ -67,6 +67,43 @@ describe("BarChart", () => {
     expect(three?.[2]).toBe(116);
   });
 
+  it("puts grouped bars side by side from the baseline, scaled to the larger one", () => {
+    const { container } = render(
+      <BarChart
+        data={data}
+        label={(r) => r.name}
+        series={[A, B]}
+        layout="grouped"
+        max={8}
+        height={240}
+      />,
+    );
+    const [alpha, beta] = [...container.querySelectorAll(".bar-chart__bar")].map((b) =>
+      (b.getAttribute("d") ?? "").match(/-?\d+(\.\d+)?/g)?.map(Number),
+    );
+    // Both start on the baseline (y=216), so neither sits on top of the other.
+    expect(alpha?.[1]).toBe(216);
+    expect(beta?.[1]).toBe(216);
+    // Side by side: Beta starts to the right of Alpha.
+    expect(beta?.[0]).toBeGreaterThan(alpha?.[0] ?? Infinity);
+    // Each is rounded only at the top and grows from zero: 2 of 8 and 1 of 8.
+    expect(alpha?.[2]).toBe(216 - 52 + 4);
+    expect(beta?.[2]).toBe(216 - 26 + 4);
+  });
+
+  it("scales a grouped axis to the largest single bar, not the sum", () => {
+    const { container } = render(
+      <BarChart
+        data={[{ name: "One", a: 30, b: 25 }]}
+        label={(r) => r.name}
+        series={[A, B]}
+        layout="grouped"
+      />,
+    );
+    expect(container.textContent).toContain("30");
+    expect(container.textContent).not.toContain("60");
+  });
+
   it("labels the axis and shows a legend only for stacked charts", () => {
     const one = render(
       <BarChart data={data} label={(r) => r.name} series={[A]} unit="%" max={100} />,

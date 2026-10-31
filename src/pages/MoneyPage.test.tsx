@@ -72,7 +72,7 @@ describe("MoneyPage", () => {
     const spent = await screen.findByLabelText("Spent");
     expect(within(spent).getByText("£485.00")).toBeInTheDocument();
     expect(within(screen.getByLabelText("Net")).getByText("£1,915.00")).toBeInTheDocument();
-    expect(within(screen.getByLabelText("Savings rate")).getByText("80%")).toBeInTheDocument();
+    expect(screen.getByLabelText("Savings rate")).toHaveTextContent("80 %");
     expect(screen.getByText("£30.00 left")).toHaveClass("pill--progress");
     expect(screen.getByText("£20.00 over")).toHaveClass("pill--danger");
     expect(screen.getByText("£40.00 left")).toHaveClass("pill--done");
