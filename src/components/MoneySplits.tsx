@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   addSplit,
   localDate,
@@ -8,8 +8,11 @@ import {
   type SplitRow,
 } from "../api";
 import { pounds, toPence } from "../money";
+import { checkSplit, summarise, type SplitMethod } from "../splitMath";
+import "../styles/money-splits.css";
 import { Group } from "./Card";
 import { BALANCES_ID, SPLIT_FIELD_ID } from "./MoneyQuickActions";
+import { Toast, type ToastMessage } from "./Toast";
 
 /** "Sam owes you £12.00", "You owe Sam £5.00" or "Settled up". */
 export function balanceText(f: FriendBalance): string {
@@ -34,17 +37,32 @@ function errorText(err: unknown, fallback: string): string {
 
 type Message = { error: boolean; text: string } | null;
 
-function Balances({ friends, onChanged }: { friends: FriendBalance[]; onChanged: () => void }) {
+/** A settle-up that was written and can be reversed from the toast. */
+export interface Settled {
+  friend: string;
+  /** Pence written by the settle-up (the opposite of the balance). */
+  amount: number;
+  date: string;
+}
+
+function Balances({
+  friends,
+  onSettled,
+}: {
+  friends: FriendBalance[];
+  onSettled: (s: Settled) => void;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [message, setMessage] = useState<Message>(null);
 
   const settle = (f: FriendBalance) => {
     setBusy(f.friend);
-    settleUp(f.friend, -f.balance, localDate())
+    setMessage(null);
+    const record: Settled = { friend: f.friend, amount: -f.balance, date: localDate() };
+    settleUp(record.friend, record.amount, record.date)
       .then(() => {
-        setMessage({ error: false, text: `Recorded a settle-up with ${f.friend}.` });
-        onChanged();
+        onSettled(record);
       })
       .catch((err: unknown) => {
         setMessage({ error: true, text: errorText(err, "Could not save.") });
@@ -120,6 +138,18 @@ function Balances({ friends, onChanged }: { friends: FriendBalance[]; onChanged:
   );
 }
 
+const UNIT: Record<Exclude<SplitMethod, "equal">, string> = {
+  amounts: "£",
+  percent: "%",
+  shares: "share",
+};
+
+const PLACEHOLDER: Record<Exclude<SplitMethod, "equal">, string> = {
+  amounts: "0.00",
+  percent: "0",
+  shares: "1",
+};
+
 function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void }) {
   const [date, setDate] = useState(localDate());
   const [description, setDescription] = useState("");
@@ -127,7 +157,7 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
   const [names, setNames] = useState("");
   const [includeMe, setIncludeMe] = useState(true);
   const [paidBy, setPaidBy] = useState("");
-  const [method, setMethod] = useState<NewSplit["method"]>("equal");
+  const [method, setMethod] = useState<SplitMethod>("equal");
   const [values, setValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
@@ -135,40 +165,33 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
   const friends = parseNames(names);
   // "" stands for the owner in the per-person inputs.
   const people = [...(includeMe ? [""] : []), ...friends];
+  const pence = toPence(total);
+  const validTotal = pence !== null && pence > 0 ? pence : null;
+  const check = checkSplit(
+    method,
+    validTotal,
+    people.map((who) => values[who] ?? ""),
+  );
+
+  let reason: string | null = null;
+  if (description.trim() === "") reason = "Add what it was for.";
+  else if (validTotal === null) reason = "Enter a total like 45.00.";
+  else if (friends.length === 0) reason = "Add at least one friend.";
+  else reason = check.problem;
 
   const submit = (e: React.SyntheticEvent) => {
     e.preventDefault();
-    if (busy) return;
-    const pence = toPence(total);
-    if (pence === null || pence === 0) {
-      setMessage({ error: true, text: "Enter a total like 45.00." });
-      return;
-    }
-    const value = (who: string): number | null => {
-      const text = values[who] ?? "";
-      if (method === "equal") return 0;
-      if (method === "amounts") return toPence(text);
-      return /^\d+$/.test(text.trim()) ? Number(text) : null;
-    };
+    if (busy || reason !== null || validTotal === null || check.values === null) return;
+    const parts = check.values;
     const split: NewSplit = {
       date,
       description,
-      total: pence,
+      total: validTotal,
       paidBy: paidBy === "" ? null : paidBy,
-      method,
-      people: [],
+      // Percentages are saved as the exact pence they work out to.
+      method: method === "percent" ? "amounts" : method,
+      people: people.map((who, i) => ({ name: who === "" ? null : who, value: parts[i] })),
     };
-    for (const who of people) {
-      const v = value(who);
-      if (v === null) {
-        setMessage({
-          error: true,
-          text: `Enter ${method === "amounts" ? "an amount" : "a share"} for everyone.`,
-        });
-        return;
-      }
-      split.people.push({ name: who === "" ? null : who, value: v });
-    }
     setBusy(true);
     setMessage(null);
     addSplit(split)
@@ -265,11 +288,13 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
           <select
             value={method}
             onChange={(e) => {
-              setMethod(e.target.value as NewSplit["method"]);
+              setMethod(e.target.value as SplitMethod);
+              setValues({});
             }}
           >
             <option value="equal">Equally</option>
             <option value="amounts">By amount</option>
+            <option value="percent">By percentage</option>
             <option value="shares">By shares</option>
           </select>
         </label>
@@ -287,10 +312,11 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
           people.map((who) => (
             <label key={who === "" ? "me" : who}>
               <span className="kicker">
-                {who === "" ? "Me" : who} ({method === "amounts" ? "£" : "share"})
+                {who === "" ? "Me" : who} ({UNIT[method]})
               </span>
               <input
-                inputMode={method === "amounts" ? "decimal" : "numeric"}
+                inputMode={method === "shares" ? "numeric" : "decimal"}
+                placeholder={PLACEHOLDER[method]}
                 value={values[who] ?? ""}
                 onChange={(e) => {
                   setValues({ ...values, [who]: e.target.value });
@@ -298,10 +324,25 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
               />
             </label>
           ))}
-        <div className="form__actions">
-          <button type="submit" className="button button--primary">
+        {check.progress !== "" && people.length > 0 && (
+          <p className="split-form__progress" aria-live="polite">
+            {check.progress}
+          </p>
+        )}
+        <div className="form__actions split-form__actions">
+          <button
+            type="submit"
+            className="button button--primary"
+            disabled={busy || reason !== null}
+            aria-describedby={reason === null ? undefined : "split-save-reason"}
+          >
             {busy ? "Saving…" : "Save split"}
           </button>
+          {reason !== null && (
+            <span id="split-save-reason" className="split-form__reason">
+              {reason}
+            </span>
+          )}
         </div>
       </div>
       {message && (
@@ -313,6 +354,32 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
         </p>
       )}
     </form>
+  );
+}
+
+/** You owe, you are owed and net, across every friend (spec P9). */
+export function SplitsSummary({ friends }: { friends: FriendBalance[] }) {
+  const { owe, owed, net } = summarise(friends.map((f) => f.balance));
+  const tone = (pence: number) =>
+    pence > 0 ? "splits-summary__value--owed" : pence < 0 ? "splits-summary__value--owe" : "";
+  const netWords = net > 0 ? "owed to you" : net < 0 ? "you owe" : "all square";
+  return (
+    <dl className="splits-summary" aria-label="Split totals">
+      <div className="splits-summary__item">
+        <dt>You owe</dt>
+        <dd className={tone(-owe)}>{pounds(owe)}</dd>
+      </div>
+      <div className="splits-summary__item">
+        <dt>You are owed</dt>
+        <dd className={tone(owed)}>{pounds(owed)}</dd>
+      </div>
+      <div className="splits-summary__item">
+        <dt>Net</dt>
+        <dd className={tone(net)}>
+          {pounds(Math.abs(net))} <span className="splits-summary__words">{netWords}</span>
+        </dd>
+      </div>
+    </dl>
   );
 }
 
@@ -328,6 +395,40 @@ export function MoneySplits({
   readOnly: boolean;
   onChanged: () => void;
 }) {
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  const nextId = useRef(0);
+
+  const show = (t: Omit<ToastMessage, "id">) => {
+    nextId.current += 1;
+    setToast({ ...t, id: nextId.current });
+  };
+
+  const undo = (s: Settled) => {
+    setUndoing(true);
+    settleUp(s.friend, -s.amount, s.date)
+      .then(() => {
+        onChanged();
+        show({ text: "Settle-up undone" });
+      })
+      .catch((err: unknown) => {
+        show({ error: true, text: errorText(err, "Could not undo the settle-up.") });
+      })
+      .finally(() => {
+        setUndoing(false);
+      });
+  };
+
+  const settled = (s: Settled) => {
+    onChanged();
+    show({
+      text: `Recorded a settle-up with ${s.friend}`,
+      onUndo: () => {
+        undo(s);
+      },
+    });
+  };
+
   const recentLog = recent.length > 0 && (
     <details className="project__log">
       <summary>Recent ({recent.length})</summary>
@@ -343,6 +444,7 @@ export function MoneySplits({
   );
   return (
     <Group title="Splits with friends" className="money__splits" bare>
+      {friends.length > 0 && <SplitsSummary friends={friends} />}
       {readOnly ? (
         <div className="card card--stack">
           <ul className="list" aria-label="Balances with friends">
@@ -357,7 +459,7 @@ export function MoneySplits({
       ) : (
         <div className="grid grid--2">
           <div id={BALANCES_ID} className="card card--stack">
-            <Balances friends={friends} onChanged={onChanged} />
+            <Balances friends={friends} onSettled={settled} />
             {recentLog}
           </div>
           <div className="card card--stack">
@@ -365,6 +467,13 @@ export function MoneySplits({
           </div>
         </div>
       )}
+      <Toast
+        toast={toast}
+        busy={undoing}
+        onDismiss={() => {
+          setToast(null);
+        }}
+      />
     </Group>
   );
 }
