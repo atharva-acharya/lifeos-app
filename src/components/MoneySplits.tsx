@@ -9,6 +9,7 @@ import {
 } from "../api";
 import { pounds, toPence } from "../money";
 import { Group } from "./Card";
+import { BALANCES_ID, SPLIT_FIELD_ID } from "./MoneyQuickActions";
 
 /** "Sam owes you £12.00", "You owe Sam £5.00" or "Settled up". */
 export function balanceText(f: FriendBalance): string {
@@ -94,6 +95,7 @@ function Balances({ friends, onChanged }: { friends: FriendBalance[]; onChanged:
                   <button
                     type="button"
                     className="button"
+                    data-settle
                     disabled={busy !== null}
                     onClick={() => {
                       setConfirming(f.friend);
@@ -194,6 +196,7 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
         <label>
           <span className="kicker">What for</span>
           <input
+            id={SPLIT_FIELD_ID}
             required
             maxLength={200}
             value={description}
@@ -353,7 +356,7 @@ export function MoneySplits({
         </div>
       ) : (
         <div className="grid grid--2">
-          <div className="card card--stack">
+          <div id={BALANCES_ID} className="card card--stack">
             <Balances friends={friends} onChanged={onChanged} />
             {recentLog}
           </div>
