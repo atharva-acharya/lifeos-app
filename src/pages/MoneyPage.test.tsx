@@ -79,8 +79,13 @@ describe("MoneyPage", () => {
     expect(
       screen.getByRole("progressbar", { name: "Transport: £100.00 of £80.00" }),
     ).toHaveAttribute("aria-valuenow", "8000");
-    expect(screen.getByText("+£2,400.00")).toBeInTheDocument();
-    expect(screen.getByText("-£120.00")).toBeInTheDocument();
+    const payroll = screen.getByText("Example payroll").closest("li");
+    expect(payroll).toHaveTextContent("Salary");
+    expect(payroll).toHaveTextContent("+£2,400.00");
+    const grocer = screen.getByText("Corner Grocer").closest("li");
+    expect(grocer).toHaveTextContent("Groceries");
+    expect(grocer).toHaveTextContent("Card");
+    expect(grocer).toHaveTextContent("-£120.00");
   });
 
   it("moves between months", async () => {

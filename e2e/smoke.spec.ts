@@ -161,7 +161,10 @@ test("Money quick add writes a ledger row to the vault", async () => {
   await page.getByLabel("Category").fill("Eating out");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText(/Saved to Money\/Ledger\//)).toBeVisible();
-  await expect(page.getByRole("cell", { name: "E2E coffee / test" })).toBeVisible();
+  const today = page.getByRole("list", { name: "Transactions on Today" });
+  await expect(today.getByRole("listitem").filter({ hasText: "E2E coffee / test" })).toContainText(
+    "Eating out",
+  );
 
   // The form defaults to the local date, so the note is this local month.
   const now = new Date();
