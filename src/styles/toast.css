@@ -18,9 +18,7 @@
   border-radius: var(--radius-pill);
   background: var(--glass-bg);
   backdrop-filter: var(--glass-filter);
-  box-shadow:
-    var(--glass-highlight),
-    0 8px 24px rgb(0 0 0 / 0.4);
+  box-shadow: var(--glass-highlight), var(--shadow-float);
   color: var(--text);
   font-size: var(--fs-body);
   translate: -50% 0;

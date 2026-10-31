@@ -163,7 +163,7 @@
 /* Line charts draw themselves in; rings fill with a spring. Keyframe
    animations (not transitions) so the inline final value is the end point. */
 .line-chart__line {
-  animation: line-draw calc(var(--dur-slow) * 2) var(--ease-standard) both;
+  animation: line-draw var(--dur-line-draw) var(--ease-standard) both;
 }
 
 .line-chart__line--dashed {
@@ -177,7 +177,7 @@
 }
 
 .rings__fill {
-  animation: ring-fill calc(var(--dur-slow) * 3) var(--ease-spring) both;
+  animation: ring-fill var(--dur-ring-fill) var(--ease-spring) both;
   transition: stroke-dashoffset var(--dur-slow) var(--ease-spring);
 }
 

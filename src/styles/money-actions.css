@@ -30,19 +30,19 @@
   transition:
     background-color var(--dur-fast) var(--ease-standard),
     opacity var(--dur-base) var(--ease-standard),
-    transform var(--dur-base) var(--ease-spring);
+    transform var(--dur-release) var(--ease-spring);
 }
 
 .money-actions__button:active:not(:disabled) {
   transform: scale(0.97);
   transition:
     background-color var(--dur-fast) var(--ease-standard),
-    transform var(--dur-fast) var(--ease-standard);
+    transform var(--dur-press) var(--ease-out);
 }
 
 @media (hover: hover) {
   .money-actions__button:hover:not(:disabled) {
-    background: #3a3a3c;
+    background: var(--bg-control-hover);
   }
 }
 

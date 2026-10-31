@@ -81,26 +81,45 @@ a {
   color: var(--c-danger);
 }
 
-/* Slow breathing highlight for the active item (requirements §4). */
-@keyframes breathe {
-  0%,
-  100% {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-progress) 35%, transparent);
-  }
-  50% {
-    box-shadow:
-      0 0 0 1px var(--c-progress),
-      0 0 18px color-mix(in srgb, var(--c-progress) 30%, transparent);
-  }
+/* Slow breathing highlight for the active item (requirements §4, M10). The
+   resting ring is static; the brighter ring and glow sit on a pseudo-element
+   whose opacity breathes, so only opacity animates (M11). */
+.breathing {
+  position: relative;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c-progress) 35%, transparent);
 }
 
-.breathing {
-  animation: breathe 3.2s ease-in-out infinite;
+.breathing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px var(--c-progress),
+    0 0 18px color-mix(in srgb, var(--c-progress) 30%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: breathe var(--dur-breathe) var(--ease-breathe) infinite;
+}
+
+/* A card's ring sits outside its 1 px border, as the box-shadow did. */
+.card.breathing::after {
+  inset: -1px;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .breathing {
-    animation: none;
     box-shadow: 0 0 0 1px var(--c-progress);
+  }
+
+  .breathing::after {
+    display: none;
+    animation: none;
   }
 }

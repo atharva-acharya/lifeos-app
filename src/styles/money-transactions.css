@@ -14,8 +14,9 @@
    rows from showing through it. */
 .money-tx__head {
   position: sticky;
-  /* Sticks just under the scroll-edge fade at the top of the page (L4). */
-  top: var(--scroll-edge);
+  /* Sticks just under the scroll-edge fade, or under the page bar while it
+     shows (L4); set on .main in layout.css. */
+  top: var(--page-top-inset, var(--scroll-edge));
   z-index: 1;
   display: flex;
   align-items: baseline;
