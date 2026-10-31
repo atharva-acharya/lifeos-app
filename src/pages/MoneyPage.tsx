@@ -13,6 +13,7 @@ import { EmptyHint } from "../components/EmptyHint";
 import { MoneyImport } from "../components/MoneyImport";
 import { ADD_FIELD_ID, MoneyQuickActions } from "../components/MoneyQuickActions";
 import { MoneySplits } from "../components/MoneySplits";
+import { MoneyTransactions } from "../components/MoneyTransactions";
 import { MoneyTrends } from "../components/MoneyTrends";
 import { NotConnected } from "../components/NotConnected";
 import { useMode } from "../mode";
@@ -278,38 +279,7 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
         <QuickAdd categories={money.knownCategories} onAdded={onAdded} />
       </div>
 
-      <Group title="Transactions" cardClassName="card--flush">
-        {money.transactions.length === 0 ? (
-          <p className="muted">Nothing recorded in {monthLabel(money.month)}.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Description</th>
-                <th scope="col">Category</th>
-                <th scope="col">Account</th>
-                <th scope="col" className="table__num">
-                  Amount
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {money.transactions.map((t, i) => (
-                <tr key={`${t.date}-${String(i)}`}>
-                  <td>{t.date}</td>
-                  <td>{t.description}</td>
-                  <td>{t.category ?? "—"}</td>
-                  <td>{t.account ?? "—"}</td>
-                  <td className={`table__num${t.amount > 0 ? " money__in" : ""}`}>
-                    {t.amount > 0 ? `+${pounds(t.amount)}` : pounds(t.amount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Group>
+      <MoneyTransactions transactions={money.transactions} monthLabel={monthLabel(money.month)} />
 
       <MoneySplits
         friends={money.friends}
