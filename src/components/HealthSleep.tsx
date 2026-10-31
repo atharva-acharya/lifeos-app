@@ -1,10 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { HealthDay } from "../api";
 import { shortLabel } from "../fitnessStats";
-import { latestSleep, sleepHours } from "../healthStats";
+import { latestSleep, sleepContributors, sleepHours } from "../healthStats";
 import { BarChart, type Series } from "./BarChart";
-import { MetricHead, Value } from "./Card";
+import { MetricHead } from "./Card";
+import { Contributors } from "./Contributors";
 import { EmptyHint } from "./EmptyHint";
+import { ValueChevron } from "./HealthTrendCard";
+import { Sheet } from "./Sheet";
+import "../styles/contributors.css";
 
 interface Row {
   date: string;
@@ -17,8 +21,22 @@ const SERIES: Series<Row>[] = [
   { key: "sleep", name: "Sleep", color: "var(--cat-sleep)", value: (r) => r.hours },
 ];
 
-/** Nightly sleep against the goal, and the stages of the latest night. */
-export function HealthSleep({ days, goal }: { days: HealthDay[]; goal: number }) {
+/**
+ * Nightly sleep against the goal, and the stages of the latest night. The
+ * value opens the latest night's stages against the 30-day average (P4).
+ */
+export function HealthSleep({
+  days,
+  goal,
+  history,
+}: {
+  days: HealthDay[];
+  goal: number;
+  /** Every day (oldest first), not just the shown range, for the 30-day average. */
+  history?: HealthDay[];
+}) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
   const rows: Row[] = useMemo(
     () =>
       days.map((d) => ({
@@ -48,7 +66,37 @@ export function HealthSleep({ days, goal }: { days: HealthDay[]; goal: number })
         color="var(--cat-sleep)"
         aside={night ? shortLabel(night.date) : undefined}
       />
-      {night?.sleep && <Value value={sleepHours(night.sleep.total)} srPrefix="Latest night" />}
+      {night?.sleep && (
+        <>
+          <button
+            ref={button}
+            type="button"
+            className="metric__value metric__value--button"
+            aria-haspopup="dialog"
+            aria-label={`Latest night ${sleepHours(night.sleep.total)}, sleep in detail`}
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            <span className="sr-only">Latest night </span>
+            {sleepHours(night.sleep.total)}
+            <ValueChevron />
+          </button>
+          <Sheet
+            open={open}
+            onClose={() => {
+              setOpen(false);
+            }}
+            title="Sleep in detail"
+            trigger={button}
+          >
+            <Contributors
+              lead={`The night of ${shortLabel(night.date)}, against your own average over the 30 nights before.`}
+              items={sleepContributors(history ?? days)}
+            />
+          </Sheet>
+        </>
+      )}
       {night === null ? (
         <EmptyHint lead="No sleep recorded in this range.">
           Turn on Sleep Analysis in Health Auto Export, or pick a longer range.

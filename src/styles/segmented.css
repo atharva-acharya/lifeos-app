@@ -1,0 +1,57 @@
+/* Segmented control (ui-spec C5): glass-free, on a raised track. The
+   selected segment is an indicator that slides to the new choice with the
+   M1 spring; only its transform animates (M11). SegmentedTabs.tsx sets its
+   position and scale inline, and `data-instant` for keyboard changes and
+   the first paint (M4). Reduce motion makes the duration 0 (tokens.css). */
+.tabs.segmented {
+  --segmented-selected: color-mix(in srgb, var(--text) 30%, var(--bg-hover));
+
+  position: relative;
+  isolation: isolate;
+  align-self: flex-start;
+  justify-self: start;
+  background: var(--bg-hover);
+}
+
+.segmented__indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 100px; /* the BASE in SegmentedTabs.tsx; scaled to the segment */
+  border-radius: 7px; /* the same as .tabs__tab */
+  background: var(--segmented-selected);
+  opacity: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  transition: transform var(--dur-release) var(--ease-spring);
+}
+
+.segmented[data-ready] .segmented__indicator {
+  opacity: 1;
+}
+
+.segmented[data-instant] .segmented__indicator {
+  transition: none;
+}
+
+.segmented > .tabs__tab {
+  position: relative;
+  z-index: 1;
+}
+
+/* Once the indicator is placed, it is the selected background. */
+.segmented[data-ready] > .tabs__tab[aria-selected="true"] {
+  background: transparent;
+}
+
+.segmented > .tabs__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segmented__indicator {
+    transition: none;
+  }
+}

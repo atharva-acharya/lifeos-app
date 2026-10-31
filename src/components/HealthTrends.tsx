@@ -33,11 +33,12 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
   const [id, setId] = useState<RangeId>("week");
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  const hr = useMemo(() => days.map((d) => d.restingHr), [days]);
+  const hrv = useMemo(() => days.map((d) => d.hrv), [days]);
+  const weight = useMemo(() => days.map((d) => d.weight), [days]);
+
   const series = useMemo(() => {
     // Averages run over all 90 days, then the range is cut, so the first point is complete.
-    const hr = days.map((d) => d.restingHr);
-    const hrv = days.map((d) => d.hrv);
-    const weight = days.map((d) => d.weight);
     return {
       dates: range(
         days.map((d) => d.date),
@@ -55,7 +56,7 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
       ),
       days: range(days, id),
     };
-  }, [days, id]);
+  }, [days, hr, hrv, weight, id]);
 
   // Keyboard changes (arrow keys, Enter, Space) are instant (M4).
   const choose = (next: RangeId, instant: boolean) => {
@@ -123,6 +124,7 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
           values={series.hr}
           average={series.hrAvg}
           decimals={0}
+          history={hr}
         />
         <TrendCard
           title="Heart rate variability"
@@ -133,6 +135,7 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
           values={series.hrv}
           average={series.hrvAvg}
           decimals={0}
+          history={hrv}
         />
         <TrendCard
           title="Weight"
@@ -144,8 +147,9 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
           average={series.weightAvg}
           noteHeader="Source"
           notes={series.weightSource}
+          history={weight}
         />
-        <HealthSleep days={series.days} goal={sleepGoal} />
+        <HealthSleep days={series.days} goal={sleepGoal} history={days} />
       </div>
     </Group>
   );
