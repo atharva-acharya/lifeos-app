@@ -62,13 +62,32 @@
 
   --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
 
+  /* Chrome glass (ui-spec L3). Only chrome (sidebar, toolbars, sheets,
+     popovers, menus, toasts) uses these; content cards stay solid (L1). */
+  --glass-bg: rgb(28 28 30 / 0.72);
+  --glass-filter: blur(24px) saturate(160%);
+  --glass-edge: rgb(255 255 255 / 0.08);
+  --glass-highlight: inset 0 1px 0 var(--glass-edge);
+  --glass-border: var(--glass-edge);
+  --popover-solid: #2c2c2e; /* glass never sits on glass (L2) */
+  --glass-hover: rgb(255 255 255 / 0.08);
+  --sidebar-width: 232px;
+  --scroll-edge: 24px; /* scroll-edge fade where content meets glass (L4) */
+
   /* Motion (phase 3). Use these, never raw values, so the app moves as one.
      fast: hovers, presses. base: tabs, small enters. slow: pages, charts. */
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-exit: cubic-bezier(0.3, 0, 1, 1);
+  --ease-exit: cubic-bezier(0.3, 0, 1, 1); /* exits only, never on entry */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --dur-press: 120ms; /* press down (M1) */
+  --dur-release: 200ms; /* release with the spring (M1) */
+  --dur-page-out: 120ms; /* old page fades out (M3) */
+  --dur-page-in: 240ms; /* new page fades in and rises (M3) */
+  --dur-list: 200ms; /* new list rows (M8) */
+  --list-stagger: 30ms; /* M8: delay between rows, at most 8 rows */
   /* Damped spring (damping 0.7, about 5% overshoot), sampled for linear(). */
   --ease-spring: linear(
     0,
@@ -100,5 +119,38 @@
     --dur-fast: 0ms;
     --dur-base: 0ms;
     --dur-slow: 0ms;
+    --dur-press: 0ms;
+    --dur-release: 0ms;
+    --dur-page-out: 0ms;
+    --dur-page-in: 0ms;
+    --dur-list: 0ms;
+    --list-stagger: 0ms;
   }
+}
+
+/* Increase contrast (L6): secondary text at least 4.5:1 on every surface,
+   and glass edges become stronger. */
+@media (prefers-contrast: more) {
+  :root {
+    --text-muted: #c7c7cc;
+    --glass-edge: rgb(255 255 255 / 0.24);
+  }
+}
+
+/* Reduce transparency (L5), from the system setting or the app's own
+   toggle in Settings: glass becomes solid with a hairline border. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-bg: var(--bg-card);
+    --glass-filter: none;
+    --glass-highlight: none;
+    --glass-border: var(--border);
+  }
+}
+
+:root[data-transparency="reduced"] {
+  --glass-bg: var(--bg-card);
+  --glass-filter: none;
+  --glass-highlight: none;
+  --glass-border: var(--border);
 }

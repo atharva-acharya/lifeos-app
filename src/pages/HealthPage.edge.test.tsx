@@ -313,14 +313,14 @@ describe("HealthPage motion and keyboard", () => {
     expect(start).not.toHaveBeenCalled();
   });
 
-  it("uses a view transition for the arrow keys when motion is allowed", async () => {
+  it("moves instantly with the arrow keys even when motion is allowed (M4)", async () => {
     const start = stubMotion(false);
     ready();
     render(<HealthPage onNavigate={vi.fn()} />);
     const week = await screen.findByRole("tab", { name: "Week" });
     week.focus();
     fireEvent.keyDown(week, { key: "ArrowRight" });
-    expect(start).toHaveBeenCalledTimes(1);
+    expect(start).not.toHaveBeenCalled();
     expect(screen.getByRole("tab", { name: "Month" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Month" })).toHaveFocus();
   });

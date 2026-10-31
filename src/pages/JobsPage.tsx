@@ -9,7 +9,7 @@ import {
 } from "../api";
 import { ApplicationsTab } from "../components/ApplicationsTab";
 import { ChartsTab } from "../components/JobCharts";
-import { withTransition } from "../motion";
+import { fromKeyboard, withTransition } from "../motion";
 import { EmptyHint } from "../components/EmptyHint";
 import { NotConnected } from "../components/NotConnected";
 import type { Navigate } from "../routes";
@@ -272,10 +272,14 @@ export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
             aria-selected={tab === t.id}
             aria-controls={`panel-${t.id}`}
             className="tabs__tab"
-            onClick={() => {
-              withTransition(() => {
-                setTab(t.id);
-              });
+            onClick={(e) => {
+              // Enter or Space on a tab is instant (M4); a mouse click animates.
+              withTransition(
+                () => {
+                  setTab(t.id);
+                },
+                { instant: fromKeyboard(e) },
+              );
             }}
           >
             {t.label}

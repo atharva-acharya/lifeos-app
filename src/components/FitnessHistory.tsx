@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ExerciseSet, FitnessWorkout } from "../api";
 import { shortLabel } from "../fitnessStats";
-import { withTransition } from "../motion";
+import { fromKeyboard, withTransition } from "../motion";
 import type { Navigate } from "../routes";
 import { EmptyHint } from "./EmptyHint";
 import { Group } from "./Card";
@@ -74,10 +74,14 @@ export function FitnessHistory({
                 aria-selected={tab === t}
                 aria-controls="workout-panel"
                 className="tabs__tab"
-                onClick={() => {
-                  withTransition(() => {
-                    setChosen(t);
-                  });
+                onClick={(e) => {
+                  // Enter or Space on a tab is instant (M4); a mouse click animates.
+                  withTransition(
+                    () => {
+                      setChosen(t);
+                    },
+                    { instant: fromKeyboard(e) },
+                  );
                 }}
               >
                 {t}

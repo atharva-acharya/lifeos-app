@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { chooseVaultFolder, getSettings, type AppSettings } from "../api";
+import { AppearanceSettings } from "../components/AppearanceSettings";
 import { DiagnosticsSettings } from "../components/DiagnosticsSettings";
 import { GoogleSettings } from "../components/GoogleSettings";
 import { HealthSettings } from "../components/HealthSettings";
@@ -112,6 +113,8 @@ export function SettingsPage({ openGuide = null }: { openGuide?: GuideId | null 
 
         {settings && <UpdateSettings autoUpdate={settings.autoUpdate} onChange={setSettings} />}
       </fieldset>
+
+      <AppearanceSettings />
 
       <DiagnosticsSettings />
     </>

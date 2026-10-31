@@ -1,16 +1,32 @@
+/* The sidebar is chrome: a glass panel floating over the page (ui-spec L1,
+   L3). The main area spans the whole window underneath it, so content
+   scrolls beneath the sidebar's edge (L4); its left padding keeps the page
+   clear of the panel. DOM order (sidebar, then main) keeps focus order. */
 .shell {
   display: grid;
-  grid-template-columns: 232px 1fr;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
 }
 
 .sidebar {
+  position: relative;
+  z-index: 2;
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  padding: var(--space-5) var(--space-3);
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
+  min-height: 0;
+  margin: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  /* Concentric with the nav items: their radius plus the 12 px inset. */
+  border-radius: calc(var(--radius-control) + var(--space-3));
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: var(--glass-filter);
 }
 
 .brand {
@@ -62,9 +78,11 @@
   cursor: pointer;
 }
 
-.nav__item:hover {
-  background: var(--bg-card);
-  color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+  .nav__item:hover {
+    background: var(--glass-hover);
+    color: var(--text);
+  }
 }
 
 .nav__item[aria-current="page"] {
@@ -90,8 +108,33 @@
 }
 
 .main {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
   overflow-y: auto;
-  padding: var(--space-5) var(--space-6);
+  /* No top padding: the 24 px scroll-edge strip below takes its place. */
+  padding: 0 var(--space-6) var(--space-5) calc(var(--sidebar-width) + var(--space-6));
+}
+
+/* Scroll-edge fade (L4): where content meets the window's top edge it fades
+   out instead of being cut by a hard line. Shown only once the area has
+   scrolled (data-scrolled is set by useScrolled in App.tsx). */
+.main::before {
+  content: "";
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: block;
+  height: var(--scroll-edge);
+  margin-inline: calc(-1 * (var(--sidebar-width) + var(--space-6))) calc(-1 * var(--space-6));
+  background: linear-gradient(to bottom, var(--bg-page), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.main[data-scrolled]::before {
+  opacity: 1;
 }
 
 .page-header {
@@ -195,8 +238,10 @@
   cursor: pointer;
 }
 
-.button:hover:not(:disabled) {
-  background: #3a3a3c;
+@media (hover: hover) and (pointer: fine) {
+  .button:hover:not(:disabled) {
+    background: #3a3a3c;
+  }
 }
 
 .button:disabled {
@@ -459,8 +504,10 @@
   border-bottom: 0;
 }
 
-.table tbody tr:hover td {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr:hover td {
+    background: var(--bg-hover);
+  }
 }
 
 .setting--stacked {
@@ -501,9 +548,11 @@
   grid-column: 1 / -1;
 }
 
-.button--danger:hover:not(:disabled) {
-  border-color: var(--c-danger);
-  color: var(--c-danger);
+@media (hover: hover) and (pointer: fine) {
+  .button--danger:hover:not(:disabled) {
+    border-color: var(--c-danger);
+    color: var(--c-danger);
+  }
 }
 
 .toolbar__search {
@@ -573,8 +622,10 @@
   animation: bar-grow var(--dur-slow) var(--ease-spring) both;
 }
 
-.bar-chart__bar:hover {
-  filter: brightness(1.15);
+@media (hover: hover) and (pointer: fine) {
+  .bar-chart__bar:hover {
+    filter: brightness(1.15);
+  }
 }
 
 @keyframes bar-grow {
@@ -749,8 +800,10 @@
   color: var(--text-muted);
 }
 
-.button--quiet:hover:not(:disabled) {
-  color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+  .button--quiet:hover:not(:disabled) {
+    color: var(--text);
+  }
 }
 
 .fitness {
@@ -901,8 +954,10 @@
   transition: color var(--dur-fast) var(--ease-standard);
 }
 
-.project__log summary:hover {
-  color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+  .project__log summary:hover {
+    color: var(--text);
+  }
 }
 
 .project__log ul {
@@ -962,8 +1017,10 @@
   cursor: pointer;
 }
 
-.welcome__skip:hover:not(:disabled) {
-  color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+  .welcome__skip:hover:not(:disabled) {
+    color: var(--text);
+  }
 }
 
 a.button {
@@ -1203,8 +1260,10 @@ a.button {
   color: #fff;
 }
 
-.button--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 65%, #000);
+@media (hover: hover) and (pointer: fine) {
+  .button--primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 65%, #000);
+  }
 }
 
 .money .form {
@@ -1253,8 +1312,10 @@ a.button {
   cursor: pointer;
 }
 
-.link-button:hover {
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .link-button:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Home: the ring with its count under it, and habits as a compact checklist. */
@@ -1285,6 +1346,6 @@ a.button {
   grid-auto-rows: 1fr;
 }
 
-.settings-group + .setting {
+.settings-group ~ .setting {
   margin-top: var(--card-pad);
 }
