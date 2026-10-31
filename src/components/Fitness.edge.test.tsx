@@ -137,7 +137,9 @@ describe("FitnessWeight", () => {
     expect(plot?.contains(table)).toBe(false);
     // One row per weigh-in plus the header.
     expect(within(table).getAllByRole("row")).toHaveLength(3);
-    expect(screen.getByText("83.2 kg")).toBeInTheDocument();
+    expect(screen.getByText("83.2", { selector: ".metric__value" })).toHaveTextContent(
+      "Latest 83.2 kg",
+    );
   });
 
   it("omits the target line and shows the hint when the plan has no target", () => {
@@ -188,7 +190,9 @@ describe("FitnessWeight", () => {
 
   it("does not crash on a single reading or a weight of zero", () => {
     render(<FitnessWeight days={[day(TODAY, { weight: 0 })]} plan={null} today={TODAY} />);
-    expect(screen.getByText("0.0 kg")).toBeInTheDocument();
+    expect(screen.getByText("0.0", { selector: ".metric__value" })).toHaveTextContent(
+      "Latest 0.0 kg",
+    );
   });
 });
 

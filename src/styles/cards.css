@@ -1,0 +1,291 @@
+/* Grouped inset cards in the style of Apple Health (docs/design-rules.md). */
+
+/* A page is a column of sections, 20 px apart. */
+.page {
+  display: grid;
+  gap: var(--gutter);
+  min-width: 0;
+}
+
+/* A titled group: heading above, card(s) below. */
+.group {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.group > * {
+  min-width: 0;
+}
+
+.group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 26px;
+}
+
+.group__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-group);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+/* Cards side by side; one gap everywhere. */
+.grid {
+  display: grid;
+  gap: var(--card-pad);
+  min-width: 0;
+}
+
+.grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid--wide-left {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+/* A card's content stacks with a 12 px rhythm. */
+.card--stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Metric card: label + chevron top, big number bottom-left. */
+.metric {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.metric__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.metric__label {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric__aside {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+}
+
+.metric__open {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -4px -6px -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* The whole card is the target; the chevron is the button. */
+.metric--link .metric__open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
+.metric--link {
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .metric--link:hover {
+    background: #232325;
+  }
+  .metric--link:hover .metric__chevron {
+    color: var(--text);
+  }
+}
+
+.metric--link:active {
+  transform: scale(0.98);
+}
+
+.metric--link:has(.metric__open:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.metric__open:focus-visible {
+  box-shadow: none;
+}
+
+.metric__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.metric__value {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-number);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.metric__value--danger {
+  color: var(--c-danger);
+}
+
+.metric__unit {
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.metric__detail {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* A chart card opens with a metric head and value, then the plot. */
+.chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Rows inside one card, divided by hairlines inset from the left edge. */
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.list__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.list__row:last-child {
+  padding-bottom: 0;
+}
+
+.list__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.list__title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list__sub {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list__value {
+  flex: none;
+  min-width: 64px;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The window's minimum width is 1100 (tauri.conf.json), so this only
+   applies in a browser; in the app every grid keeps its columns. */
+@media (max-width: 1000px) {
+  .grid--3,
+  .grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid--2,
+  .grid--wide-left {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A title inside a card, for a sub-part such as a form. */
+.card__title {
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+/* Tables run to the card's edges; the first and last columns keep the card's padding. */
+.card--flush {
+  padding: var(--space-1) 0;
+}
+
+.card--flush .table th:first-child,
+.card--flush .table td:first-child {
+  padding-left: var(--card-pad);
+}
+
+.card--flush .table th:last-child,
+.card--flush .table td:last-child {
+  padding-right: var(--card-pad);
+}
+
+.card--flush > .muted {
+  padding: var(--space-3) var(--card-pad);
+}

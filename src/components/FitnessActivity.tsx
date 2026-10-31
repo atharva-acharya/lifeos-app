@@ -3,6 +3,7 @@ import type { FitnessDay } from "../api";
 import { calendar, shortLabel } from "../fitnessStats";
 import { BarChart, type Series } from "./BarChart";
 import { EmptyHint } from "./EmptyHint";
+import { Group } from "./Card";
 
 const DAYS = 14;
 
@@ -58,19 +59,14 @@ export function FitnessActivity({
   const nothingLogged = rows.every((r) => r.loggedSteps === null && r.proteinG === null);
 
   return (
-    <section className="card chart" aria-labelledby="fitness-activity">
-      <header className="chart__head">
-        <h2 id="fitness-activity" className="kicker">
-          Steps and protein
-        </h2>
-        <span className="muted">
-          Protein goal {proteinGoal} g, hit on{" "}
-          <strong>
-            {hits} of {DAYS}
-          </strong>{" "}
-          days
-        </span>
-      </header>
+    <Group title="Steps and protein" cardClassName="card--stack chart-card">
+      <span className="muted">
+        Protein goal {proteinGoal} g, hit on{" "}
+        <strong>
+          {hits} of {DAYS}
+        </strong>{" "}
+        days
+      </span>
       {nothingLogged && (
         <EmptyHint lead="No steps or protein logged in the last 14 days.">
           Add <code>steps</code> and <code>protein_g</code> to your <code>type: daily</code> notes.
@@ -107,6 +103,6 @@ export function FitnessActivity({
           ))}
         </tbody>
       </table>
-    </section>
+    </Group>
   );
 }

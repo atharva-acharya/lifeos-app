@@ -28,7 +28,7 @@ export function SetupCard({ onNavigate }: { onNavigate: Navigate }) {
   return (
     <section className="card setup-card" aria-labelledby="setup-card-heading">
       <div className="section-head">
-        <h2 id="setup-card-heading" className="kicker">
+        <h2 id="setup-card-heading" className="card__title">
           Finish setting up
         </h2>
         <button
