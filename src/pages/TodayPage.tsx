@@ -14,6 +14,8 @@ import { SetupCard } from "../components/SetupCard";
 import type { Navigate } from "../routes";
 
 const HABITS = 5;
+/** Home must fit the minimum window without scrolling, so the list is capped. */
+const FOLLOW_UPS_SHOWN = 3;
 
 function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -115,77 +117,92 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
           </EmptyHint>
         </section>
       )}
-      <section className="card today-hero" aria-labelledby="habits-heading">
-        <Rings
-          size={132}
-          rings={[
-            {
-              key: "habits",
-              name: "Habits",
-              value: habitsDone,
-              goal: HABITS,
-              color: habitsDone === HABITS ? "var(--ring-exercise)" : "var(--ring-move)",
-            },
-          ]}
-        />
-        <div className="today-hero__habits">
-          <h2 id="habits-heading" className="kicker">
-            Habits
-          </h2>
-          <ul className="habits">
-            <Habit label="Weigh-in" done={h.weighIn} />
-            <Habit
-              label="Steps"
-              done={h.steps !== null}
-              value={h.steps !== null ? h.steps.toLocaleString("en-GB") : undefined}
-            />
-            <Habit
-              label="Protein"
-              done={h.proteinG !== null}
-              value={h.proteinG !== null ? `${String(h.proteinG)} g` : undefined}
-            />
-            <Habit label="Meals tracked" done={h.mealsTracked} />
-            <Habit label="Mobility" done={h.mobility} />
-          </ul>
-        </div>
-      </section>
+      <div className="today-top">
+        <section className="card today-hero" aria-labelledby="habits-heading">
+          <Rings
+            size={96}
+            rings={[
+              {
+                key: "habits",
+                name: "Habits",
+                value: habitsDone,
+                goal: HABITS,
+                color: habitsDone === HABITS ? "var(--ring-exercise)" : "var(--ring-move)",
+              },
+            ]}
+          />
+          <div className="today-hero__habits">
+            <h2 id="habits-heading" className="kicker">
+              Habits
+            </h2>
+            <ul className="habits">
+              <Habit label="Weigh-in" done={h.weighIn} />
+              <Habit
+                label="Steps"
+                done={h.steps !== null}
+                value={h.steps !== null ? h.steps.toLocaleString("en-GB") : undefined}
+              />
+              <Habit
+                label="Protein"
+                done={h.proteinG !== null}
+                value={h.proteinG !== null ? `${String(h.proteinG)} g` : undefined}
+              />
+              <Habit label="Meals tracked" done={h.mealsTracked} />
+              <Habit label="Mobility" done={h.mobility} />
+            </ul>
+          </div>
+        </section>
 
-      <div className="stats">
-        <Stat
-          label="Follow-ups due"
-          value={String(today.followUps.length)}
-          tone={today.followUps.length > 0 ? "progress" : "done"}
-        />
-        <Stat
-          label="Weight"
-          value={today.weight !== null ? `${today.weight.toFixed(1)} kg` : "—"}
-          detail={
-            today.weightChange !== null ? (
-              <span className="pill pill--read">{signed(today.weightChange)} kg since last</span>
-            ) : (
-              today.weight === null && "Not weighed in yet"
-            )
-          }
-        />
-        <Stat
-          label="Applications today"
-          value={today.applications !== null ? String(today.applications) : noNote ? "—" : "0"}
-        />
-        <Stat label="Gym session" value={today.gym ?? (noNote ? "—" : "Rest day")} />
+        <div className="stats">
+          <Stat
+            label="Follow-ups due"
+            value={String(today.followUps.length)}
+            tone={today.followUps.length > 0 ? "progress" : "done"}
+          />
+          <Stat
+            label="Weight"
+            value={today.weight !== null ? `${today.weight.toFixed(1)} kg` : "—"}
+            detail={
+              today.weightChange !== null ? (
+                <span className="pill pill--read">{signed(today.weightChange)} kg since last</span>
+              ) : (
+                today.weight === null && "Not weighed in yet"
+              )
+            }
+          />
+          <Stat
+            label="Applications today"
+            value={today.applications !== null ? String(today.applications) : noNote ? "—" : "0"}
+          />
+          <Stat label="Gym session" value={today.gym ?? (noNote ? "—" : "Rest day")} />
+        </div>
       </div>
 
       <div className="columns">
         <section className="card" aria-labelledby="followups-heading">
-          <h2 id="followups-heading" className="kicker">
-            Follow-ups
-          </h2>
+          <div className="section-head">
+            <h2 id="followups-heading" className="kicker">
+              Follow-ups
+            </h2>
+            {today.followUps.length > FOLLOW_UPS_SHOWN && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  onNavigate("jobs");
+                }}
+              >
+                {today.followUps.length - FOLLOW_UPS_SHOWN} more in Jobs
+              </button>
+            )}
+          </div>
           {today.followUps.length === 0 ? (
             <EmptyHint lead="Nothing due. Nice.">
               Follow-ups come from <code>type: company</code> notes with a <code>next_date</code>.
             </EmptyHint>
           ) : (
             <ul className="rows">
-              {today.followUps.map((f) => (
+              {today.followUps.slice(0, FOLLOW_UPS_SHOWN).map((f) => (
                 <FollowUpRow key={f.path} item={f} today={today.date} />
               ))}
             </ul>
