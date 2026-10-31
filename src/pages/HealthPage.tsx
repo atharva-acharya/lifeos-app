@@ -4,6 +4,8 @@ import { EmptyHint } from "../components/EmptyHint";
 import { HealthToday } from "../components/HealthToday";
 import { HealthTrends } from "../components/HealthTrends";
 import { HealthWorkouts } from "../components/HealthWorkouts";
+import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
+import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
 import { ago, dateTime, wholeDays } from "../healthStats";
 import type { Navigate } from "../routes";
@@ -11,6 +13,16 @@ import type { Navigate } from "../routes";
 const REFRESH_MS = 5 * 60_000;
 const DATE_CHECK_MS = 60_000;
 const LISTED_BAD_FILES = 5;
+
+/** Today's rings and cards, the trend cards, then the workouts list. */
+const SKELETON: SkeletonGroup[][] = [
+  [
+    { height: 200, weight: 2 },
+    { cards: 2, height: 92, weight: 3 },
+  ],
+  [{ cards: 4, columns: 2, height: 160 }],
+  [{ height: 240 }],
+];
 
 function Notices({ health, now }: { health: Health; now: number }) {
   const bad = health.badFiles.slice(0, LISTED_BAD_FILES).map((f) => f.name);
@@ -58,7 +70,7 @@ function Dashboard({ health, now }: { health: Health; now: number }) {
 
 export function HealthPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<HealthResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const [date, setDate] = useState(() => localDate());
   const [now, setNow] = useState(() => Date.now());
   // Only the newest request may update the page.
@@ -79,9 +91,14 @@ export function HealthPage({ onNavigate }: { onNavigate: Navigate }) {
       })
       .catch((err: unknown) => {
         if (mine !== request.current) return;
-        setError(typeof err === "string" ? err : "Could not load health.");
+        setError(loadError(err));
       });
   }, [date]);
+
+  const retry = useCallback(() => {
+    setError(null);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -118,11 +135,8 @@ export function HealthPage({ onNavigate }: { onNavigate: Navigate }) {
           </p>
         )}
       </header>
-      {error && (
-        <p className="setting__error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorState title="Could not load health." detail={error.detail} onRetry={retry} />}
+      {response === null && error === null && <Skeleton label="health" layout={SKELETON} />}
       {response?.status === "notConfigured" && (
         <NotConnected onNavigate={onNavigate} pill="Not set up">
           Choose the folder where Health Auto Export saves its files, to see your steps, sleep,

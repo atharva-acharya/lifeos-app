@@ -19,7 +19,7 @@
   left: 0;
   z-index: 0;
   width: 100px; /* the BASE in SegmentedTabs.tsx; scaled to the segment */
-  border-radius: 7px; /* the same as .tabs__tab */
+  border-radius: var(--radius-inset); /* the same as .tabs__tab */
   background: var(--segmented-selected);
   opacity: 0;
   transform-origin: 0 0;

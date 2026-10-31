@@ -30,14 +30,14 @@
 .money-tx__date {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
   font-weight: 600;
 }
 
 .money-tx__net {
   margin: 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -50,7 +50,7 @@
   gap: var(--space-3);
   min-width: 0;
   margin-left: var(--card-pad);
-  padding: 10px var(--card-pad) 10px 0;
+  padding: var(--space-3) var(--card-pad) var(--space-3) 0;
   border-top: 1px solid var(--border);
 }
 
@@ -62,7 +62,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -73,7 +73,7 @@
 
 .money-tx__sub {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
   overflow-wrap: anywhere;
 }
 
@@ -93,7 +93,7 @@
 .money-tx__note {
   margin: 0;
   padding: var(--space-2) var(--card-pad) 0;
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 /* The category under each row is a small button that opens a popover to
@@ -108,10 +108,11 @@
   align-items: center;
   gap: var(--space-1);
   min-height: 24px;
-  margin: -2px 0 -2px calc(var(--space-1) * -1);
-  padding: 2px var(--space-1);
+  margin: calc(var(--space-1) * -1) 0 calc(var(--space-1) * -1) calc(var(--space-1) * -1);
+  padding: var(--space-1);
   border: 0;
-  border-radius: 6px;
+  /* Inset 16 px in a 14 px card, so the 4 px floor (T5). */
+  border-radius: var(--radius-small);
   background: transparent;
   color: inherit;
   font-size: inherit;
@@ -257,7 +258,7 @@
 
 .money-tx__new-label {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .money-tx__new-row {
@@ -285,7 +286,7 @@
 
 .money-tx__error {
   padding: 0 var(--space-3) var(--space-2);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
   overflow-wrap: anywhere;
 }
 

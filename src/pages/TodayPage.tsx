@@ -9,12 +9,23 @@ import {
 } from "../api";
 import { Group, Metric } from "../components/Card";
 import { EmptyHint } from "../components/EmptyHint";
+import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
+import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
 import { Rings } from "../components/Rings";
 import { SetupCard } from "../components/SetupCard";
 import type { Navigate } from "../routes";
 
 const HABITS = 5;
+
+/** Habits beside four summary cards, then follow-ups beside the project. */
+const SKELETON: SkeletonGroup[][] = [
+  [{ height: 236 }, { cards: 4, columns: 2, height: 110 }],
+  [
+    { height: 180, weight: 3 },
+    { height: 180, weight: 2 },
+  ],
+];
 /** Home must fit the minimum window without scrolling, so the list is capped. */
 const FOLLOW_UPS_SHOWN = 3;
 
@@ -138,7 +149,7 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
             <Metric
               label="Follow-ups due"
               color="var(--cat-jobs)"
-              value={String(today.followUps.length)}
+              count={today.followUps.length}
               onOpen={() => {
                 onNavigate("jobs");
               }}
@@ -147,7 +158,9 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
             <Metric
               label="Weight"
               color="var(--cat-body)"
-              value={today.weight !== null ? today.weight.toFixed(1) : "—"}
+              value="—"
+              count={today.weight ?? undefined}
+              format={(n) => n.toFixed(1)}
               unit={today.weight !== null ? "kg" : undefined}
               aside={
                 today.weightChange !== null ? (
@@ -162,7 +175,8 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
             <Metric
               label="Applied today"
               color="var(--cat-jobs)"
-              value={today.applications !== null ? String(today.applications) : noNote ? "—" : "0"}
+              value={noNote ? "—" : "0"}
+              count={today.applications ?? undefined}
               onOpen={() => {
                 onNavigate("jobs");
               }}
@@ -256,7 +270,7 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
 
 export function TodayPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<TodayResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const date = localDate();
 
   const load = useCallback(() => {
@@ -266,9 +280,14 @@ export function TodayPage({ onNavigate }: { onNavigate: Navigate }) {
         setError(null);
       })
       .catch((err: unknown) => {
-        setError(typeof err === "string" ? err : "Could not load today.");
+        setError(loadError(err));
       });
   }, [date]);
+
+  const retry = useCallback(() => {
+    setError(null);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -292,11 +311,8 @@ export function TodayPage({ onNavigate }: { onNavigate: Navigate }) {
         <p className="page-header__sub">{longDate(date)}</p>
         <h1 className="page-title">{greeting(new Date().getHours())}</h1>
       </header>
-      {error && (
-        <p className="setting__error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorState title="Could not load today." detail={error.detail} onRetry={retry} />}
+      {response === null && error === null && <Skeleton label="today" layout={SKELETON} />}
       {response?.status === "noVault" && (
         <NotConnected onNavigate={onNavigate}>
           Choose your Life OS vault folder to see today's dashboard.

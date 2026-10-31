@@ -65,14 +65,15 @@
 .money-actions__key {
   flex: none;
   min-width: 20px;
-  padding: 1px 6px;
-  border-radius: 6px;
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-small);
   background: var(--bg-card);
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--fs-kicker);
   font-weight: 600;
   line-height: 18px;
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 

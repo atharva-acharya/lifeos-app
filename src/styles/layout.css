@@ -35,14 +35,14 @@
   gap: var(--space-2);
   padding: 0 var(--space-3);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-label);
   font-weight: 600;
 }
 
 .brand__mark {
   width: 22px;
   height: 22px;
-  border-radius: 7px;
+  border-radius: var(--radius-small);
   background: conic-gradient(
     var(--ring-move),
     var(--ring-exercise),
@@ -196,7 +196,7 @@
   overflow: hidden;
   color: var(--text);
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-bar-title);
   font-weight: 600;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -262,7 +262,7 @@
 
 .setting__title {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-label);
   font-weight: 600;
 }
 
@@ -285,12 +285,12 @@
 }
 
 .path {
-  padding: 2px var(--space-2);
-  border-radius: 6px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-small);
   background: var(--bg-page);
   border: 1px solid var(--border);
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--fs-kicker);
   overflow-wrap: anywhere;
 }
 
@@ -311,7 +311,7 @@
 }
 
 .button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
 
@@ -349,7 +349,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 6px var(--space-3);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: var(--bg-hover);
@@ -368,7 +368,7 @@
   height: 18px;
   border-radius: 50%;
   border: 1px solid currentColor;
-  font-size: 11px;
+  font-size: var(--fs-kicker);
   font-weight: 700;
 }
 
@@ -380,7 +380,8 @@
 
 .habit__value {
   color: var(--text-muted);
-  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-kicker);
 }
 
 .today-hero {
@@ -400,7 +401,7 @@
 
 .row__sub {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .resume {
@@ -411,7 +412,7 @@
 
 .resume__project {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-label);
   font-weight: 600;
 }
 
@@ -453,7 +454,8 @@
 .tabs__tab {
   padding: var(--space-2) var(--space-4);
   border: 0;
-  border-radius: 7px;
+  /* Concentric in the 10 px track with its 4 px inset (T5). */
+  border-radius: var(--radius-inset);
   background: transparent;
   color: var(--text-muted);
   font-weight: 600;
@@ -512,11 +514,11 @@
 }
 
 .kanban__action {
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .kanban__empty {
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .toolbar {
@@ -550,6 +552,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
 }
 
 .table th {
@@ -601,7 +604,7 @@
   background: var(--bg-hover);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .form__actions {
@@ -649,7 +652,8 @@
 
 .counts strong {
   color: var(--text);
-  font-size: 16px;
+  font-size: var(--fs-label);
+  font-variant-numeric: tabular-nums;
 }
 
 .charts {
@@ -680,7 +684,8 @@
 
 .bar-chart__tick {
   fill: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-tick);
+  font-variant-numeric: tabular-nums;
 }
 
 .bar-chart__bar {
@@ -714,7 +719,7 @@
   padding: 0;
   list-style: none;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-kicker);
 }
 
 .bar-chart__legend li {
@@ -726,7 +731,7 @@
 .bar-chart__swatch {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: var(--radius-small);
 }
 
 .chart__table tbody th {
@@ -777,7 +782,8 @@
 
 .line-chart__target text {
   fill: var(--c-pending);
-  font-size: 11px;
+  font-size: var(--fs-kicker);
+  font-variant-numeric: tabular-nums;
 }
 
 .rings {
@@ -830,7 +836,7 @@
 .rings__value {
   justify-self: end;
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-label);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1131,7 +1137,7 @@ a.button {
 }
 
 .settings-group:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .setup,
@@ -1189,7 +1195,7 @@ a.button {
 .guide code,
 .setup-card code {
   font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .guide {
@@ -1199,7 +1205,8 @@ a.button {
   margin-top: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  /* A panel nested in a card, like a control in a card (T5). */
+  border-radius: var(--radius-control);
   background: var(--bg-page);
 }
 
@@ -1211,7 +1218,8 @@ a.button {
   margin: 0;
   padding: var(--space-3);
   overflow-x: auto;
-  border-radius: 6px;
+  /* Inset 12 px in the 10 px guide panel, so the 4 px floor (T5). */
+  border-radius: var(--radius-small);
   background: var(--bg-card);
   border: 1px solid var(--border);
 }
@@ -1260,7 +1268,7 @@ a.button {
 
 .month-nav .button {
   padding: var(--space-1) var(--space-3);
-  font-size: 18px;
+  font-size: var(--fs-group);
   line-height: 1;
 }
 
@@ -1353,7 +1361,7 @@ a.button {
   background: var(--bg-hover);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-kicker);
 }
 
 .money .counts {
@@ -1393,11 +1401,11 @@ a.button {
 .today-hero .habits {
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .today-hero .habit {
-  padding: 3px 0;
+  padding: var(--space-1) 0;
   border-radius: 0;
   background: none;
 }

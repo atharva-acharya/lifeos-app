@@ -101,6 +101,7 @@
   gap: var(--space-2);
   color: var(--text-muted);
   font-size: var(--fs-kicker);
+  font-variant-numeric: tabular-nums;
 }
 
 .metric__open {
@@ -108,10 +109,11 @@
   place-items: center;
   width: 24px;
   height: 24px;
-  margin: -4px -6px -4px 0;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  /* Inset 10 px or more in a 14 px card, so the 4 px floor (T5). */
+  border-radius: var(--radius-small);
   background: none;
   color: var(--text-muted);
   cursor: pointer;
@@ -183,7 +185,8 @@
 
 .metric__detail {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
+  font-variant-numeric: tabular-nums;
 }
 
 /* A chart card opens with a metric head and value, then the plot. */
@@ -208,7 +211,7 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
-  padding: 10px 0;
+  padding: var(--space-3) 0;
   border-top: 1px solid var(--border);
 }
 
@@ -238,7 +241,7 @@
 .list__sub {
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--fs-kicker);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

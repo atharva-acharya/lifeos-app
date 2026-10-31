@@ -43,8 +43,8 @@ export function fit(text: string, px: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** Bar width in a group, and the gap between bars of one group. */
-const GROUP_BAR_MAX = 24;
+/** Widest a bar may be in any layout (C4), and the gap between bars of one group. */
+export const BAR_MAX = 24;
 const GROUP_GAP = 4;
 
 /** Path of a bar from `y0` (base) up to `y1`, rounded only at the top. */
@@ -80,11 +80,11 @@ export function BarChart<T>({
   const slot = data.length > 0 ? plotW / data.length : plotW;
   const groupBarW = Math.max(
     2,
-    Math.min(GROUP_BAR_MAX, (slot * 0.7 - GROUP_GAP * (series.length - 1)) / series.length),
+    Math.min(BAR_MAX, (slot * 0.7 - GROUP_GAP * (series.length - 1)) / series.length),
   );
   const barW = grouped
     ? groupBarW * series.length + GROUP_GAP * (series.length - 1)
-    : Math.max(2, Math.min(48, slot * 0.7));
+    : Math.max(2, Math.min(BAR_MAX, slot * 0.7));
   const y = (v: number) => PAD.top + plotH - (top > 0 ? (v / top) * plotH : 0);
   // Show every label when they fit, otherwise every second or third.
   const every = Math.max(1, Math.ceil(56 / Math.max(1, slot)));
