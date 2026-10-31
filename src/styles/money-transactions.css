@@ -1,0 +1,90 @@
+/* Money transactions grouped by day (spec P6, C3). */
+.money-tx__days,
+.money-tx__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.money-tx__day + .money-tx__day {
+  margin-top: var(--space-2);
+}
+
+/* Sticks to the top of the scrolling page; the solid card colour keeps
+   rows from showing through it. */
+.money-tx__head {
+  position: sticky;
+  /* Sticks to the very top of .main, past its top padding, so no row
+     shows above the header. */
+  top: calc(-1 * var(--space-5));
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--card-pad);
+  background: var(--bg-card);
+}
+
+.money-tx__date {
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.money-tx__net {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Hairlines run from the text's left edge to the card's right edge. */
+.money-tx__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-left: var(--card-pad);
+  padding: 10px var(--card-pad) 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.money-tx__row:first-child {
+  border-top: 0;
+}
+
+.money-tx__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.money-tx__title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.money-tx__sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.money-tx__amount {
+  flex: none;
+  min-width: 64px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.money-tx__amount--in {
+  color: var(--c-done);
+}
