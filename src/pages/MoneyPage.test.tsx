@@ -88,6 +88,45 @@ describe("MoneyPage", () => {
     expect(grocer).toHaveTextContent("-£120.00");
   });
 
+  it("compares each metric with the previous month, in words", async () => {
+    const [y, m] = MONTH.split("-").map(Number);
+    const before = new Date(y, m - 2, 1);
+    const prevKey = `${String(before.getFullYear())}-${String(before.getMonth() + 1).padStart(2, "0")}`;
+    const prevName = before.toLocaleDateString("en-GB", { month: "long" });
+    const totals = (month: string, income: number, spent: number) => ({
+      month,
+      income,
+      spent,
+      spending: [],
+      incomeBySource: [],
+    });
+    mockCommands({
+      get_money: {
+        status: "ready",
+        money: {
+          ...MONEY,
+          trend: [totals(prevKey, 240_000, 60_000), totals(MONTH, 240_000, 48_500)],
+        },
+      },
+    });
+    render(<MoneyPage onNavigate={vi.fn()} />);
+    const spent = await screen.findByLabelText("Spent");
+    expect(spent).toHaveTextContent(`£115.00 less than ${prevName}`);
+    expect(within(spent).getByText("less")).toHaveClass("change__mark--good");
+    expect(screen.getByLabelText("Income")).toHaveTextContent(`Same as ${prevName}`);
+    expect(screen.getByLabelText("Net")).toHaveTextContent(`£115.00 more than ${prevName}`);
+    expect(document.querySelector('.metric[aria-label="Savings rate"]')).toHaveTextContent(
+      `5 pts more than ${prevName}`,
+    );
+  });
+
+  it("shows no comparison without a previous month with data", async () => {
+    mockCommands({ get_money: { status: "ready", money: MONEY } });
+    render(<MoneyPage onNavigate={vi.fn()} />);
+    const spent = await screen.findByLabelText("Spent");
+    expect(spent).not.toHaveTextContent(/than/);
+  });
+
   it("moves between months", async () => {
     mockCommands({ get_money: { status: "ready", money: MONEY } });
     render(<MoneyPage onNavigate={vi.fn()} />);

@@ -14,10 +14,10 @@ import { MoneyImport } from "../components/MoneyImport";
 import { ADD_FIELD_ID, MoneyQuickActions } from "../components/MoneyQuickActions";
 import { MoneySplits } from "../components/MoneySplits";
 import { MoneyTransactions } from "../components/MoneyTransactions";
-import { MoneyTrends } from "../components/MoneyTrends";
+import { ChangeLine, MoneyTrends } from "../components/MoneyTrends";
 import { NotConnected } from "../components/NotConnected";
 import { useMode } from "../mode";
-import { pounds, toPence } from "../money";
+import { compareMonths, pounds, toPence } from "../money";
 import type { Navigate } from "../routes";
 
 function monthLabel(month: string): string {
@@ -245,6 +245,9 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
   const sample = useMode() === "sample";
   const net = money.income - money.spent;
   const rate = money.income > 0 ? Math.round((net / money.income) * 100) : null;
+  // "vs previous period" for the metric row; the trend ends with this month.
+  const vs =
+    money.trend[money.trend.length - 1]?.month === money.month ? compareMonths(money.trend) : null;
   return (
     <div className="page money">
       {!money.hasLedger && !money.hasBudgets && (
@@ -256,19 +259,36 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
         </section>
       )}
       <div className="grid grid--4">
-        <Metric label="Spent" color="var(--cat-money)" value={pounds(money.spent)} />
-        <Metric label="Income" color="var(--cat-money)" value={pounds(money.income)} />
+        <Metric
+          label="Spent"
+          color="var(--cat-money)"
+          value={pounds(money.spent)}
+          detail={vs && <ChangeLine diff={vs.spent} previous={vs.previous} upIsGood={false} />}
+        />
+        <Metric
+          label="Income"
+          color="var(--cat-money)"
+          value={pounds(money.income)}
+          detail={vs && <ChangeLine diff={vs.income} previous={vs.previous} upIsGood />}
+        />
         <Metric
           label="Net"
           color="var(--cat-money)"
           value={pounds(net)}
           tone={net < 0 ? "danger" : undefined}
+          detail={vs && <ChangeLine diff={vs.net} previous={vs.previous} upIsGood />}
         />
         <Metric
           label="Savings rate"
           color="var(--cat-money)"
           value={rate === null ? "—" : String(rate)}
           unit={rate === null ? undefined : "%"}
+          detail={
+            vs &&
+            vs.rate !== null && (
+              <ChangeLine diff={vs.rate} previous={vs.previous} unit="points" upIsGood />
+            )
+          }
         />
       </div>
 
