@@ -1,6 +1,6 @@
 import { useWidth } from "./useWidth";
 
-/** One stacked part of each bar; `color` is a CSS colour or token. */
+/** One part of each bar (stacked) or one bar of each group (grouped); `color` is a CSS colour or token. */
 export interface Series<T> {
   key: string;
   name: string;
@@ -18,6 +18,8 @@ export interface BarChartProps<T> {
   target?: { value: number; label: string };
   unit?: string;
   height?: number;
+  /** Stacked parts of one bar (default), or one bar per series side by side. */
+  layout?: "stacked" | "grouped";
 }
 
 const PAD = { top: 8, right: 8, bottom: 24, left: 36 };
@@ -41,7 +43,16 @@ export function fit(text: string, px: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** Small SVG bar chart (stacked when given several series). No chart library. */
+/** Bar width in a group, and the gap between bars of one group. */
+const GROUP_BAR_MAX = 24;
+const GROUP_GAP = 4;
+
+/** Path of a bar from `y0` (base) up to `y1`, rounded only at the top. */
+function barPath(x: number, w: number, y0: number, y1: number, r: number): string {
+  return `M${String(x)},${String(y0)}V${String(y1 + r)}Q${String(x)},${String(y1)} ${String(x + r)},${String(y1)}H${String(x + w - r)}Q${String(x + w)},${String(y1)} ${String(x + w)},${String(y1 + r)}V${String(y0)}Z`;
+}
+
+/** Small SVG bar chart: stacked or grouped when given several series. No chart library. */
 export function BarChart<T>({
   data,
   label,
@@ -50,10 +61,16 @@ export function BarChart<T>({
   target,
   unit = "",
   height = 240,
+  layout = "stacked",
 }: BarChartProps<T>) {
+  const grouped = layout === "grouped" && series.length > 1;
   const [ref, width] = useWidth<HTMLDivElement>(FALLBACK_WIDTH);
 
-  const totals = data.map((d) => series.reduce((n, s) => n + s.value(d), 0));
+  const totals = data.map((d) =>
+    grouped
+      ? Math.max(0, ...series.map((s) => s.value(d)))
+      : series.reduce((n, s) => n + s.value(d), 0),
+  );
   const { top, ticks } =
     max === undefined
       ? niceScale(Math.max(0, ...totals, target?.value ?? 0))
@@ -61,7 +78,13 @@ export function BarChart<T>({
   const plotW = Math.max(0, width - PAD.left - PAD.right);
   const plotH = height - PAD.top - PAD.bottom;
   const slot = data.length > 0 ? plotW / data.length : plotW;
-  const barW = Math.max(2, Math.min(48, slot * 0.7));
+  const groupBarW = Math.max(
+    2,
+    Math.min(GROUP_BAR_MAX, (slot * 0.7 - GROUP_GAP * (series.length - 1)) / series.length),
+  );
+  const barW = grouped
+    ? groupBarW * series.length + GROUP_GAP * (series.length - 1)
+    : Math.max(2, Math.min(48, slot * 0.7));
   const y = (v: number) => PAD.top + plotH - (top > 0 ? (v / top) * plotH : 0);
   // Show every label when they fit, otherwise every second or third.
   const every = Math.max(1, Math.ceil(56 / Math.max(1, slot)));
@@ -100,29 +123,55 @@ export function BarChart<T>({
         )}
         {data.map((d, i) => {
           const x = PAD.left + slot * i + (slot - barW) / 2;
-          let base = 0;
-          const parts = series.map((s) => ({ s, v: s.value(d) })).filter((p) => p.v > 0);
+          const bars = grouped
+            ? series.map((s, j) => {
+                const v = s.value(d);
+                const h = Math.max(0, y(0) - y(Math.max(0, v)));
+                return {
+                  s,
+                  v,
+                  x: x + j * (groupBarW + GROUP_GAP),
+                  w: groupBarW,
+                  y0: y(0),
+                  h,
+                  top: true,
+                };
+              })
+            : (() => {
+                let base = 0;
+                const parts = series.map((s) => ({ s, v: s.value(d) })).filter((p) => p.v > 0);
+                return parts.map(({ s, v }, j) => {
+                  const y0 = y(base);
+                  base += v;
+                  return {
+                    s,
+                    v,
+                    x,
+                    w: barW,
+                    y0,
+                    h: Math.max(0, y0 - y(base)),
+                    top: j === parts.length - 1,
+                  };
+                });
+              })();
           return (
             <g key={label(d)}>
-              {parts.map(({ s, v }, j) => {
-                const y0 = y(base);
-                base += v;
-                const y1 = y(base);
-                const last = j === parts.length - 1;
-                const h = Math.max(0, y0 - y1);
-                const r = last ? Math.min(4, barW / 2, h) : 0;
-                return (
-                  <path
-                    key={s.key}
-                    className="bar-chart__bar"
-                    fill={s.color}
-                    style={{ transformOrigin: `0 ${String(y(0))}px` }}
-                    d={`M${String(x)},${String(y0)}V${String(y1 + r)}Q${String(x)},${String(y1)} ${String(x + r)},${String(y1)}H${String(x + barW - r)}Q${String(x + barW)},${String(y1)} ${String(x + barW)},${String(y1 + r)}V${String(y0)}Z`}
-                  >
-                    <title>{`${label(d)} · ${s.name}: ${String(v)}${unit}`}</title>
-                  </path>
-                );
-              })}
+              {bars
+                .filter((b) => b.v > 0)
+                .map((b) => {
+                  const r = b.top ? Math.min(4, b.w / 2, b.h) : 0;
+                  return (
+                    <path
+                      key={b.s.key}
+                      className="bar-chart__bar"
+                      fill={b.s.color}
+                      style={{ transformOrigin: `0 ${String(y(0))}px` }}
+                      d={barPath(b.x, b.w, b.y0, b.y0 - b.h, r)}
+                    >
+                      <title>{`${label(d)} · ${b.s.name}: ${String(b.v)}${unit}`}</title>
+                    </path>
+                  );
+                })}
               {i % every === 0 && (
                 <text
                   className="bar-chart__tick"

@@ -1,5 +1,6 @@
 import { SESSIONS_GOAL, type WeekSummary } from "../fitnessStats";
 import { Rings, type Ring } from "./Rings";
+import { Group } from "./Card";
 
 /** This week at a glance: steps, protein days and sessions against their goals. */
 export function FitnessWeek({
@@ -34,10 +35,7 @@ export function FitnessWeek({
     },
   ];
   return (
-    <section className="card" aria-labelledby="fitness-week">
-      <h2 id="fitness-week" className="kicker">
-        This week
-      </h2>
+    <Group title="This week" cardClassName="card--stack">
       <div className="fitness__week">
         <Rings rings={rings} />
         <p className="muted">
@@ -60,6 +58,6 @@ export function FitnessWeek({
           </p>
         )}
       </div>
-    </section>
+    </Group>
   );
 }

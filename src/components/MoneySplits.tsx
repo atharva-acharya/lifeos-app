@@ -8,6 +8,7 @@ import {
   type SplitRow,
 } from "../api";
 import { pounds, toPence } from "../money";
+import { Group } from "./Card";
 
 /** "Sam owes you £12.00", "You owe Sam £5.00" or "Settled up". */
 export function balanceText(f: FriendBalance): string {
@@ -57,12 +58,12 @@ function Balances({ friends, onChanged }: { friends: FriendBalance[]; onChanged:
       {friends.length === 0 ? (
         <p className="muted">No splits yet. Split a bill below to start a balance.</p>
       ) : (
-        <ul className="rows" aria-label="Balances with friends">
+        <ul className="list" aria-label="Balances with friends">
           {friends.map((f) => (
-            <li key={f.friend} className="row">
-              <div className="row__main">
-                <span className="row__title">{balanceText(f)}</span>
-                <span className="row__sub">Last change {f.lastDate}</span>
+            <li key={f.friend} className="list__row">
+              <div className="list__main">
+                <span className="list__title">{balanceText(f)}</span>
+                <span className="list__sub">Last change {f.lastDate}</span>
               </div>
               {f.balance !== 0 &&
                 (confirming === f.friend ? (
@@ -186,7 +187,7 @@ function SplitForm({ known, onAdded }: { known: string[]; onAdded: () => void })
 
   return (
     <form onSubmit={submit} aria-labelledby="split-heading">
-      <h3 id="split-heading" className="kicker">
+      <h3 id="split-heading" className="card__title">
         Split a bill
       </h3>
       <div className="form">
@@ -324,38 +325,43 @@ export function MoneySplits({
   readOnly: boolean;
   onChanged: () => void;
 }) {
+  const recentLog = recent.length > 0 && (
+    <details className="project__log">
+      <summary>Recent ({recent.length})</summary>
+      <ul>
+        {recent.map((r, i) => (
+          <li key={`${r.date}-${String(i)}`}>
+            <time>{r.date}</time> {r.description} · {r.friend}{" "}
+            {r.amount > 0 ? `owes ${pounds(r.amount)}` : `is owed ${pounds(-r.amount)}`}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
   return (
-    <section className="card money__splits" aria-labelledby="splits-heading">
-      <h2 id="splits-heading" className="kicker">
-        Splits with friends
-      </h2>
+    <Group title="Splits with friends" className="money__splits" bare>
       {readOnly ? (
-        <ul className="rows" aria-label="Balances with friends">
-          {friends.map((f) => (
-            <li key={f.friend} className="row">
-              <span className="row__title">{balanceText(f)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <>
-          <Balances friends={friends} onChanged={onChanged} />
-          <SplitForm known={friends.map((f) => f.friend)} onAdded={onChanged} />
-        </>
-      )}
-      {recent.length > 0 && (
-        <details className="project__log">
-          <summary>Recent ({recent.length})</summary>
-          <ul>
-            {recent.map((r, i) => (
-              <li key={`${r.date}-${String(i)}`}>
-                <time>{r.date}</time> {r.description} · {r.friend}{" "}
-                {r.amount > 0 ? `owes ${pounds(r.amount)}` : `is owed ${pounds(-r.amount)}`}
+        <div className="card card--stack">
+          <ul className="list" aria-label="Balances with friends">
+            {friends.map((f) => (
+              <li key={f.friend} className="list__row">
+                <span className="list__title">{balanceText(f)}</span>
               </li>
             ))}
           </ul>
-        </details>
+          {recentLog}
+        </div>
+      ) : (
+        <div className="grid grid--2">
+          <div className="card card--stack">
+            <Balances friends={friends} onChanged={onChanged} />
+            {recentLog}
+          </div>
+          <div className="card card--stack">
+            <SplitForm known={friends.map((f) => f.friend)} onAdded={onChanged} />
+          </div>
+        </div>
       )}
-    </section>
+    </Group>
   );
 }

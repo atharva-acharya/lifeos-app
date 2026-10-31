@@ -26,7 +26,21 @@
   --ring-exercise: #a6ff00;
   --ring-stand: #00e5ff;
 
-  --radius: 16px;
+  /* Category colours, as Apple Health colours each data type. Lightened
+     where needed so a 15 px label stays AA (4.5:1) on a card. */
+  --cat-activity: #ff9f0a;
+  --cat-heart: #ff6482;
+  --cat-body: #da8fff;
+  --cat-sleep: #8e8cff;
+  --cat-fitness: #30d158;
+  --cat-money: #63e6e2;
+  --cat-jobs: #ff9f0a;
+  --cat-projects: #5eb0ff;
+
+  /* Cards and spacing (docs/design-rules.md). */
+  --radius: 14px;
+  --card-pad: 16px; /* inside a card, and between cards */
+  --gutter: 20px; /* between sections */
   --radius-control: 10px;
   --radius-pill: 999px;
   --space-1: 4px;
@@ -39,10 +53,12 @@
   --font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --font-display:
     "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --fs-kicker: 12px;
+  --fs-kicker: 13px;
   --fs-body: 14px;
   --fs-title: 34px;
-  --fs-number: 34px;
+  --fs-number: 30px;
+  --fs-group: 20px;
+  --fs-label: 15px;
 
   --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
 

@@ -4,6 +4,7 @@ import { shortLabel } from "../fitnessStats";
 import { withTransition } from "../motion";
 import type { Navigate } from "../routes";
 import { EmptyHint } from "./EmptyHint";
+import { Group } from "./Card";
 
 const DAYS = ["Push A", "Pull A", "Legs", "Push B", "Pull B"];
 const OTHER = "Other";
@@ -54,10 +55,7 @@ export function FitnessHistory({
   const shown = workouts.filter((w) => dayOf(w) === tab);
 
   return (
-    <section className="card" aria-labelledby="fitness-history">
-      <h2 id="fitness-history" className="kicker">
-        Workout history
-      </h2>
+    <Group title="Workout history" cardClassName="card--stack">
       {workouts.length === 0 ? (
         <EmptyHint lead="No workouts logged yet." guide="workout" onNavigate={onNavigate}>
           Add one <code>type: workout</code> note per session (suggested <code>Fitness/Log/</code>)
@@ -99,6 +97,6 @@ export function FitnessHistory({
           </div>
         </>
       )}
-    </section>
+    </Group>
   );
 }

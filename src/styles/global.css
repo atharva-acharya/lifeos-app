@@ -32,12 +32,11 @@ button {
   box-shadow: var(--focus-ring);
 }
 
+/* Small secondary label: sentence case, never tracked capitals. */
 .kicker {
   margin: 0;
   font-size: var(--fs-kicker);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
 
@@ -46,7 +45,7 @@ button {
   /* No outline; the transparent border keeps room for coloured ones. */
   border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: var(--space-5);
+  padding: var(--card-pad);
 }
 
 a {

@@ -21,8 +21,8 @@ function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate 
         </section>
       ) : (
         <>
-          <section aria-labelledby="projects-active">
-            <h2 id="projects-active" className="kicker">
+          <section className="group" aria-labelledby="projects-active">
+            <h2 id="projects-active" className="group__title">
               Active
             </h2>
             {active.length === 0 ? (
@@ -38,8 +38,8 @@ function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate 
             )}
           </section>
           {other.length > 0 && (
-            <section aria-labelledby="projects-other">
-              <h2 id="projects-other" className="kicker">
+            <section className="group" aria-labelledby="projects-other">
+              <h2 id="projects-other" className="group__title">
                 Other
               </h2>
               <div className="projects__list">

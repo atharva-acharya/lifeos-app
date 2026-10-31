@@ -1,5 +1,6 @@
 import type { HealthWorkout } from "../api";
 import { shortLabel } from "../fitnessStats";
+import { Group } from "./Card";
 import { EmptyHint } from "./EmptyHint";
 
 const SOURCE = { health: "Apple Health", vault: "Vault" } as const;
@@ -15,34 +16,27 @@ function details(w: HealthWorkout): string[] {
 /** Apple Health and vault workouts in one list, newest first. */
 export function HealthWorkouts({ workouts }: { workouts: HealthWorkout[] }) {
   return (
-    <section className="card" aria-labelledby="health-workouts">
-      <h2 id="health-workouts" className="kicker">
-        Workouts
-      </h2>
+    <Group title="Workouts" cardClassName="card--stack">
       {workouts.length === 0 ? (
         <EmptyHint lead="No workouts yet.">
           Workouts come from Health Auto Export, and from workout notes in your vault.
         </EmptyHint>
       ) : (
-        <ul className="sessions" aria-label="Workouts, newest first">
+        <ul className="list" aria-label="Workouts, newest first">
           {workouts.map((w, i) => (
-            <li key={`${w.source}-${String(i)}`} className="session">
-              <div className="session__head">
-                <span className={`pill ${w.source === "health" ? "pill--read" : "pill--done"}`}>
-                  {SOURCE[w.source]}
-                </span>
-                <strong>{w.name}</strong>
-                <span className="muted">{shortLabel(w.date)}</span>
-                {details(w).map((d) => (
-                  <span key={d} className="muted">
-                    {d}
-                  </span>
-                ))}
+            <li key={`${w.source}-${String(i)}`} className="list__row">
+              <div className="list__main">
+                <span className="list__title">{w.name}</span>
+                <span className="list__sub">{details(w).join(" · ")}</span>
               </div>
+              <span className={`pill ${w.source === "health" ? "pill--read" : "pill--done"}`}>
+                {SOURCE[w.source]}
+              </span>
+              <span className="list__value">{shortLabel(w.date)}</span>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Group>
   );
 }

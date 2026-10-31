@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { shortLabel } from "../fitnessStats";
+import { MetricHead, Value } from "./Card";
 import { EmptyHint } from "./EmptyHint";
 import { LineChart } from "./LineChart";
 
@@ -33,23 +34,20 @@ export function TrendCard({
   decimals = 1,
 }: TrendCardProps) {
   const id = useId();
-  const latest = values.reduce<number | null>((last, v) => v ?? last, null);
+  const at = values.reduce<number>((last, v, i) => (v === null ? last : i), -1);
+  const latest = at >= 0 ? values[at] : null;
   return (
-    <section className="card chart" aria-labelledby={id}>
-      <header className="chart__head">
-        <h3 id={id} className="kicker">
-          {title}
-        </h3>
-        {latest !== null && (
-          <span className="muted">
-            Latest{" "}
-            <strong>
-              {latest.toFixed(decimals)}
-              {unit}
-            </strong>
-          </span>
-        )}
-      </header>
+    <section className="card chart-card" aria-labelledby={id}>
+      <MetricHead
+        as="h3"
+        id={id}
+        label={title}
+        color={color}
+        aside={latest !== null ? shortLabel(dates[at]) : undefined}
+      />
+      {latest !== null && (
+        <Value value={latest.toFixed(decimals)} unit={unit.trim()} srPrefix="Latest" />
+      )}
       {latest === null ? (
         <EmptyHint lead="No readings in this range.">
           Pick a longer range, or check this metric is on in Health Auto Export.

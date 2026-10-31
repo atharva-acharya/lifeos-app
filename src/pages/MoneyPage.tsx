@@ -8,6 +8,7 @@ import {
   type Money,
   type MoneyResponse,
 } from "../api";
+import { Group, Metric } from "../components/Card";
 import { EmptyHint } from "../components/EmptyHint";
 import { MoneyImport } from "../components/MoneyImport";
 import { MoneySplits } from "../components/MoneySplits";
@@ -36,10 +37,7 @@ const STATUS_TONE: Record<BudgetLine["status"], string> = {
 
 function Budgets({ budgets }: { budgets: BudgetLine[] }) {
   return (
-    <section className="card money__budgets" aria-labelledby="budgets-heading">
-      <h2 id="budgets-heading" className="kicker">
-        Budgets
-      </h2>
+    <Group title="Budgets" cardClassName="money__budgets">
       {budgets.length === 0 ? (
         <EmptyHint lead="No budgets yet.">
           Add <code>Money/Budgets.md</code> with <code>type: budgets</code> and a table with{" "}
@@ -78,7 +76,7 @@ function Budgets({ budgets }: { budgets: BudgetLine[] }) {
           })}
         </ul>
       )}
-    </section>
+    </Group>
   );
 }
 
@@ -125,10 +123,7 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
   };
 
   return (
-    <section className="card" aria-labelledby="quick-add-heading">
-      <h2 id="quick-add-heading" className="kicker">
-        Quick add
-      </h2>
+    <Group title="Quick add" cardClassName="card--stack">
       {sample && <p className="muted">Quick add is off while sample data is on.</p>}
       <form onSubmit={submit}>
         {/* Not disabled while saving, so focus stays on the Add button. */}
@@ -239,7 +234,7 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
           {message.text}
         </p>
       )}
-    </section>
+    </Group>
   );
 }
 
@@ -248,7 +243,7 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
   const net = money.income - money.spent;
   const rate = money.income > 0 ? Math.round((net / money.income) * 100) : null;
   return (
-    <div className="money">
+    <div className="page money">
       {!money.hasLedger && !money.hasBudgets && (
         <section className="card">
           <EmptyHint lead="No money notes yet.">
@@ -257,34 +252,29 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
           </EmptyHint>
         </section>
       )}
-      <div className="stats">
-        <section className="card stat" aria-label="Spent">
-          <p className="kicker">Spent</p>
-          <p className="stat__value">{pounds(money.spent)}</p>
-        </section>
-        <section className="card stat" aria-label="Income">
-          <p className="kicker">Income</p>
-          <p className="stat__value stat__value--done">{pounds(money.income)}</p>
-        </section>
-        <section className="card stat" aria-label="Net">
-          <p className="kicker">Net</p>
-          <p className={`stat__value${net < 0 ? " stat__value--danger" : ""}`}>{pounds(net)}</p>
-        </section>
-        <section className="card stat" aria-label="Savings rate">
-          <p className="kicker">Savings rate</p>
-          <p className="stat__value">{rate === null ? "—" : `${String(rate)}%`}</p>
-        </section>
+      <div className="grid grid--4">
+        <Metric label="Spent" color="var(--cat-money)" value={pounds(money.spent)} />
+        <Metric label="Income" color="var(--cat-money)" value={pounds(money.income)} />
+        <Metric
+          label="Net"
+          color="var(--cat-money)"
+          value={pounds(net)}
+          tone={net < 0 ? "danger" : undefined}
+        />
+        <Metric
+          label="Savings rate"
+          color="var(--cat-money)"
+          value={rate === null ? "—" : String(rate)}
+          unit={rate === null ? undefined : "%"}
+        />
       </div>
 
-      <div className="columns">
+      <div className="grid grid--wide-left">
         <Budgets budgets={money.budgets} />
         <QuickAdd categories={money.knownCategories} onAdded={onAdded} />
       </div>
 
-      <section className="card" aria-labelledby="transactions-heading">
-        <h2 id="transactions-heading" className="kicker">
-          Transactions
-        </h2>
+      <Group title="Transactions" cardClassName="card--flush">
         {money.transactions.length === 0 ? (
           <p className="muted">Nothing recorded in {monthLabel(money.month)}.</p>
         ) : (
@@ -315,7 +305,7 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
             </tbody>
           </table>
         )}
-      </section>
+      </Group>
 
       <MoneySplits
         friends={money.friends}

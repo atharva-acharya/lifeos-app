@@ -8,6 +8,7 @@ import {
   type ImportRow,
 } from "../api";
 import { pounds } from "../money";
+import { Group } from "./Card";
 
 /** Largest statement the app reads (the Rust core enforces the same cap). */
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -138,10 +139,7 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
 
   const m = preview?.mapping;
   return (
-    <section className="card" aria-labelledby="import-heading">
-      <h2 id="import-heading" className="kicker">
-        Import bank statement
-      </h2>
+    <Group title="Import bank statement" cardClassName="card--stack">
       <p className="muted">
         Export a CSV from your bank. Rows already in your ledger are skipped, so importing the same
         statement twice is safe.
@@ -342,6 +340,6 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
           {message.text}
         </p>
       )}
-    </section>
+    </Group>
   );
 }

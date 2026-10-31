@@ -18,6 +18,7 @@ import { WelcomePage } from "./pages/WelcomePage";
 import { ALL_ROUTES, type RouteId } from "./routes";
 import "./styles/global.css";
 import "./styles/layout.css";
+import "./styles/cards.css";
 import "./styles/motion.css";
 import { withTransition } from "./motion";
 
