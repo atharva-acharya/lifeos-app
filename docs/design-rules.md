@@ -42,7 +42,7 @@ Sources: [dimensional-drawing](https://github.com/enesozturk/dimensional-drawing
 - Top row: small coloured label (with an optional glyph) on the left, chevron on the right if the card navigates. The chevron appears only when the card is clickable.
 - Bottom-left: the big number with the unit set smaller in secondary grey (`#98989F`) on the same baseline. Never colour the number; colour belongs to the label (Hallmark: "text never wears the data colour" applies to charts and numbers alike).
 - Optional detail line (change since last, goal) below the value, 13 px muted.
-- Category colours: Activity `#FA114F`, Fitness `#30D158`, Body `#BF5AF2`, Heart `#FF375F`, Sleep `#5E5CE6`, Money `#30D158`, Jobs `#FF9F0A`, Projects `#0A84FF`.
+- Category colours (lightened from Apple's system colours where needed so a 15 px label stays AA on the card): Activity and Jobs `#FF9F0A`, Heart `#FF6482`, Body `#DA8FFF`, Sleep `#8E8CFF`, Fitness `#30D158`, Money `#63E6E2`, Projects `#5EB0FF`.
 
 ## 5. Type
 
