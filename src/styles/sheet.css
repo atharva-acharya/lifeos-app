@@ -5,9 +5,6 @@
    ease-out. Reduce motion: no animation, it only appears. Its ancestors are
    <body> and <html> only (it is portalled), so nothing breaks the backdrop. */
 .sheet {
-  --sheet-in: 280ms;
-  --sheet-out: 160ms;
-
   width: min(480px, calc(100vw - 64px));
   max-height: calc(100vh - 64px);
   padding: 0;
@@ -22,21 +19,21 @@
 }
 
 .sheet[open] {
-  animation: sheet-in var(--sheet-in) var(--ease-spring) both;
+  animation: sheet-in var(--dur-pop-in) var(--ease-spring) both;
 }
 
 .sheet[data-state="closing"] {
-  animation: sheet-out var(--sheet-out) var(--ease-out) both;
+  animation: sheet-out var(--dur-pop-out) var(--ease-out) both;
 }
 
 /* The dimming scrim. */
 .sheet::backdrop {
-  background: rgb(0 0 0 / 0.5);
-  animation: scrim-in var(--sheet-in) var(--ease-out) both;
+  background: var(--scrim);
+  animation: scrim-in var(--dur-pop-in) var(--ease-out) both;
 }
 
 .sheet[data-state="closing"]::backdrop {
-  animation: scrim-out var(--sheet-out) var(--ease-out) both;
+  animation: scrim-out var(--dur-pop-out) var(--ease-out) both;
 }
 
 @keyframes sheet-in {

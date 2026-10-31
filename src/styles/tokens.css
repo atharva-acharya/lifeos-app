@@ -7,6 +7,9 @@
   --bg-card: #1c1c1e;
   --bg-hover: #2c2c2e; /* also raised controls: buttons, inputs, selected tab */
   --border: #38383a; /* separators */
+  --bg-card-hover: #232325; /* a clickable card under the pointer */
+  --bg-control-hover: #3a3a3c; /* a raised control under the pointer */
+  --bg-selected: #636366; /* the selected tab in a plain tab bar */
 
   --text: #f5f5f7;
   --text-muted: #98989f; /* AA on page, card and raised surfaces */
@@ -20,6 +23,10 @@
   --c-pending: #ffd60a; /* yellow: pending */
   --c-danger: #ff6961; /* red: destructive */
   --accent: #0a84ff; /* blue: current page, links, checkboxes, focus */
+  --on-accent: #fff; /* text on a filled accent button */
+  /* Darkened from the accent so white text stays AA (about 6:1). */
+  --accent-fill: color-mix(in srgb, var(--accent) 75%, #000);
+  --accent-fill-hover: color-mix(in srgb, var(--accent) 65%, #000);
 
   /* Activity rings. */
   --ring-move: #fa114f;
@@ -71,8 +78,12 @@
   --glass-border: var(--glass-edge);
   --popover-solid: #2c2c2e; /* glass never sits on glass (L2) */
   --glass-hover: rgb(255 255 255 / 0.08);
+  --scrim: rgb(0 0 0 / 0.5); /* dims the page behind a sheet */
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.4); /* toasts float over content */
   --sidebar-width: 232px;
   --scroll-edge: 24px; /* scroll-edge fade where content meets glass (L4) */
+  --page-bar-height: 48px; /* the compact page toolbar (L1, L4) */
+  --page-bar-edge: transparent; /* no hard divider under glass (L4) */
 
   /* Motion (phase 3). Use these, never raw values, so the app moves as one.
      fast: hovers, presses. base: tabs, small enters. slow: pages, charts. */
@@ -90,6 +101,12 @@
   --list-stagger: 30ms; /* M8: delay between rows, at most 8 rows */
   --dur-pop-in: 280ms; /* sheets, popovers and toasts open (M5) */
   --dur-pop-out: 160ms; /* and close faster (M5) */
+  --dur-line-draw: 480ms; /* line charts draw in (M7) */
+  --dur-ring-fill: 800ms; /* rings fill with the spring (M6) */
+  /* The one looping highlight, on the active project (M10). Symmetric
+     because it loops; it is never an entry. */
+  --dur-breathe: 3.2s;
+  --ease-breathe: cubic-bezier(0.42, 0, 0.58, 1);
   /* Damped spring (damping 0.7, about 5% overshoot), sampled for linear(). */
   --ease-spring: linear(
     0,
@@ -129,6 +146,8 @@
     --list-stagger: 0ms;
     --dur-pop-in: 0ms;
     --dur-pop-out: 0ms;
+    --dur-line-draw: 0ms;
+    --dur-ring-fill: 0ms;
   }
 }
 
@@ -149,6 +168,7 @@
     --glass-filter: none;
     --glass-highlight: none;
     --glass-border: var(--border);
+    --page-bar-edge: var(--border);
   }
 }
 
@@ -157,4 +177,5 @@
   --glass-filter: none;
   --glass-highlight: none;
   --glass-border: var(--border);
+  --page-bar-edge: var(--border);
 }
