@@ -144,3 +144,35 @@ export function weekSummary(
     proteinGoal,
   };
 }
+
+const plural = (n: number, one: string, many: string) =>
+  `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
+
+/** One sentence per ring on Fitness This week on what to do next (ui-spec P3). */
+export interface WeekHints {
+  steps: string;
+  protein: string;
+  sessions: string;
+}
+
+export function weekHints(summary: WeekSummary, sessionsGoal = SESSIONS_GOAL): WeekHints {
+  const { avgSteps, stepsGoal, proteinDays, proteinGoal, sessions } = summary;
+  const stepsGap = avgSteps === null ? null : Math.ceil(stepsGoal - avgSteps);
+  const proteinLeft = 7 - proteinDays;
+  const sessionsLeft = sessionsGoal - sessions;
+  let steps: string;
+  if (stepsGap === null) steps = "Log steps to start the average";
+  else if (stepsGap <= 0) steps = "Goal reached";
+  else steps = `${plural(stepsGap, "step", "steps")} a day below your goal`;
+  return {
+    steps,
+    protein:
+      proteinLeft <= 0
+        ? "Goal reached"
+        : `${plural(proteinLeft, "more day", "more days")} at ${String(proteinGoal)} g to fill the ring`,
+    sessions:
+      sessionsLeft <= 0
+        ? "Goal reached"
+        : `${plural(sessionsLeft, "session", "sessions")} left this week`,
+  };
+}

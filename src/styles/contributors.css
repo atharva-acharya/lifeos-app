@@ -1,0 +1,85 @@
+/* Contributors sheet rows (ui-spec P4, C3) and the triggers that open it. */
+.contributors__lead {
+  margin: 0;
+}
+
+.contributors__value {
+  display: inline-flex;
+  flex: none;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 64px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Up, down or level: a glyph in text colour, named for screen readers. The
+   direction is not good or bad on its own, so it carries no state colour. */
+.contributors__mark {
+  display: inline-block;
+  min-width: 1ch;
+  color: var(--text-muted);
+}
+
+/* A metric value that opens its detail sheet: looks like the value, and the
+   whole number is the target. */
+.metric__value--button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  border-radius: var(--space-1);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-release) var(--ease-spring);
+}
+
+.metric__value--button:active {
+  transform: scale(0.97);
+  transition:
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.metric__value--button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.metric__value-chevron {
+  align-self: center;
+  color: var(--text-muted);
+}
+
+/* The Today rings card opens its sheet as a whole (C2); the details button
+   is the keyboard and screen-reader target. */
+.health-today {
+  cursor: pointer;
+}
+
+.health-today__details {
+  justify-self: start;
+}
+
+/* One sentence on what to do next, under each ring's legend line (P3). */
+.rings__hint {
+  grid-column: 2 / -1;
+  margin-top: calc(var(--space-1) * -1);
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric__value--button:active {
+    transform: none;
+  }
+}
