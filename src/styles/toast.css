@@ -1,10 +1,11 @@
-/* Toast (ui-spec C8): chrome, so glass (L3), bottom centre of the window.
+/* Toast (ui-spec C8): chrome, so glass (L3), bottom centre of the page area.
    It opens like a popover (M5): scale 0.96 to 1 and fade, 280 ms spring.
    Rendered into document.body, so no content ancestor has a transform,
    filter or animation that would break the backdrop. */
 .toast {
   position: fixed;
-  left: 50%;
+  /* Centred on the page area beside the sidebar, not the whole window. */
+  left: calc(50% + var(--sidebar-width) / 2);
   bottom: var(--space-6);
   z-index: 10;
   display: flex;
