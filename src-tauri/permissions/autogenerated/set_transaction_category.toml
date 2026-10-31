@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-transaction-category"
+description = "Enables the set_transaction_category command without any pre-configured scope."
+commands.allow = ["set_transaction_category"]
+
+[[permission]]
+identifier = "deny-set-transaction-category"
+description = "Denies the set_transaction_category command without any pre-configured scope."
+commands.deny = ["set_transaction_category"]

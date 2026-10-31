@@ -279,7 +279,12 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
         <QuickAdd categories={money.knownCategories} onAdded={onAdded} />
       </div>
 
-      <MoneyTransactions transactions={money.transactions} monthLabel={monthLabel(money.month)} />
+      <MoneyTransactions
+        transactions={money.transactions}
+        monthLabel={monthLabel(money.month)}
+        categories={money.knownCategories}
+        onChanged={onAdded}
+      />
 
       <MoneySplits
         friends={money.friends}
