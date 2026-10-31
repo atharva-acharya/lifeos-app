@@ -220,6 +220,82 @@ test("Money splits a bill and settles up", async () => {
   expect(text).toContain("| Settle-up | Sam | -10.00 |");
 });
 
+test("Money quick actions move focus to their fields", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Money", exact: true }).click();
+  const actions = page.getByRole("group", { name: "Quick actions" });
+  await expect(actions).toBeVisible();
+
+  // A shortcut key with nothing focused (focus on the page body).
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  await page.keyboard.press("s");
+  await expect(page.getByLabel("What for", { exact: true })).toBeFocused();
+
+  await actions.getByRole("button", { name: "Add a transaction" }).click();
+  await expect(page.getByLabel("Description", { exact: true })).toBeFocused();
+});
+
+test("Money percentage split shows what is left and saves only at 100%", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Money", exact: true }).click();
+  const form = page.getByRole("form", { name: "Split a bill" });
+  const save = form.getByRole("button", { name: "Save split" });
+  try {
+    await form.getByLabel("What for", { exact: true }).fill("E2E percent check");
+    await form.getByLabel("Total (£)", { exact: true }).fill("30");
+    await form.getByLabel("Friends (comma-separated)", { exact: true }).fill("Sam");
+    await form.getByRole("combobox", { name: "Split", exact: true }).selectOption("percent");
+    // "Include me in the split" is on by default, so there is a field for me too.
+    await form.getByLabel("Me (%)", { exact: true }).fill("50");
+    await form.getByLabel("Sam (%)", { exact: true }).fill("30");
+    await expect(form.getByText("20% left", { exact: true })).toBeVisible();
+    await expect(form.getByText("Percentages must add up to 100%.")).toBeVisible();
+    await expect(save).toBeDisabled();
+
+    await form.getByLabel("Sam (%)", { exact: true }).fill("50");
+    await expect(form.getByText("Adds up to 100%", { exact: true })).toBeVisible();
+    await expect(form.getByText("Percentages must add up to 100%.")).toHaveCount(0);
+    await expect(save).toBeEnabled();
+  } finally {
+    // Not saved: put the form back as it was.
+    await form.getByRole("combobox", { name: "Split", exact: true }).selectOption("equal");
+    await form.getByLabel("What for", { exact: true }).fill("");
+    await form.getByLabel("Total (£)", { exact: true }).fill("");
+    await form.getByLabel("Friends (comma-separated)", { exact: true }).fill("");
+  }
+});
+
+test("Money changes a row's category from its button and rewrites only that cell", async () => {
+  const { page, vault } = running();
+  await page.getByRole("button", { name: "Money", exact: true }).click();
+  // The row written by the quick add test above.
+  const now = new Date();
+  const month = `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const file = join(vault, "Money", "Ledger", `${month}.md`);
+  const before = readFileSync(file, "utf8");
+  const oldRow = "| E2E coffee / test | Eating out | -3.20 |  |";
+  const newRow = "| E2E coffee / test | E2E groceries | -3.20 |  |";
+  expect(before.split(oldRow)).toHaveLength(2);
+
+  const today = page.getByRole("list", { name: "Transactions on Today" });
+  await today
+    .getByRole("button", { name: "Change category for E2E coffee / test, now Eating out" })
+    .click();
+  const pop = page.getByRole("dialog", { name: "Category for E2E coffee / test" });
+  await expect(pop).toBeVisible();
+  await pop.getByLabel("New category", { exact: true }).fill("E2E groceries");
+  await pop.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(pop).toHaveCount(0);
+  await expect(
+    today.getByRole("button", { name: "Change category for E2E coffee / test, now E2E groceries" }),
+  ).toBeVisible();
+
+  await expect.poll(() => readFileSync(file, "utf8")).toContain(newRow);
+  expect(readFileSync(file, "utf8")).toBe(before.replace(oldRow, newRow));
+});
+
 test("Projects shows progress and where to resume", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Projects" }).click();
@@ -302,12 +378,82 @@ test("Health shows rings, trends and workouts", async () => {
   );
 });
 
+test("Health opens what is behind today in a sheet that Escape closes", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Health" }).click();
+  const trigger = page.getByRole("button", { name: "What’s behind today" });
+  await trigger.click();
+  const sheet = page.getByRole("dialog", { name: "What’s behind today" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toContainText("Each input against your own average over the 30 days before.");
+  await expect(sheet.getByRole("listitem").first()).toContainText("Steps");
+
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test("the page bar shows once the large title scrolls away", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Health" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Health" })).toBeVisible();
+  // Health is long enough to scroll at the default window size.
+  await expect(page.getByRole("list", { name: "Workouts, newest first" })).toBeVisible();
+  const main = page.locator("main");
+  const bar = page.locator(".page-bar");
+  const scrollTo = (top: "bottom" | "top") =>
+    main.evaluate((m, where) => {
+      m.scrollTo({
+        top: where === "bottom" ? m.scrollHeight : 0,
+        // Overrides any CSS smooth scrolling.
+        behavior: "instant" as ScrollBehavior,
+      });
+    }, top);
+  try {
+    await expect
+      .poll(() => main.evaluate((m) => m.scrollHeight - m.clientHeight))
+      .toBeGreaterThan(100);
+    // Earlier tests may have left the page scrolled.
+    await scrollTo("top");
+    await expect(bar).not.toHaveAttribute("data-visible");
+    await scrollTo("bottom");
+    await expect(bar).toHaveAttribute("data-visible", "");
+    await expect(main).toHaveAttribute("data-page-bar", "");
+    await expect(bar).toContainText("Health");
+
+    await scrollTo("top");
+    await expect(bar).not.toHaveAttribute("data-visible");
+    await expect(main).not.toHaveAttribute("data-page-bar");
+  } finally {
+    await scrollTo("top");
+  }
+});
+
 test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.getByText("Connected")).toBeVisible();
   await expect(page.getByText(vault)).toBeVisible();
+});
+
+test("Reduce transparency marks the page solid and back", async () => {
+  const { page } = running();
+  await page.getByRole("button", { name: "Settings" }).click();
+  const toggle = page.getByRole("checkbox", { name: "Reduce transparency" });
+  const html = page.locator("html");
+  try {
+    // The choice is kept in the WebView's storage, so start from off.
+    await toggle.setChecked(false);
+    await expect(html).not.toHaveAttribute("data-transparency");
+    await toggle.check();
+    await expect(toggle).toBeChecked();
+    await expect(html).toHaveAttribute("data-transparency", "reduced");
+    await toggle.uncheck();
+    await expect(html).not.toHaveAttribute("data-transparency");
+  } finally {
+    await toggle.setChecked(false);
+  }
 });
 
 test("an uncaught error is logged locally and shown in Diagnostics", async () => {
