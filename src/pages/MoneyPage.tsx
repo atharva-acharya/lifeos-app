@@ -11,6 +11,7 @@ import {
 import { Group, Metric } from "../components/Card";
 import { EmptyHint } from "../components/EmptyHint";
 import { MoneyImport } from "../components/MoneyImport";
+import { ADD_FIELD_ID, MoneyQuickActions } from "../components/MoneyQuickActions";
 import { MoneySplits } from "../components/MoneySplits";
 import { MoneyTrends } from "../components/MoneyTrends";
 import { NotConnected } from "../components/NotConnected";
@@ -172,6 +173,7 @@ function QuickAdd({ categories, onAdded }: { categories: string[]; onAdded: () =
             <label>
               <span className="kicker">Description</span>
               <input
+                id={ADD_FIELD_ID}
                 required
                 maxLength={200}
                 value={description}
@@ -268,6 +270,8 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
           unit={rate === null ? undefined : "%"}
         />
       </div>
+
+      <MoneyQuickActions friends={money.friends} />
 
       <div className="grid grid--wide-left">
         <Budgets budgets={money.budgets} />
