@@ -1,0 +1,83 @@
+/* Money quick actions (spec P5, C6, M1): equal-width capsules on the
+   raised control surface, under the metric row. */
+.money-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.money-actions__row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--card-pad);
+}
+
+.money-actions__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hover);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  /* Release springs back (M1); the press itself is set on :active. */
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    opacity var(--dur-base) var(--ease-standard),
+    transform var(--dur-base) var(--ease-spring);
+}
+
+.money-actions__button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .money-actions__button:hover:not(:disabled) {
+    background: #3a3a3c;
+  }
+}
+
+.money-actions__button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.money-actions__icon {
+  flex: none;
+  color: var(--cat-money);
+}
+
+.money-actions__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The shortcut hint: a small key cap, after the label. */
+.money-actions__key {
+  flex: none;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.money-actions__reason {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+}
