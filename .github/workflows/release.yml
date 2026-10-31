@@ -105,7 +105,6 @@ jobs:
         run: |
           mkdir -p dist-release
           cp src-tauri/target/release/bundle/nsis/*.exe dist-release/
-          cp src-tauri/target/release/bundle/msi/*.msi dist-release/
           # GitHub replaces spaces in asset names with dots; match it so SHA256SUMS.txt checks.
           for f in dist-release/*' '*; do mv "$f" "${f// /.}"; done
           ls -l dist-release
@@ -198,7 +197,6 @@ jobs:
         with:
           subject-path: |
             dist-release/*.exe
-            dist-release/*.msi
             dist-release/latest.json
             dist-release/sbom.cdx.json
 
