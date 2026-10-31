@@ -59,7 +59,14 @@ function ReplyRate({ rows }: { rows: Application[] }) {
     <Group title="Reply rate by source" cardClassName="card--stack chart-card">
       <span className="muted">Share of applications that got any reply</span>
       <div className="chart__plot" aria-hidden="true">
-        <BarChart data={sources} label={(r) => r.source} series={REPLIES} max={100} unit="%" />
+        <BarChart
+          data={sources}
+          label={(r) => r.source}
+          series={REPLIES}
+          max={100}
+          unit="%"
+          layout="grouped"
+        />
       </div>
       <table className="table chart__table">
         <thead>

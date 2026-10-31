@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { BarChart, fit, niceScale, type Series } from "./BarChart";
+import { BAR_MAX, BarChart, fit, niceScale, type Series } from "./BarChart";
 
 interface Row {
   name: string;
@@ -65,6 +65,30 @@ describe("BarChart", () => {
     expect(beta?.[1]).toBe(164);
     // The top segment has 4 px rounded corners.
     expect(three?.[2]).toBe(116);
+  });
+
+  it("keeps every bar at most 24 px wide, single, stacked or grouped (C4)", () => {
+    // Three slots across a 480 px fallback width would allow far wider bars.
+    const width = (d: string | null) => {
+      const n = (d ?? "").match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+      // Path: M x,y0 V .. Q .. H x+w-r Q x+w ..; the last-but-one Q ends at x+w.
+      return n[8] - n[0];
+    };
+    expect(BAR_MAX).toBe(24);
+    for (const props of [
+      { series: [A] },
+      { series: [A, B] },
+      { series: [A, B], layout: "grouped" as const },
+    ]) {
+      const { container, unmount } = render(
+        <BarChart data={data} label={(r) => r.name} max={8} {...props} />,
+      );
+      const bars = [...container.querySelectorAll(".bar-chart__bar")];
+      expect(bars.length).toBeGreaterThan(0);
+      // The slots allow about 100 px, so the cap is what sets the width.
+      for (const bar of bars) expect(width(bar.getAttribute("d"))).toBeCloseTo(BAR_MAX, 6);
+      unmount();
+    }
   });
 
   it("puts grouped bars side by side from the baseline, scaled to the larger one", () => {

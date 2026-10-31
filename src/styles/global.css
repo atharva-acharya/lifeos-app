@@ -56,10 +56,11 @@ a {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px var(--space-3);
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
   font-size: var(--fs-kicker);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   /* Opaque, so text contrast is the same on every surface (AA). */
   background: color-mix(in srgb, currentColor 18%, var(--bg-page));
   white-space: nowrap;

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { localDate, type Money } from "../api";
 import { setMode } from "../mode";
@@ -34,7 +34,14 @@ const OWED = [
 async function renderPage(friends: Money["friends"] = OWED) {
   mockCommands({ get_money: { status: "ready", money: money(friends) } });
   render(<MoneyPage onNavigate={vi.fn()} />);
-  return screen.findByRole("group", { name: "Quick actions" });
+  const group = await screen.findByRole("group", { name: "Quick actions" });
+  // Let the page finish settling (the index listener, late effects) before
+  // keys are pressed; on a slow runner a late re-render could otherwise move
+  // focus back to the page after a shortcut had set it.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  return group;
 }
 
 const action = (name: string) =>

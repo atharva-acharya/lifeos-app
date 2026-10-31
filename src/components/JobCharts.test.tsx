@@ -60,6 +60,26 @@ describe("JobCharts", () => {
     expect(screen.getByText(/1 reply not matched/)).toBeInTheDocument();
   });
 
+  it("draws moved-on and rejected side by side from the baseline, not stacked (C4)", () => {
+    const { container } = render(
+      <JobCharts
+        rows={[
+          app({ applied: "2026-01-05", source: "Indeed", status: "Interview" }),
+          app({ applied: "2026-01-06", source: "Indeed", status: "Rejected" }),
+        ]}
+      />,
+    );
+    const plots = container.querySelectorAll(".chart__plot");
+    const bars = [...plots[1].querySelectorAll(".bar-chart__bar")].map((b) =>
+      (b.getAttribute("d") ?? "").match(/-?\d+(\.\d+)?/g)?.map(Number),
+    );
+    expect(bars).toHaveLength(2);
+    const [moved, rejected] = bars;
+    // Both start on the same baseline, with Rejected to the right.
+    expect(moved?.[1]).toBe(rejected?.[1]);
+    expect(rejected?.[0]).toBeGreaterThan(moved?.[0] ?? Infinity);
+  });
+
   it("says so when the saved copy is empty or only has unmatched replies", () => {
     const { unmount } = render(<JobCharts rows={[]} />);
     expect(screen.getByText("No applications in the saved copy yet.")).toBeInTheDocument();

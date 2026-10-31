@@ -4,6 +4,7 @@ import { useMode } from "../mode";
 import { pounds } from "../money";
 import { fromKeyboard } from "../motion";
 import { Group } from "./Card";
+import { Toast, type ToastMessage } from "./Toast";
 import "../styles/money-transactions.css";
 
 /** Longest category name the core accepts. */
@@ -103,7 +104,8 @@ interface EditProps {
   categories: string[];
   /** Id of the text saying why editing is off, when it is. */
   disabledReason: string | null;
-  onChanged?: () => void;
+  /** Called after a save, with the category before and after it. */
+  onSaved: (row: MoneyRow, from: string | null, to: string) => void;
 }
 
 /**
@@ -111,7 +113,7 @@ interface EditProps {
  * It opens a popover from itself (M5) listing the known categories and a
  * field for a new one. Escape closes it and puts focus back on the button.
  */
-function CategoryEdit({ row, rowRef, categories, disabledReason, onChanged }: EditProps) {
+function CategoryEdit({ row, rowRef, categories, disabledReason, onSaved }: EditProps) {
   const popId = useId();
   const inputId = useId();
   const wrap = useRef<HTMLSpanElement>(null);
@@ -201,7 +203,7 @@ function CategoryEdit({ row, rowRef, categories, disabledReason, onChanged }: Ed
       .then(() => {
         setSaving(false);
         close(instant, true);
-        onChanged?.();
+        onSaved(row, row.category, value);
       })
       .catch((err: unknown) => {
         setSaving(false);
@@ -339,14 +341,14 @@ function DayGroup({
   refs,
   categories,
   disabledReason,
-  onChanged,
+  onSaved,
 }: {
   day: Day;
   today: string;
   refs: Map<MoneyRow, RowRef>;
   categories: string[];
   disabledReason: string | null;
-  onChanged?: () => void;
+  onSaved: EditProps["onSaved"];
 }) {
   const id = useId();
   const label = dayLabel(day.date, today);
@@ -374,7 +376,7 @@ function DayGroup({
                     rowRef={refs.get(t) ?? { occurrence: 0, duplicates: 1 }}
                     categories={categories}
                     disabledReason={disabledReason}
-                    onChanged={onChanged}
+                    onSaved={onSaved}
                   />
                   <span aria-hidden="true"> · </span>
                   <span className="sr-only">, account </span>
@@ -419,6 +421,81 @@ export function MoneyTransactions({
   const reasonId = useId();
   const days = groupByDay(transactions);
   const refs = rowRefs(transactions);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  const nextId = useRef(0);
+  // The latest list, so Undo finds the row whether or not the reload has landed.
+  const latest = useRef(transactions);
+  useEffect(() => {
+    latest.current = transactions;
+  }, [transactions]);
+
+  const show = (t: Omit<ToastMessage, "id">) => {
+    nextId.current += 1;
+    setToast({ ...t, id: nextId.current });
+  };
+
+  // Sets the row at `index` (page order) back from `to` to `from` (C8).
+  const undo = (index: number, original: MoneyRow, from: string, to: string) => {
+    const now = latest.current;
+    const same = (t: MoneyRow | undefined, category: string | null) =>
+      t !== undefined &&
+      t.date === original.date &&
+      t.description === original.description &&
+      t.amount === original.amount &&
+      t.account === original.account &&
+      t.category === category;
+    // Before the reload the list still shows the old category; read it as saved.
+    const after =
+      !same(now[index], to) && same(now[index], original.category)
+        ? now.map((t, i) => (i === index ? { ...t, category: to } : t))
+        : now;
+    const row = after[index];
+    const ref = rowRefs(after).get(row);
+    if (!same(row, to) || !ref) {
+      show({ error: true, text: "Could not undo: the list has changed." });
+      return;
+    }
+    setUndoing(true);
+    setTransactionCategory({
+      date: row.date,
+      description: row.description,
+      amount: row.amount,
+      account: row.account,
+      category: to,
+      occurrence: ref.occurrence,
+      duplicates: ref.duplicates,
+      newCategory: from,
+    })
+      .then(() => {
+        onChanged?.();
+        show({ text: `Category changed back to ${from}` });
+      })
+      .catch((err: unknown) => {
+        show({
+          error: true,
+          text: typeof err === "string" ? err : "Could not undo the category change.",
+        });
+      })
+      .finally(() => {
+        setUndoing(false);
+      });
+  };
+
+  const saved = (row: MoneyRow, from: string | null, to: string) => {
+    const index = transactions.indexOf(row);
+    onChanged?.();
+    // A row with no category cannot be set back to none, so no Undo then.
+    show({
+      text: `Category changed to ${to}`,
+      onUndo:
+        from === null || index === -1
+          ? undefined
+          : () => {
+              undo(index, row, from, to);
+            },
+    });
+  };
   return (
     <Group title="Transactions" cardClassName="card--flush money-tx">
       {days.length === 0 ? (
@@ -439,12 +516,19 @@ export function MoneyTransactions({
                 refs={refs}
                 categories={categories}
                 disabledReason={sample ? reasonId : null}
-                onChanged={onChanged}
+                onSaved={saved}
               />
             ))}
           </ul>
         </>
       )}
+      <Toast
+        toast={toast}
+        busy={undoing}
+        onDismiss={() => {
+          setToast(null);
+        }}
+      />
     </Group>
   );
 }

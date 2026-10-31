@@ -214,6 +214,95 @@ describe("changing a category", () => {
     expect(button).toHaveFocus();
   });
 
+  it("confirms the change in a toast whose Undo sets the old category back", async () => {
+    mockCommands({ set_transaction_category: undefined });
+    const onChanged = renderEditable();
+    click(trigger("Corner Grocer", "Groceries"));
+    click(screen.getByRole("button", { name: "Eating out" }));
+    const toast = await screen.findByRole("status");
+    expect(toast).toHaveTextContent("Category changed to Eating out");
+    fireEvent.click(within(toast).getByRole("button", { name: "Undo" }));
+    await waitFor(() => {
+      expect(onChanged).toHaveBeenCalledTimes(2);
+    });
+    // The same call, from the saved category back to the old one.
+    expect(sentChange()).toEqual({
+      date: "2026-10-29",
+      description: "Corner Grocer",
+      amount: -1250,
+      account: "Card",
+      category: "Eating out",
+      occurrence: 0,
+      duplicates: 1,
+      newCategory: "Groceries",
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Category changed back to Groceries",
+    );
+  });
+
+  it("undoes the right row after the page reloads with the new category", async () => {
+    mockCommands({ set_transaction_category: undefined });
+    const saved = { ...CAFE, category: "Coffee" };
+    const { rerender } = render(
+      <MoneyTransactions
+        transactions={[{ ...CAFE, category: "Snacks" }, saved]}
+        monthLabel="October 2026"
+        today={TODAY}
+        categories={CATEGORIES}
+      />,
+    );
+    click(screen.getByRole("button", { name: "Change category for Sample Cafe, now Coffee" }));
+    click(screen.getByRole("button", { name: "Salary" }));
+    const toast = await screen.findByRole("status");
+    // The reload lands: the row now reads Salary, next to an identical Salary row.
+    rerender(
+      <MoneyTransactions
+        transactions={[
+          { ...CAFE, category: "Salary" },
+          { ...saved, category: "Salary" },
+        ]}
+        monthLabel="October 2026"
+        today={TODAY}
+        categories={CATEGORIES}
+      />,
+    );
+    fireEvent.click(within(toast).getByRole("button", { name: "Undo" }));
+    await waitFor(() => {
+      expect(sentChange()).toMatchObject({
+        category: "Salary",
+        newCategory: "Coffee",
+        occurrence: 1,
+        duplicates: 2,
+      });
+    });
+  });
+
+  it("offers no Undo when the row had no category before", async () => {
+    mockCommands({ set_transaction_category: undefined });
+    renderEditable();
+    click(trigger("Sample Cafe", "none"));
+    click(screen.getByRole("button", { name: "Salary" }));
+    const toast = await screen.findByRole("status");
+    expect(toast).toHaveTextContent("Category changed to Salary");
+    expect(within(toast).queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
+  });
+
+  it("shows a failed Undo as an error toast", async () => {
+    const reason = "The ledger note changed since this page loaded.";
+    mockCommands({
+      set_transaction_category: (args?: Record<string, unknown>) =>
+        (args?.change as CategoryChange).newCategory === "Groceries" ? rejected(reason) : undefined,
+    });
+    renderEditable();
+    click(trigger("Corner Grocer", "Groceries"));
+    click(screen.getByRole("button", { name: "Eating out" }));
+    fireEvent.click(
+      within(await screen.findByRole("status")).getByRole("button", { name: "Undo" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(reason);
+  });
+
   it("tells the core which of two identical rows was chosen", async () => {
     mockCommands({ set_transaction_category: undefined });
     renderEditable([CAFE, { ...CAFE }]);
