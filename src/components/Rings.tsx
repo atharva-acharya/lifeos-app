@@ -8,6 +8,8 @@ export interface Ring {
   unit?: string;
   /** Writes a value in the legend (e.g. "7 h 12 min"); overrides `unit`. */
   format?: (n: number) => string;
+  /** One sentence on what to do next, shown under the legend line (ui-spec P3). */
+  hint?: string;
 }
 
 const STROKE = 14;
@@ -73,6 +75,7 @@ export function Rings({ rings, size = 168 }: { rings: Ring[]; size?: number }) {
               <span className="rings__value">
                 {legendValue(r, r.value)} / {legendValue(r, r.goal)}
               </span>
+              {r.hint && <span className="rings__hint">{r.hint}</span>}
             </li>
           ))}
         </ul>

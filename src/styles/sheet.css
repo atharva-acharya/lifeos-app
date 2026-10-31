@@ -1,0 +1,123 @@
+/* Sheet (ui-spec M5). A sheet is chrome, so it is glass (L1, L3) and becomes
+   solid under reduce transparency (L5) through the glass tokens. It opens
+   from its trigger (the scale origin is set inline by Sheet.tsx): scale 0.96
+   to 1 and fade over 280 ms with the spring; it closes faster, 160 ms
+   ease-out. Reduce motion: no animation, it only appears. Its ancestors are
+   <body> and <html> only (it is portalled), so nothing breaks the backdrop. */
+.sheet {
+  --sheet-in: 280ms;
+  --sheet-out: 160ms;
+
+  width: min(480px, calc(100vw - 64px));
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  color: var(--text);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+
+.sheet[open] {
+  animation: sheet-in var(--sheet-in) var(--ease-spring) both;
+}
+
+.sheet[data-state="closing"] {
+  animation: sheet-out var(--sheet-out) var(--ease-out) both;
+}
+
+/* The dimming scrim. */
+.sheet::backdrop {
+  background: rgb(0 0 0 / 0.5);
+  animation: scrim-in var(--sheet-in) var(--ease-out) both;
+}
+
+.sheet[data-state="closing"]::backdrop {
+  animation: scrim-out var(--sheet-out) var(--ease-out) both;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes sheet-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet[open],
+  .sheet[data-state="closing"],
+  .sheet::backdrop,
+  .sheet[data-state="closing"]::backdrop {
+    animation: none;
+  }
+}
+
+.sheet__body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--card-pad) var(--card-pad);
+}
+
+.sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: var(--fs-group);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sheet__close {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sheet__close:hover {
+    color: var(--text);
+  }
+}
+
+.sheet__close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

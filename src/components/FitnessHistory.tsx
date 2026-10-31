@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { ExerciseSet, FitnessWorkout } from "../api";
 import { shortLabel } from "../fitnessStats";
-import { fromKeyboard, withTransition } from "../motion";
+import { withTransition } from "../motion";
 import type { Navigate } from "../routes";
 import { EmptyHint } from "./EmptyHint";
 import { Group } from "./Card";
+import { SegmentedTabs } from "./SegmentedTabs";
 
 const DAYS = ["Push A", "Pull A", "Legs", "Push B", "Pull B"];
 const OTHER = "Other";
@@ -64,30 +65,22 @@ export function FitnessHistory({
         </EmptyHint>
       ) : (
         <>
-          <div className="tabs" role="tablist" aria-label="Workout days">
-            {tabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                id={`workout-tab-${slug(t)}`}
-                aria-selected={tab === t}
-                aria-controls="workout-panel"
-                className="tabs__tab"
-                onClick={(e) => {
-                  // Enter or Space on a tab is instant (M4); a mouse click animates.
-                  withTransition(
-                    () => {
-                      setChosen(t);
-                    },
-                    { instant: fromKeyboard(e) },
-                  );
-                }}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          <SegmentedTabs
+            items={tabs.map((t) => ({ id: t, label: t }))}
+            value={tab}
+            label="Workout days"
+            tabId={(t) => `workout-tab-${slug(t)}`}
+            panelId={() => "workout-panel"}
+            onChange={(t, instant) => {
+              // Keyboard changes are instant (M4); a mouse click animates.
+              withTransition(
+                () => {
+                  setChosen(t);
+                },
+                { instant },
+              );
+            }}
+          />
           <div role="tabpanel" id="workout-panel" aria-labelledby={`workout-tab-${slug(tab)}`}>
             {shown.length === 0 ? (
               <p className="muted">No {tab} sessions yet.</p>

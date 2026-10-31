@@ -49,7 +49,7 @@ function Dashboard({ health, now }: { health: Health; now: number }) {
           In Health Auto Export, add those metrics to the export, then let it run once.
         </EmptyHint>
       )}
-      <HealthToday day={health.ringsDay} goals={health.goals} />
+      <HealthToday day={health.ringsDay} goals={health.goals} days={health.days} />
       <HealthTrends days={health.days} sleepGoal={health.goals.sleepHours} />
       <HealthWorkouts workouts={health.workouts} />
     </div>

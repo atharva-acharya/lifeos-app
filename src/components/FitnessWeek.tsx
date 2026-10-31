@@ -1,8 +1,12 @@
-import { SESSIONS_GOAL, type WeekSummary } from "../fitnessStats";
+import { SESSIONS_GOAL, weekHints, type WeekSummary } from "../fitnessStats";
 import { Rings, type Ring } from "./Rings";
 import { Group } from "./Card";
+import "../styles/contributors.css";
 
-/** This week at a glance: steps, protein days and sessions against their goals. */
+/**
+ * This week at a glance: steps, protein days and sessions against their
+ * goals, each with what to do next (ui-spec P3).
+ */
 export function FitnessWeek({
   summary,
   defaults,
@@ -11,6 +15,7 @@ export function FitnessWeek({
   /** Which goals are the app's own defaults rather than set in the plan note. */
   defaults?: { steps: boolean; protein: boolean };
 }) {
+  const hints = weekHints(summary);
   const rings: Ring[] = [
     {
       key: "steps",
@@ -18,6 +23,7 @@ export function FitnessWeek({
       value: summary.avgSteps ?? 0,
       goal: summary.stepsGoal,
       color: "var(--ring-move)",
+      hint: hints.steps,
     },
     {
       key: "protein",
@@ -25,6 +31,7 @@ export function FitnessWeek({
       value: summary.proteinDays,
       goal: 7,
       color: "var(--ring-exercise)",
+      hint: hints.protein,
     },
     {
       key: "sessions",
@@ -32,6 +39,7 @@ export function FitnessWeek({
       value: summary.sessions,
       goal: SESSIONS_GOAL,
       color: "var(--ring-stand)",
+      hint: hints.sessions,
     },
   ];
   return (

@@ -9,9 +9,10 @@ import {
 } from "../api";
 import { ApplicationsTab } from "../components/ApplicationsTab";
 import { ChartsTab } from "../components/JobCharts";
-import { fromKeyboard, withTransition } from "../motion";
+import { withTransition } from "../motion";
 import { EmptyHint } from "../components/EmptyHint";
 import { NotConnected } from "../components/NotConnected";
+import { SegmentedTabs } from "../components/SegmentedTabs";
 import type { Navigate } from "../routes";
 
 type Tab = "applications" | "pipeline" | "outreach" | "charts";
@@ -262,30 +263,22 @@ export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
         <h1 className="page-title">Jobs</h1>
       </header>
 
-      <div className="tabs" role="tablist" aria-label="Jobs views">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls={`panel-${t.id}`}
-            className="tabs__tab"
-            onClick={(e) => {
-              // Enter or Space on a tab is instant (M4); a mouse click animates.
-              withTransition(
-                () => {
-                  setTab(t.id);
-                },
-                { instant: fromKeyboard(e) },
-              );
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedTabs
+        items={TABS}
+        value={tab}
+        label="Jobs views"
+        tabId={(id) => `tab-${id}`}
+        panelId={(id) => `panel-${id}`}
+        onChange={(next, instant) => {
+          // Keyboard changes are instant (M4); a mouse click animates.
+          withTransition(
+            () => {
+              setTab(next);
+            },
+            { instant },
+          );
+        }}
+      />
 
       {error && (
         <p className="setting__error" role="alert">
