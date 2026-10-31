@@ -133,7 +133,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .metric--link:hover {
-    background: #232325;
+    background: var(--bg-card-hover);
   }
   .metric--link:hover .metric__chevron {
     color: var(--text);

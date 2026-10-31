@@ -53,6 +53,15 @@ describe("App shell", () => {
     expect(screen.getByRole("main")).toHaveFocus();
   });
 
+  it("names the page bar after the current page", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Fitness" }));
+    const bar = screen.getByRole("main").querySelector(".page-bar");
+    expect(bar).toHaveTextContent("Fitness");
+    expect(bar).toHaveAttribute("aria-hidden", "true");
+    expect(bar).not.toHaveAttribute("data-visible");
+  });
+
   it("opens Search with Ctrl+K", async () => {
     render(<App />);
     await screen.findByRole("button", { name: "Today" });
