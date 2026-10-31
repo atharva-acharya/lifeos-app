@@ -50,10 +50,16 @@
   --gutter: 20px; /* between sections */
   --radius-control: 10px;
   --radius-pill: 999px;
+  /* Concentric inside a 10 px control with a 4 px inset (the tabs track). */
+  --radius-inset: 6px;
+  /* The floor (T5): small marks and anything inset 10 px or more in a card. */
+  --radius-small: 4px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  /* 24 px: the larger in-component step (sidebar groups, ring to legend,
+     setting text to its control, list indent, page bottom); ui-spec T6. */
   --space-5: 24px;
   --space-6: 32px;
 
@@ -66,6 +72,8 @@
   --fs-number: 30px;
   --fs-group: 20px;
   --fs-label: 15px;
+  --fs-tick: 12px; /* chart axis ticks only (T7) */
+  --fs-bar-title: 17px; /* the compact page bar's title, as iOS (T7) */
 
   --focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent);
 
@@ -76,7 +84,6 @@
   --glass-edge: rgb(255 255 255 / 0.08);
   --glass-highlight: inset 0 1px 0 var(--glass-edge);
   --glass-border: var(--glass-edge);
-  --popover-solid: #2c2c2e; /* glass never sits on glass (L2) */
   --glass-hover: rgb(255 255 255 / 0.08);
   --scrim: rgb(0 0 0 / 0.5); /* dims the page behind a sheet */
   --shadow-float: 0 8px 24px rgb(0 0 0 / 0.4); /* toasts float over content */
