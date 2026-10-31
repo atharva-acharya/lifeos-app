@@ -1,0 +1,95 @@
+/* Toast (ui-spec C8): chrome, so glass (L3), bottom centre of the page area.
+   It opens like a popover (M5): scale 0.96 to 1 and fade, 280 ms spring.
+   Rendered into document.body, so no content ancestor has a transform,
+   filter or animation that would break the backdrop. */
+.toast {
+  position: fixed;
+  /* Centred on the page area beside the sidebar, not the whole window. */
+  left: calc(50% + var(--sidebar-width) / 2);
+  bottom: var(--space-6);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: min(560px, calc(100vw - 2 * var(--space-6)));
+  min-height: 48px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    var(--glass-highlight),
+    0 8px 24px rgb(0 0 0 / 0.4);
+  color: var(--text);
+  font-size: var(--fs-body);
+  translate: -50% 0;
+  transform-origin: 50% 100%;
+  animation: toast-in var(--dur-pop-in) var(--ease-spring) both;
+}
+
+.toast__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.toast--error .toast__text {
+  color: var(--c-danger);
+}
+
+.toast__undo {
+  flex: none;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-hover);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-release) var(--ease-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toast__undo:hover:not(:disabled) {
+    background: var(--bg-hover);
+  }
+}
+
+.toast__undo:active:not(:disabled) {
+  transform: scale(0.97);
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.toast__undo:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toast__undo:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Reduce motion: the toast only appears; nothing scales. */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+
+  .toast__undo:active:not(:disabled) {
+    transform: none;
+  }
+}
