@@ -65,6 +65,28 @@ describe("TodayPage", () => {
     expect(screen.getByRole("status")).toHaveTextContent("1 note could not be read");
   });
 
+  it("shows three follow-ups and links to Jobs for the rest", async () => {
+    const followUps = Array.from({ length: 5 }, (_, i) => ({
+      ...TODAY.followUps[0],
+      path: `Jobs/Companies/Company ${String(i)}.md`,
+      company: `Company ${String(i)}`,
+    }));
+    mockCommands({ get_today: { status: "ready", today: { ...TODAY, followUps } } });
+    const onNavigate = vi.fn();
+    render(<TodayPage onNavigate={onNavigate} />);
+    expect(await screen.findByText("Company 2")).toBeInTheDocument();
+    expect(screen.queryByText("Company 3")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "2 more in Jobs" }));
+    expect(onNavigate).toHaveBeenCalledWith("jobs");
+  });
+
+  it("has no link to Jobs when every follow-up is shown", async () => {
+    mockCommands({ get_today: { status: "ready", today: TODAY } });
+    render(<TodayPage onNavigate={vi.fn()} />);
+    await screen.findByText("Example Security Ltd");
+    expect(screen.queryByRole("button", { name: /more in Jobs/ })).not.toBeInTheDocument();
+  });
+
   it("refreshes when the index changes", async () => {
     mockCommands({ get_today: { status: "noVault" } });
     render(<TodayPage onNavigate={vi.fn()} />);
