@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: events, window controls and the app's own settings, Today, Jobs, Fitness, Projects, Health, Money (read, quick add and CSV import from text the UI read, which write only ledger rows through the safe writer), setup checklist, sample data, Google Sheets, diagnostics and update commands (the updater plugin itself is not exposed); no fs, shell, http or path access (threat model T5)",
+  "description": "Main window: events, window controls and the app's own settings, Today, Jobs, Fitness, Projects, Health, Money (read, quick add, changing one row's category and CSV import from text the UI read, which write only ledger rows through the safe writer), setup checklist, sample data, Google Sheets, diagnostics and update commands (the updater plugin itself is not exposed); no fs, shell, http or path access (threat model T5)",
   "windows": ["main"],
   "permissions": [
     "core:event:default",
@@ -22,6 +22,7 @@
     "allow-get-health",
     "allow-get-money",
     "allow-add-transaction",
+    "allow-set-transaction-category",
     "allow-get-banks",
     "allow-preview-import",
     "allow-import-csv",

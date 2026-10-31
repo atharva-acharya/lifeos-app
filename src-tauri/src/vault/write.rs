@@ -115,6 +115,35 @@ pub fn append_rows(
     }
 }
 
+/// Rewrites the existing note at `rel` with `edit`, which gets the note's
+/// text and returns the new text (or refuses). The same safe path as
+/// `append_rows`: links and junctions refused, the folder re-checked inside
+/// the vault, a temp file moved over the note only if the note is unchanged
+/// since it was read. A missing note is refused, never created. If `edit`
+/// changes nothing, nothing is written.
+pub fn rewrite<E: From<WriteError>>(
+    root: &Path,
+    rel: &str,
+    edit: impl FnOnce(&str) -> Result<String, E>,
+) -> Result<WriteRecord, E> {
+    let path = guard::resolve(root, rel).map_err(WriteError::from)?;
+    let parent = path
+        .parent()
+        .ok_or(WriteError::Guard(GuardError::Empty))?
+        .to_path_buf();
+    sweep_temps(&parent);
+    let original = read(&path)?;
+    let updated = edit(&original)?;
+    if updated != original {
+        check_inside(root, &parent)?;
+        replace(&parent, &path, &original, &updated)?;
+    }
+    Ok(WriteRecord {
+        before: Some(hex(&original)),
+        after: hex(&updated),
+    })
+}
+
 /// Appends one line to `write-log.txt` in `log_dir` (app data, never the
 /// vault): time, action, note path and hashes. No note content is logged.
 pub fn log_write(log_dir: &Path, action: &str, rel: &str, record: &WriteRecord) {

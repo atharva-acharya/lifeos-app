@@ -15,6 +15,7 @@ const COMMANDS: &[&str] = &[
     "get_health",
     "get_money",
     "add_transaction",
+    "set_transaction_category",
     "get_banks",
     "preview_import",
     "import_csv",

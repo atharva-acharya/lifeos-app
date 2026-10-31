@@ -89,3 +89,227 @@
 .money-tx__amount--in {
   color: var(--c-done);
 }
+
+.money-tx__note {
+  margin: 0;
+  padding: var(--space-2) var(--card-pad) 0;
+  font-size: 13px;
+}
+
+/* The category under each row is a small button that opens a popover to
+   change it (P6). It reads as the secondary line's text until hovered. */
+.money-tx__cat-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.money-tx__cat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+  margin: -2px 0 -2px calc(var(--space-1) * -1);
+  padding: 2px var(--space-1);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-release) var(--ease-spring);
+}
+
+.money-tx__cat:active:not(:disabled) {
+  transform: scale(0.97);
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-press) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .money-tx__cat:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+}
+
+.money-tx__cat[aria-expanded="true"] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* Disabled (C6): half opacity, with the reason above the list. */
+.money-tx__cat:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.money-tx__chevron {
+  font-size: 10px;
+}
+
+/* The popover is chrome, so glass (L1, L3); it sits on a content card, never
+   on another glass surface (L2). It grows from its trigger (M5): scale
+   0.96 to 1 and a fade, 280 ms with the spring; it closes in 160 ms. */
+.money-tx__pop {
+  --pop-in: 280ms;
+  --pop-out: 160ms;
+
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  width: 240px;
+  max-width: 80vw;
+  padding: var(--space-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: var(--glass-filter);
+  color: var(--text);
+  font-size: var(--fs-body);
+  transform-origin: top left;
+  transition:
+    opacity var(--pop-in) var(--ease-out),
+    transform var(--pop-in) var(--ease-spring);
+}
+
+@starting-style {
+  .money-tx__pop {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.money-tx__pop[data-closing] {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--pop-out) var(--ease-out),
+    transform var(--pop-out) var(--ease-out);
+}
+
+/* Opened from the keyboard: no animation (M4). */
+.money-tx__pop[data-instant] {
+  transition: none;
+}
+
+.money-tx__options {
+  max-height: 216px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+/* Inset 4 px in a 14 px popover, so 10 px corners (T5). */
+.money-tx__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .money-tx__option:hover:not(:disabled) {
+    background: var(--glass-hover);
+  }
+}
+
+.money-tx__option[aria-current="true"] {
+  font-weight: 600;
+}
+
+.money-tx__option-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.money-tx__tick {
+  flex: none;
+  color: var(--accent);
+}
+
+.money-tx__new {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.money-tx__new-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.money-tx__new-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.money-tx__new-row input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-hover);
+  color: var(--text);
+  font: inherit;
+}
+
+.money-tx__new-row .button {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.money-tx__error {
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .money-tx__pop {
+    --pop-in: 0ms;
+    --pop-out: 0ms;
+
+    transform: none;
+  }
+
+  .money-tx__pop[data-closing] {
+    transform: none;
+  }
+
+  .money-tx__cat:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @starting-style {
+    .money-tx__pop {
+      transform: none;
+    }
+  }
+}

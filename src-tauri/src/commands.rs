@@ -14,6 +14,7 @@ use crate::health::{self, Health, HealthState};
 use crate::jobs::{self, Jobs};
 use crate::live::{self, LiveState, Mode};
 use crate::money::{self, Money, NewTransaction};
+use crate::money_edit::{self, CategoryChange};
 use crate::money_import::{self, ImportResult, Mapping, Preview};
 use crate::money_splits::{self, NewSplit};
 use crate::onboarding::{self, Setup};
@@ -482,6 +483,38 @@ pub fn add_transaction(
     Ok(())
 }
 
+/// Refuses in sample mode, then changes the row's category in the open
+/// vault. Returns the note's path and hashes for the write log.
+fn change_category(
+    state: &LiveState,
+    change: &CategoryChange,
+) -> Result<(String, crate::vault::write::WriteRecord), String> {
+    state.require_real()?;
+    let vault = state
+        .vault()
+        .ok_or_else(|| "Choose your vault folder first.".to_owned())?;
+    money_edit::set_category(&vault, change)
+}
+
+/// Recategorise: rewrites the Category cell of one existing row in
+/// `Money/Ledger/YYYY-MM.md`. The row is named by its content, never by a
+/// path; the note follows from its date.
+#[tauri::command]
+pub fn set_transaction_category(
+    app: AppHandle,
+    state: tauri::State<'_, LiveState>,
+    change: CategoryChange,
+) -> Result<(), String> {
+    let (rel, record) = change_category(&state, &change)?;
+    if record.before.as_deref() != Some(record.after.as_str()) {
+        if let Ok(dir) = live::data_dir(&app) {
+            crate::vault::write::log_write(&dir, "set-category", &rel, &record);
+        }
+        live::resync(&app);
+    }
+    Ok(())
+}
+
 /// Banks with a saved CSV mapping, for the import form.
 #[tauri::command]
 pub fn get_banks(
@@ -897,6 +930,46 @@ mod tests {
                 .expect("folder")
                 .starts_with(sample::sample_dir(Path::new("data")))
         );
+    }
+
+    #[test]
+    fn sample_mode_refuses_category_changes_before_touching_a_vault() {
+        let state = LiveState::default();
+        let index = crate::index::Index::open_in_memory().expect("index");
+        state.install_sample(PathBuf::from("sample"), index, Cache::default());
+        let change: CategoryChange = serde_json::from_value(serde_json::json!({
+            "date": "2026-10-03",
+            "description": "Corner Grocer",
+            "amount": -1250,
+            "account": null,
+            "category": null,
+            "occurrence": 0,
+            "duplicates": 1,
+            "newCategory": "Food"
+        }))
+        .expect("change");
+        assert_eq!(
+            change_category(&state, &change).map(|_| ()),
+            Err(live::SAMPLE_REFUSED.to_owned())
+        );
+        // With no vault open (real mode) it is refused too.
+        assert!(change_category(&LiveState::default(), &change).is_err());
+    }
+
+    #[test]
+    fn a_category_change_carries_no_path() {
+        let with_path = serde_json::json!({
+            "date": "2026-10-03",
+            "description": "x",
+            "amount": -1,
+            "account": null,
+            "category": null,
+            "occurrence": 0,
+            "duplicates": 1,
+            "newCategory": "Food",
+            "path": "../elsewhere.md"
+        });
+        assert!(serde_json::from_value::<CategoryChange>(with_path).is_err());
     }
 
     #[test]

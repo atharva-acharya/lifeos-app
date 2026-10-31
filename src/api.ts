@@ -222,6 +222,27 @@ export function addTransaction(transaction: NewTransaction): Promise<undefined> 
   return invoke<undefined>("add_transaction", { transaction });
 }
 
+/**
+ * Names one ledger row by what the page shows, never by a path. `occurrence`
+ * picks one of several identical rows (0 is the first the page lists) and
+ * `duplicates` is how many the page shows; the core refuses if the note no
+ * longer has exactly that many.
+ */
+export interface CategoryChange {
+  date: string;
+  description: string;
+  amount: number;
+  account: string | null;
+  category: string | null;
+  occurrence: number;
+  duplicates: number;
+  newCategory: string;
+}
+
+export function setTransactionCategory(change: CategoryChange): Promise<undefined> {
+  return invoke<undefined>("set_transaction_category", { change });
+}
+
 export type DateFormat = "dmy" | "ymd" | "mdy";
 
 /** Which CSV column (by header) holds each field of a bank statement. */
