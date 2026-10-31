@@ -14,9 +14,8 @@
    rows from showing through it. */
 .money-tx__head {
   position: sticky;
-  /* Sticks to the very top of .main, past its top padding, so no row
-     shows above the header. */
-  top: calc(-1 * var(--space-5));
+  /* Sticks just under the scroll-edge fade at the top of the page (L4). */
+  top: var(--scroll-edge);
   z-index: 1;
   display: flex;
   align-items: baseline;
