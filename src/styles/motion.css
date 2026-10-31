@@ -160,8 +160,10 @@
   }
 }
 
-/* Line charts draw themselves in; rings fill with a spring. Keyframe
-   animations (not transitions) so the inline final value is the end point. */
+/* Line charts draw themselves in; rings fill with a spring (M6), each ring
+   60 ms after the one outside it. Rings.tsx sets --ring-index on every fill.
+   Keyframe animations (not transitions) so the inline final value is the
+   end point. */
 .line-chart__line {
   animation: line-draw var(--dur-line-draw) var(--ease-standard) both;
 }
@@ -178,6 +180,7 @@
 
 .rings__fill {
   animation: ring-fill var(--dur-ring-fill) var(--ease-spring) both;
+  animation-delay: calc(var(--ring-index, 0) * var(--ring-stagger));
   transition: stroke-dashoffset var(--dur-slow) var(--ease-spring);
 }
 

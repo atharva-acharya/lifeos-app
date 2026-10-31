@@ -103,6 +103,7 @@
   --dur-pop-out: 160ms; /* and close faster (M5) */
   --dur-line-draw: 480ms; /* line charts draw in (M7) */
   --dur-ring-fill: 800ms; /* rings fill with the spring (M6) */
+  --ring-stagger: 60ms; /* M6: delay between rings, outermost first */
   /* The one looping highlight, on the active project (M10). Symmetric
      because it loops; it is never an entry. */
   --dur-breathe: 3.2s;
@@ -148,6 +149,7 @@
     --dur-pop-out: 0ms;
     --dur-line-draw: 0ms;
     --dur-ring-fill: 0ms;
+    --ring-stagger: 0ms;
   }
 }
 
