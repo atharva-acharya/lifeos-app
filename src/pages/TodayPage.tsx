@@ -7,6 +7,7 @@ import {
   type Today,
   type TodayResponse,
 } from "../api";
+import { Group, Metric } from "../components/Card";
 import { EmptyHint } from "../components/EmptyHint";
 import { NotConnected } from "../components/NotConnected";
 import { Rings } from "../components/Rings";
@@ -14,6 +15,8 @@ import { SetupCard } from "../components/SetupCard";
 import type { Navigate } from "../routes";
 
 const HABITS = 5;
+/** Home must fit the minimum window without scrolling, so the list is capped. */
+const FOLLOW_UPS_SHOWN = 3;
 
 function greeting(hour: number): string {
   if (hour < 12) return "Good morning";
@@ -39,26 +42,6 @@ function signed(n: number): string {
   return `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}`;
 }
 
-function Stat({
-  label,
-  value,
-  detail,
-  tone,
-}: {
-  label: string;
-  value: string;
-  detail?: React.ReactNode;
-  tone?: "progress" | "done";
-}) {
-  return (
-    <section className="card stat" aria-label={label}>
-      <p className="kicker">{label}</p>
-      <p className={`stat__value${tone ? ` stat__value--${tone}` : ""}`}>{value}</p>
-      {detail && <div className="stat__detail">{detail}</div>}
-    </section>
-  );
-}
-
 function Habit({ label, done, value }: { label: string; done: boolean; value?: string }) {
   return (
     <li className={`habit${done ? " habit--done" : ""}`}>
@@ -75,10 +58,12 @@ function Habit({ label, done, value }: { label: string; done: boolean; value?: s
 function FollowUpRow({ item, today }: { item: FollowUp; today: string }) {
   const overdue = item.nextDate < today;
   return (
-    <li className="row">
-      <div className="row__main">
-        <span className="row__title">{item.company ?? item.path}</span>
-        <span className="row__sub">{[item.role, item.nextAction].filter(Boolean).join(" · ")}</span>
+    <li className="list__row">
+      <div className="list__main">
+        <span className="list__title">{item.company ?? item.path}</span>
+        <span className="list__sub">
+          {[item.role, item.nextAction].filter(Boolean).join(" · ")}
+        </span>
       </div>
       {item.stage && <span className="pill pill--read">{item.stage}</span>}
       <span className={`pill ${overdue ? "pill--danger" : "pill--progress"}`}>
@@ -102,8 +87,10 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
 
   const noNote = !today.hasDailyNote;
 
+  const more = today.followUps.length - FOLLOW_UPS_SHOWN;
+
   return (
-    <>
+    <div className="page">
       {noNote && (
         <section className="card" aria-label="Daily note">
           <EmptyHint
@@ -115,23 +102,20 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
           </EmptyHint>
         </section>
       )}
-      <section className="card today-hero" aria-labelledby="habits-heading">
-        <Rings
-          size={132}
-          rings={[
-            {
-              key: "habits",
-              name: "Habits",
-              value: habitsDone,
-              goal: HABITS,
-              color: habitsDone === HABITS ? "var(--ring-exercise)" : "var(--ring-move)",
-            },
-          ]}
-        />
-        <div className="today-hero__habits">
-          <h2 id="habits-heading" className="kicker">
-            Habits
-          </h2>
+      <div className="grid grid--2">
+        <Group title="Habits" cardClassName="today-hero">
+          <Rings
+            size={96}
+            rings={[
+              {
+                key: "habits",
+                name: "Habits",
+                value: habitsDone,
+                goal: HABITS,
+                color: habitsDone === HABITS ? "var(--ring-exercise)" : "var(--ring-move)",
+              },
+            ]}
+          />
           <ul className="habits">
             <Habit label="Weigh-in" done={h.weighIn} />
             <Habit
@@ -147,55 +131,87 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
             <Habit label="Meals tracked" done={h.mealsTracked} />
             <Habit label="Mobility" done={h.mobility} />
           </ul>
-        </div>
-      </section>
+        </Group>
 
-      <div className="stats">
-        <Stat
-          label="Follow-ups due"
-          value={String(today.followUps.length)}
-          tone={today.followUps.length > 0 ? "progress" : "done"}
-        />
-        <Stat
-          label="Weight"
-          value={today.weight !== null ? `${today.weight.toFixed(1)} kg` : "—"}
-          detail={
-            today.weightChange !== null ? (
-              <span className="pill pill--read">{signed(today.weightChange)} kg since last</span>
-            ) : (
-              today.weight === null && "Not weighed in yet"
-            )
-          }
-        />
-        <Stat
-          label="Applications today"
-          value={today.applications !== null ? String(today.applications) : noNote ? "—" : "0"}
-        />
-        <Stat label="Gym session" value={today.gym ?? (noNote ? "—" : "Rest day")} />
+        <Group title="Summary" bare>
+          <div className="grid grid--2 today-metrics">
+            <Metric
+              label="Follow-ups due"
+              color="var(--cat-jobs)"
+              value={String(today.followUps.length)}
+              onOpen={() => {
+                onNavigate("jobs");
+              }}
+              openLabel="Open Jobs"
+            />
+            <Metric
+              label="Weight"
+              color="var(--cat-body)"
+              value={today.weight !== null ? today.weight.toFixed(1) : "—"}
+              unit={today.weight !== null ? "kg" : undefined}
+              aside={
+                today.weightChange !== null ? (
+                  <span title="Since the last weigh-in">{signed(today.weightChange)} kg</span>
+                ) : undefined
+              }
+              onOpen={() => {
+                onNavigate("fitness");
+              }}
+              openLabel="Open Fitness"
+            />
+            <Metric
+              label="Applied today"
+              color="var(--cat-jobs)"
+              value={today.applications !== null ? String(today.applications) : noNote ? "—" : "0"}
+              onOpen={() => {
+                onNavigate("jobs");
+              }}
+              openLabel="Open Jobs"
+            />
+            <Metric
+              label="Gym session"
+              color="var(--cat-fitness)"
+              value={today.gym ?? (noNote ? "—" : "Rest day")}
+              onOpen={() => {
+                onNavigate("fitness");
+              }}
+              openLabel="Open Fitness"
+            />
+          </div>
+        </Group>
       </div>
 
-      <div className="columns">
-        <section className="card" aria-labelledby="followups-heading">
-          <h2 id="followups-heading" className="kicker">
-            Follow-ups
-          </h2>
+      <div className="grid grid--wide-left">
+        <Group
+          title="Follow-ups"
+          action={
+            more > 0 && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  onNavigate("jobs");
+                }}
+              >
+                {more} more in Jobs
+              </button>
+            )
+          }
+        >
           {today.followUps.length === 0 ? (
             <EmptyHint lead="Nothing due. Nice.">
               Follow-ups come from <code>type: company</code> notes with a <code>next_date</code>.
             </EmptyHint>
           ) : (
-            <ul className="rows">
-              {today.followUps.map((f) => (
+            <ul className="list">
+              {today.followUps.slice(0, FOLLOW_UPS_SHOWN).map((f) => (
                 <FollowUpRow key={f.path} item={f} today={today.date} />
               ))}
             </ul>
           )}
-        </section>
+        </Group>
 
-        <section className={`card${p ? " breathing" : ""}`} aria-labelledby="resume-heading">
-          <h2 id="resume-heading" className="kicker">
-            Resume here
-          </h2>
+        <Group title="Resume here" cardClassName={`card--stack${p ? " breathing" : ""}`}>
           {p ? (
             <div className="resume">
               <p className="resume__project">{p.project ?? p.path}</p>
@@ -225,7 +241,7 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
               <code>## Steps</code> checklist.
             </EmptyHint>
           )}
-        </section>
+        </Group>
       </div>
 
       {today.parseErrors > 0 && (
@@ -234,7 +250,7 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
           their fields.
         </p>
       )}
-    </>
+    </div>
   );
 }
 
@@ -273,7 +289,7 @@ export function TodayPage({ onNavigate }: { onNavigate: Navigate }) {
   return (
     <>
       <header className="page-header">
-        <p className="kicker">{longDate(date)}</p>
+        <p className="page-header__sub">{longDate(date)}</p>
         <h1 className="page-title">{greeting(new Date().getHours())}</h1>
       </header>
       {error && (

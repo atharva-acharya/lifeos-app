@@ -40,7 +40,7 @@ export function ProjectCard({ project: p }: { project: Project }) {
       <p className="muted">{stepSummary(p)}</p>
 
       <div className="project__resume" role="group" aria-label={`Resume ${p.name}`}>
-        <h4 className="kicker">Resume here</h4>
+        <h4 className="card__title">Resume here</h4>
         {p.nextStep && (
           <p className="resume__next">
             <span className="pill pill--progress">Next</span> {p.nextStep}

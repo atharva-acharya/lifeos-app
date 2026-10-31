@@ -3,6 +3,7 @@ import type { HealthDay } from "../api";
 import { shortLabel } from "../fitnessStats";
 import { latestSleep, sleepHours } from "../healthStats";
 import { BarChart, type Series } from "./BarChart";
+import { MetricHead, Value } from "./Card";
 import { EmptyHint } from "./EmptyHint";
 
 interface Row {
@@ -13,7 +14,7 @@ interface Row {
 }
 
 const SERIES: Series<Row>[] = [
-  { key: "sleep", name: "Sleep", color: "var(--c-read)", value: (r) => r.hours },
+  { key: "sleep", name: "Sleep", color: "var(--cat-sleep)", value: (r) => r.hours },
 ];
 
 /** Nightly sleep against the goal, and the stages of the latest night. */
@@ -39,17 +40,15 @@ export function HealthSleep({ days, goal }: { days: HealthDay[]; goal: number })
     : [];
 
   return (
-    <section className="card chart" aria-labelledby="health-sleep">
-      <header className="chart__head">
-        <h3 id="health-sleep" className="kicker">
-          Sleep
-        </h3>
-        {night?.sleep && (
-          <span className="muted">
-            Latest night <strong>{sleepHours(night.sleep.total)}</strong>
-          </span>
-        )}
-      </header>
+    <section className="card chart-card" aria-labelledby="health-sleep">
+      <MetricHead
+        as="h3"
+        id="health-sleep"
+        label="Sleep"
+        color="var(--cat-sleep)"
+        aside={night ? shortLabel(night.date) : undefined}
+      />
+      {night?.sleep && <Value value={sleepHours(night.sleep.total)} srPrefix="Latest night" />}
       {night === null ? (
         <EmptyHint lead="No sleep recorded in this range.">
           Turn on Sleep Analysis in Health Auto Export, or pick a longer range.
@@ -84,7 +83,7 @@ export function HealthSleep({ days, goal }: { days: HealthDay[]; goal: number })
               )}
             </tbody>
           </table>
-          <h4 className="kicker">Stages on {shortLabel(night.date)}</h4>
+          <h4 className="card__title">Stages on {shortLabel(night.date)}</h4>
           <ul className="pill-list" aria-label="Latest night stages">
             {stages.map((s) => (
               <li key={s.name}>

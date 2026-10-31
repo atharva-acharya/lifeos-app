@@ -4,6 +4,7 @@ import { parseApplied, perWeek, replyRates, type SourceRate, type WeekCount } fr
 import type { Navigate } from "../routes";
 import { NotConnected } from "./NotConnected";
 import { BarChart, type Series } from "./BarChart";
+import { Group } from "./Card";
 
 const WEEKLY: Series<WeekCount>[] = [
   { key: "count", name: "Applications", color: "var(--c-read)", value: (w) => w.count },
@@ -23,15 +24,10 @@ function PerWeek({ rows }: { rows: Application[] }) {
   const average = Math.round((total / weeks.length) * 10) / 10;
 
   return (
-    <section className="card chart" aria-labelledby="chart-weekly">
-      <header className="chart__head">
-        <h2 id="chart-weekly" className="kicker">
-          Applications per week
-        </h2>
-        <span className="muted">
-          This week <strong>{thisWeek}</strong> · 12-week average <strong>{average}</strong>
-        </span>
-      </header>
+    <Group title="Applications per week" cardClassName="card--stack chart-card">
+      <span className="muted">
+        This week <strong>{thisWeek}</strong> · 12-week average <strong>{average}</strong>
+      </span>
       <div className="chart__plot" aria-hidden="true">
         <BarChart data={weeks} label={(w) => w.label} series={WEEKLY} />
       </div>
@@ -52,7 +48,7 @@ function PerWeek({ rows }: { rows: Application[] }) {
           ))}
         </tbody>
       </table>
-    </section>
+    </Group>
   );
 }
 
@@ -60,13 +56,8 @@ function ReplyRate({ rows }: { rows: Application[] }) {
   const { sources, unmatched } = useMemo(() => replyRates(rows), [rows]);
 
   return (
-    <section className="card chart" aria-labelledby="chart-replies">
-      <header className="chart__head">
-        <h2 id="chart-replies" className="kicker">
-          Reply rate by source
-        </h2>
-        <span className="muted">Share of applications that got any reply</span>
-      </header>
+    <Group title="Reply rate by source" cardClassName="card--stack chart-card">
+      <span className="muted">Share of applications that got any reply</span>
       <div className="chart__plot" aria-hidden="true">
         <BarChart data={sources} label={(r) => r.source} series={REPLIES} max={100} unit="%" />
       </div>
@@ -98,7 +89,7 @@ function ReplyRate({ rows }: { rows: Application[] }) {
           only) are left out.
         </p>
       )}
-    </section>
+    </Group>
   );
 }
 

@@ -3,6 +3,7 @@ import type { Lift } from "../api";
 import { shortLabel } from "../fitnessStats";
 import { EmptyHint } from "./EmptyHint";
 import { LineChart } from "./LineChart";
+import { Group } from "./Card";
 
 /** Top set per session for one exercise at a time. */
 export function FitnessLifts({ lifts }: { lifts: Lift[] }) {
@@ -10,13 +11,8 @@ export function FitnessLifts({ lifts }: { lifts: Lift[] }) {
   const lift = lifts.find((l) => l.name === chosen) ?? (lifts.length > 0 ? lifts[0] : undefined);
 
   return (
-    <section className="card chart" aria-labelledby="fitness-lifts">
-      <header className="chart__head">
-        <h2 id="fitness-lifts" className="kicker">
-          Lift progress
-        </h2>
-        <span className="muted">Heaviest set of each session. Deload weeks are left out.</span>
-      </header>
+    <Group title="Lift progress" cardClassName="card--stack chart-card">
+      <span className="muted">Heaviest set of each session. Deload weeks are left out.</span>
       {!lift ? (
         <EmptyHint lead="No lifts with a weight logged yet." guide="workout">
           Lift progress needs <code>type: workout</code> notes whose <code>exercises</code> lines
@@ -80,6 +76,6 @@ export function FitnessLifts({ lifts }: { lifts: Lift[] }) {
           </table>
         </>
       )}
-    </section>
+    </Group>
   );
 }

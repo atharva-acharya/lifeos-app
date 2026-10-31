@@ -97,7 +97,9 @@ describe("FitnessPage", () => {
     ready();
     render(<FitnessPage onNavigate={vi.fn()} />);
     expect(await screen.findByRole("heading", { name: "Weight trend" })).toBeInTheDocument();
-    expect(screen.getByText("82.8 kg")).toBeInTheDocument();
+    expect(screen.getByText("82.8", { selector: ".metric__value" })).toHaveTextContent(
+      "Latest 82.8 kg",
+    );
     expect(screen.getByRole("heading", { name: "This week" })).toBeInTheDocument();
     expect(screen.getByText("Steps, 7-day average")).toBeInTheDocument();
     // Plan has a target, so no hint.

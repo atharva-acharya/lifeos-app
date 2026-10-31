@@ -3,6 +3,7 @@ import type { HealthDay } from "../api";
 import { rollingAverage } from "../fitnessStats";
 import { RANGES, range, type RangeId } from "../healthStats";
 import { withTransition } from "../motion";
+import { Group } from "./Card";
 import { HealthSleep } from "./HealthSleep";
 import { TrendCard } from "./HealthTrendCard";
 
@@ -71,11 +72,11 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
   };
 
   return (
-    <section aria-labelledby="health-trends" className="health__trends">
-      <div className="chart__head">
-        <h2 id="health-trends" className="kicker">
-          Trends
-        </h2>
+    <Group
+      title="Trends"
+      className="health__trends"
+      bare
+      action={
         <div className="tabs" role="tablist" aria-label="Trend range">
           {RANGES.map((r, i) => (
             <button
@@ -101,18 +102,19 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
             </button>
           ))}
         </div>
-      </div>
+      }
+    >
       <div
         role="tabpanel"
         id="health-range-panel"
         aria-labelledby={`health-range-${id}`}
-        className="health__panel"
+        className="grid grid--2"
       >
         <TrendCard
           title="Resting heart rate"
           name="Resting heart rate"
           unit=" bpm"
-          color="var(--c-danger)"
+          color="var(--cat-heart)"
           dates={series.dates}
           values={series.hr}
           average={series.hrAvg}
@@ -122,7 +124,7 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
           title="Heart rate variability"
           name="HRV"
           unit=" ms"
-          color="var(--c-done)"
+          color="var(--cat-heart)"
           dates={series.dates}
           values={series.hrv}
           average={series.hrvAvg}
@@ -132,7 +134,7 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
           title="Weight"
           name="Weight"
           unit=" kg"
-          color="var(--c-read)"
+          color="var(--cat-body)"
           dates={series.dates}
           values={series.weight}
           average={series.weightAvg}
@@ -141,6 +143,6 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
         />
         <HealthSleep days={series.days} goal={sleepGoal} />
       </div>
-    </section>
+    </Group>
   );
 }
