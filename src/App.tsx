@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { getSettings } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PageBar, usePageBar } from "./components/PageBar";
 import { SampleBanner } from "./components/SampleBanner";
 import { Sidebar } from "./components/Sidebar";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -98,6 +99,7 @@ export default function App() {
   }, [current]);
 
   useScrolled(mainEl, current);
+  const pageBar = usePageBar(mainEl, current);
 
   if (hasVault === null) return <div className="boot" aria-busy="true" />;
 
@@ -118,7 +120,14 @@ export default function App() {
   return (
     <div className="shell">
       <Sidebar current={current} onNavigate={navigateFromSidebar} />
-      <main className="main" ref={setMain} tabIndex={-1} aria-label={route.label}>
+      <main
+        className="main"
+        ref={setMain}
+        tabIndex={-1}
+        aria-label={route.label}
+        data-page-bar={pageBar ? "" : undefined}
+      >
+        <PageBar title={route.label} visible={pageBar} />
         {mode === "sample" && (
           <SampleBanner
             onLeft={(vaultPath) => {
