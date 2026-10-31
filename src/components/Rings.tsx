@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 /** One activity ring: progress towards a daily goal. */
 export interface Ring {
   key: string;
@@ -59,7 +61,14 @@ export function Rings({ rings, size = 168 }: { rings: Ring[]; size?: number }) {
                 r={radius}
                 stroke={r.color}
                 pathLength={1}
-                style={{ strokeDashoffset: 1 - p, color: r.color }}
+                style={
+                  {
+                    strokeDashoffset: 1 - p,
+                    color: r.color,
+                    // M6: motion.css staggers each ring's fill by its index.
+                    "--ring-index": i,
+                  } as CSSProperties
+                }
                 opacity={p > 0 ? 1 : 0}
               />
             </g>

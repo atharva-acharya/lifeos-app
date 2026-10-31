@@ -62,4 +62,18 @@ describe("Rings", () => {
     expect(container.querySelector(".rings__legend")?.textContent).toContain("7.2h / 8.0h");
     expect(container.querySelector(".rings__legend")?.textContent).not.toContain("ignored");
   });
+
+  it("gives each ring its index so the fills are staggered (M6)", () => {
+    const { container } = render(
+      <Rings
+        rings={[
+          { key: "a", name: "Steps", value: 1, goal: 2, color: "var(--c-done)" },
+          { key: "b", name: "Energy", value: 1, goal: 2, color: "var(--c-danger)" },
+          { key: "c", name: "Stand", value: 1, goal: 2, color: "var(--c-read)" },
+        ]}
+      />,
+    );
+    const fills = [...container.querySelectorAll<SVGElement>(".rings__fill")];
+    expect(fills.map((f) => f.style.getPropertyValue("--ring-index"))).toEqual(["0", "1", "2"]);
+  });
 });
