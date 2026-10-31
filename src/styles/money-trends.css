@@ -1,0 +1,114 @@
+/* Money trends (ui-spec P7): ranges, "vs previous period" lines and the
+   ranked category breakdown. Colours come from tokens only (T1). */
+
+/* A change in words. Only the arrow and the word wear colour (T3, T4). */
+.change {
+  font-variant-numeric: tabular-nums;
+}
+
+.change__mark--bad {
+  color: var(--c-progress);
+}
+
+.change__mark--good {
+  color: var(--c-done);
+}
+
+.change abbr {
+  text-decoration: none;
+}
+
+.money-trends {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.money-trends__note {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Ranked horizontal bars: name and amount on one line, the bar and the
+   change against last month under them. */
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breakdown__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+
+.breakdown__name {
+  overflow-wrap: anywhere;
+  font-size: var(--fs-body);
+}
+
+.breakdown__name--other {
+  color: var(--text-muted);
+}
+
+.breakdown__value {
+  min-width: 64px;
+  text-align: right;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.breakdown__track {
+  display: block;
+  height: 8px;
+}
+
+/* Rounded only at the data end (C4); grows from the start on first paint (M7). */
+.breakdown__bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  transform-origin: left center;
+  animation: breakdown-grow var(--dur-slow) var(--ease-spring) both;
+}
+
+.breakdown__change {
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@keyframes breakdown-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breakdown__bar {
+    animation: none;
+  }
+}
+
+/* Charts draw in on first paint only, never when the range changes (M7). */
+.money-trends[data-settled] .breakdown__bar,
+.money-trends[data-settled] .bar-chart__bar,
+.money-trends[data-settled] .line-chart__line {
+  animation: none;
+}
+
+/* The Money metric row's "vs previous period" lines can wrap to two lines
+   on narrow cards; reserving two lines keeps all four values level. */
+.money .grid--4 .metric__detail {
+  min-height: 2lh;
+}
