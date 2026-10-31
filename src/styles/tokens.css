@@ -88,6 +88,8 @@
   --dur-page-in: 240ms; /* new page fades in and rises (M3) */
   --dur-list: 200ms; /* new list rows (M8) */
   --list-stagger: 30ms; /* M8: delay between rows, at most 8 rows */
+  --dur-pop-in: 280ms; /* sheets, popovers and toasts open (M5) */
+  --dur-pop-out: 160ms; /* and close faster (M5) */
   /* Damped spring (damping 0.7, about 5% overshoot), sampled for linear(). */
   --ease-spring: linear(
     0,
@@ -125,6 +127,8 @@
     --dur-page-in: 0ms;
     --dur-list: 0ms;
     --list-stagger: 0ms;
+    --dur-pop-in: 0ms;
+    --dur-pop-out: 0ms;
   }
 }
 

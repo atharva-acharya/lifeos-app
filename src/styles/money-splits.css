@@ -1,0 +1,79 @@
+/* Splits with friends (ui-spec P8, P9). */
+
+/* The group holds the summary as well as the cards, so rows size to content. */
+.money__splits {
+  grid-template-rows: none;
+}
+
+/* You owe, you are owed and net: three small tabular figures on one card. */
+.splits-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--card-pad);
+  margin: 0;
+  padding: var(--space-3) var(--card-pad);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.splits-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.splits-summary dt {
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+}
+
+.splits-summary dd {
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Owed to you is green, you owe is orange; the label always says which. */
+.splits-summary__value--owed {
+  color: var(--c-done);
+}
+
+.splits-summary__value--owe {
+  color: var(--c-progress);
+}
+
+.splits-summary__words {
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+  font-weight: 400;
+}
+
+/* The live "£X left to assign" line under the per-person inputs. */
+.split-form__progress {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+  font-variant-numeric: tabular-nums;
+}
+
+.split-form__actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.split-form__actions .button {
+  min-height: 32px;
+}
+
+/* Disabled is 50% opacity and says why next to it (C6). */
+.split-form__actions .button:disabled {
+  opacity: 0.5;
+}
+
+.split-form__reason {
+  color: var(--text-muted);
+  font-size: var(--fs-kicker);
+}
