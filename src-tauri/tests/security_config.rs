@@ -109,6 +109,7 @@ fn capability_grants_only_events_window_and_app_commands() {
             "allow-get-health",
             "allow-get-money",
             "allow-add-transaction",
+            "allow-set-transaction-category",
             "allow-get-banks",
             "allow-preview-import",
             "allow-import-csv",
