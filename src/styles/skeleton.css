@@ -1,0 +1,94 @@
+/* Loading placeholder (ui-spec C7). Shapes follow the page layout: a title
+   bar above each group and card shapes under it. The shimmer is the one
+   allowed loop (M10); it moves only `transform` (M11) and stops under reduce
+   motion. Colours come from tokens.css; the sheen is a local property. */
+.skeleton {
+  --skeleton-sheen: rgb(255 255 255 / 0.05);
+  --skeleton-sweep: 1600ms;
+}
+
+.skeleton__rows {
+  display: grid;
+  gap: var(--gutter);
+}
+
+.skeleton__row {
+  display: grid;
+  gap: var(--card-pad);
+  min-width: 0;
+}
+
+.skeleton__group {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-width: 0;
+}
+
+.skeleton__cards {
+  display: grid;
+  gap: var(--card-pad);
+}
+
+.skeleton__shape {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton__shape::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sweep var(--skeleton-sweep) var(--ease-standard) infinite;
+}
+
+.skeleton__title {
+  display: block;
+  width: 120px;
+  height: 20px;
+  margin-block: var(--space-1); /* sits in the group title line */
+  border-radius: var(--space-1);
+  background: var(--bg-card);
+}
+
+.skeleton__card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--card-pad);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.skeleton__line {
+  display: block;
+  border-radius: var(--space-1);
+  background: var(--bg-hover);
+}
+
+.skeleton__line--label {
+  width: 40%;
+  max-width: 120px;
+  height: 12px;
+}
+
+.skeleton__line--value {
+  width: 30%;
+  max-width: 96px;
+  height: 20px;
+}
+
+@keyframes skeleton-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton__shape::after {
+    display: none;
+    animation: none;
+  }
+}

@@ -6,8 +6,17 @@ import { FitnessLifts } from "../components/FitnessLifts";
 import { FitnessWeek } from "../components/FitnessWeek";
 import { FitnessWeight } from "../components/FitnessWeight";
 import { DEFAULT_PROTEIN_GOAL, weekSummary } from "../fitnessStats";
+import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
+import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
 import type { Navigate } from "../routes";
+
+/** This week's cards, then the weight, activity and history groups. */
+const SKELETON: SkeletonGroup[][] = [
+  [{ cards: 4, columns: 4, height: 110 }],
+  [{ height: 260 }],
+  [{ height: 200 }, { height: 200 }],
+];
 
 function Dashboard({
   fitness,
@@ -51,7 +60,7 @@ function Dashboard({
 
 export function FitnessPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<FitnessResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const date = localDate();
 
   const load = useCallback(() => {
@@ -61,9 +70,14 @@ export function FitnessPage({ onNavigate }: { onNavigate: Navigate }) {
         setError(null);
       })
       .catch((err: unknown) => {
-        setError(typeof err === "string" ? err : "Could not load fitness.");
+        setError(loadError(err));
       });
   }, [date]);
+
+  const retry = useCallback(() => {
+    setError(null);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -88,10 +102,9 @@ export function FitnessPage({ onNavigate }: { onNavigate: Navigate }) {
         <h1 className="page-title">Fitness</h1>
       </header>
       {error && (
-        <p className="setting__error" role="alert">
-          {error}
-        </p>
+        <ErrorState title="Could not load fitness." detail={error.detail} onRetry={retry} />
       )}
+      {response === null && error === null && <Skeleton label="fitness" layout={SKELETON} />}
       {response?.status === "noVault" && (
         <NotConnected onNavigate={onNavigate}>
           Choose your Life OS vault folder to see your weight, workouts and lifts.
