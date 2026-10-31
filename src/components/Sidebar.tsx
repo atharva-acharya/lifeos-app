@@ -1,10 +1,12 @@
+import { fromKeyboard, type TransitionOptions } from "../motion";
 import { useMode } from "../mode";
 import { MAIN_ROUTES, SETTINGS_ROUTE, type Route, type RouteId } from "../routes";
 import { NavIcon } from "./NavIcon";
 
 interface SidebarProps {
   current: RouteId;
-  onNavigate: (id: RouteId) => void;
+  /** `instant` is set when the keyboard chose the page, so it does not animate (M4). */
+  onNavigate: (id: RouteId, options?: TransitionOptions) => void;
 }
 
 function NavButton({ route, current, onNavigate }: { route: Route } & SidebarProps) {
@@ -14,8 +16,8 @@ function NavButton({ route, current, onNavigate }: { route: Route } & SidebarPro
         type="button"
         className="nav__item"
         aria-current={route.id === current ? "page" : undefined}
-        onClick={() => {
-          onNavigate(route.id);
+        onClick={(e) => {
+          onNavigate(route.id, { instant: fromKeyboard(e) });
         }}
       >
         <NavIcon id={route.id} />

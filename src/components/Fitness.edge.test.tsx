@@ -355,7 +355,7 @@ describe("FitnessHistory", () => {
     }
   });
 
-  it("uses a view transition when motion is allowed", () => {
+  it("uses a view transition for a mouse click when motion is allowed", () => {
     const startViewTransition = vi.fn((cb: () => void) => {
       cb();
     });
@@ -371,7 +371,7 @@ describe("FitnessHistory", () => {
     });
     try {
       render(<FitnessHistory workouts={[workout()]} />);
-      fireEvent.click(screen.getByRole("tab", { name: "Push A" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Push A" }), { detail: 1 });
       expect(startViewTransition).toHaveBeenCalledTimes(1);
       expect(screen.getByRole("tab", { name: "Push A" })).toHaveAttribute("aria-selected", "true");
     } finally {

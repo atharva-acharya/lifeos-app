@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { HealthDay } from "../api";
 import { rollingAverage } from "../fitnessStats";
 import { RANGES, range, type RangeId } from "../healthStats";
-import { withTransition } from "../motion";
+import { fromKeyboard, withTransition } from "../motion";
 import { Group } from "./Card";
 import { HealthSleep } from "./HealthSleep";
 import { TrendCard } from "./HealthTrendCard";
@@ -57,17 +57,21 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
     };
   }, [days, id]);
 
-  const choose = (next: RangeId) => {
-    withTransition(() => {
-      setId(next);
-    });
+  // Keyboard changes (arrow keys, Enter, Space) are instant (M4).
+  const choose = (next: RangeId, instant: boolean) => {
+    withTransition(
+      () => {
+        setId(next);
+      },
+      { instant },
+    );
   };
 
   const onKeyDown = (e: KeyboardEvent, index: number) => {
     const target = nextTab(e.key, index, RANGES.length);
     if (target === null) return;
     e.preventDefault();
-    choose(RANGES[target].id);
+    choose(RANGES[target].id, true);
     tabs.current[target]?.focus();
   };
 
@@ -91,8 +95,8 @@ export function HealthTrends({ days, sleepGoal }: { days: HealthDay[]; sleepGoal
               aria-controls="health-range-panel"
               tabIndex={id === r.id ? 0 : -1}
               className="tabs__tab"
-              onClick={() => {
-                choose(r.id);
+              onClick={(e) => {
+                choose(r.id, fromKeyboard(e));
               }}
               onKeyDown={(e) => {
                 onKeyDown(e, i);

@@ -1,35 +1,30 @@
-/* Motion system (phase 3). Durations and easings come from tokens.css, which
-   sets them to 0 under "reduce motion", so nothing here needs its own
-   reduced-motion branch. Only transform, opacity and colours animate. */
+/* Motion system (ui-spec §3). Durations and easings come from tokens.css,
+   which sets them to 0 under "reduce motion"; the few rules that would still
+   move or scale something at 0 ms are switched off at the end of this file.
+   Only transform, opacity and colours animate (M11): never `transition: all`,
+   never an ease-in curve on entry. Nothing loops here (M10); the only loop is
+   the active-project `.breathing` highlight in global.css. */
 
-/* Interaction feedback: quick colour changes and a slight press. */
+/* Hover (M2): colour or background only, 120 ms. The hover rules themselves
+   sit behind (hover: hover) and (pointer: fine) where they are declared. */
 .nav__item,
-.button,
 .tabs__tab,
-.kanban__card,
+.button,
+.link-button,
+.welcome__skip,
 .table td {
   transition:
     background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
     color var(--dur-fast) var(--ease-standard),
-    box-shadow var(--dur-fast) var(--ease-standard),
-    opacity var(--dur-base) var(--ease-standard),
-    transform var(--dur-fast) var(--ease-standard);
+    opacity var(--dur-base) var(--ease-standard);
 }
 
-.button:active:not(:disabled),
-.tabs__tab:active,
-.nav__item:active {
-  transform: scale(0.97);
-}
-
-.kanban__card:hover {
-  transform: translateY(-1px);
-}
-
-/* Cards, notices and table rows ease in when they first appear. */
-/* (Kanban cards keep the interaction transitions above, which include opacity.) */
+/* Cards and notices ease in when they first appear. */
+/* (Kanban cards are not clickable, so they never move on hover.) */
 .card,
-.notice {
+.notice,
+.kanban__card {
   transition:
     opacity var(--dur-base) var(--ease-standard),
     transform var(--dur-base) var(--ease-spring);
@@ -44,29 +39,117 @@
   }
 }
 
-/* Page and tab changes (View Transitions API, see src/motion.ts): the main
-   area cross-fades with a small lift; the sidebar stays still. */
+/* Press (M1) on anything clickable: down to 0.97 in 120 ms ease-out, and back
+   with the spring over 200 ms. A metric card that opens a page is pressed as
+   a whole, and so is a list row that is itself a button or link. */
+.nav__item,
+.tabs__tab,
+.button,
+.link-button,
+.welcome__skip,
+.metric--link,
+.list__row--link {
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    opacity var(--dur-base) var(--ease-standard),
+    transform var(--dur-release) var(--ease-spring);
+}
+
+.nav__item:active,
+.tabs__tab:active,
+.button:active:not(:disabled),
+.link-button:active,
+.welcome__skip:active:not(:disabled),
+.metric--link:active,
+.list__row--link:active {
+  transform: scale(0.97);
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    transform var(--dur-press) var(--ease-out);
+}
+
+/* Lists (M8): new rows fade in and rise 6 px over 200 ms, 30 ms apart; only
+   the first 8 rows are staggered, later ones arrive with the eighth. An
+   animation (not a transition) so it runs once when a row is inserted, and
+   `backwards` so it never holds a row's transform after it ends. */
+.list__row {
+  animation: row-in var(--dur-list) var(--ease-out) backwards;
+}
+
+.list__row:nth-child(2) {
+  animation-delay: var(--list-stagger);
+}
+
+.list__row:nth-child(3) {
+  animation-delay: calc(var(--list-stagger) * 2);
+}
+
+.list__row:nth-child(4) {
+  animation-delay: calc(var(--list-stagger) * 3);
+}
+
+.list__row:nth-child(5) {
+  animation-delay: calc(var(--list-stagger) * 4);
+}
+
+.list__row:nth-child(6) {
+  animation-delay: calc(var(--list-stagger) * 5);
+}
+
+.list__row:nth-child(7) {
+  animation-delay: calc(var(--list-stagger) * 6);
+}
+
+.list__row:nth-child(n + 8) {
+  animation-delay: calc(var(--list-stagger) * 7);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Page and tab changes with the mouse (M3, View Transitions API, see
+   src/motion.ts): the old page fades out in 120 ms, the new one fades in and
+   rises 8 px over 240 ms with the spring. Keyboard changes skip this (M4).
+   The sidebar is captured on its own so it stays still and on top. */
 .main {
   view-transition-name: page;
 }
 
+.sidebar {
+  view-transition-name: sidebar;
+}
+
 ::view-transition-old(root),
-::view-transition-new(root) {
+::view-transition-new(root),
+::view-transition-group(sidebar),
+::view-transition-new(sidebar) {
   animation: none;
 }
 
+::view-transition-old(sidebar) {
+  animation: none;
+  opacity: 0;
+}
+
 ::view-transition-old(page) {
-  animation: page-out var(--dur-fast) var(--ease-exit) both;
+  animation: page-out var(--dur-page-out) var(--ease-exit) both;
 }
 
 ::view-transition-new(page) {
-  animation: page-in var(--dur-slow) var(--ease-spring) both;
+  animation: page-in var(--dur-page-in) var(--ease-spring) both;
 }
 
 @keyframes page-out {
   to {
     opacity: 0;
-    transform: translateY(-4px);
   }
 }
 
@@ -101,5 +184,18 @@
 @keyframes ring-fill {
   from {
     stroke-dashoffset: 1;
+  }
+}
+
+/* Reduce motion: nothing moves or scales; it only appears. */
+@media (prefers-reduced-motion: reduce) {
+  .nav__item:active,
+  .tabs__tab:active,
+  .button:active:not(:disabled),
+  .link-button:active,
+  .welcome__skip:active:not(:disabled),
+  .metric--link:active,
+  .list__row--link:active {
+    transform: none;
   }
 }

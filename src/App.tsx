@@ -20,7 +20,13 @@ import "./styles/global.css";
 import "./styles/layout.css";
 import "./styles/cards.css";
 import "./styles/motion.css";
-import { withTransition } from "./motion";
+import { withTransition, type TransitionOptions } from "./motion";
+import { applyStoredTransparency } from "./appearance";
+import { useScrolled } from "./useScrolled";
+
+// Before the first paint, so the sidebar never flashes as glass when the
+// owner has turned on "Reduce transparency".
+applyStoredTransparency();
 
 export default function App() {
   const mode = useMode();
@@ -30,15 +36,34 @@ export default function App() {
   const [hasVault, setHasVault] = useState<boolean | null>(null);
   // "Skip for now" lasts until the app restarts; the welcome screen returns while no vault is set.
   const [skipped, setSkipped] = useState(false);
-  const mainRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [mainEl, setMainEl] = useState<HTMLElement | null>(null);
+  const setMain = useCallback((el: HTMLElement | null) => {
+    mainRef.current = el;
+    setMainEl(el);
+  }, []);
   const route = ALL_ROUTES.find((r) => r.id === current) ?? ALL_ROUTES[0];
 
-  const navigate = useCallback((id: RouteId, to?: GuideId) => {
+  const go = useCallback((id: RouteId, to?: GuideId, options?: TransitionOptions) => {
     withTransition(() => {
       setCurrent(id);
       setGuide(id === "settings" ? (to ?? null) : null);
-    });
+    }, options);
   }, []);
+  // Pages navigate with the mouse transition; the sidebar and Ctrl K say
+  // when the keyboard started the change (M4).
+  const navigate = useCallback(
+    (id: RouteId, to?: GuideId) => {
+      go(id, to);
+    },
+    [go],
+  );
+  const navigateFromSidebar = useCallback(
+    (id: RouteId, options?: TransitionOptions) => {
+      go(id, undefined, options);
+    },
+    [go],
+  );
 
   useEffect(() => {
     let active = true;
@@ -59,18 +84,20 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        navigate("search");
+        go("search", undefined, { instant: true });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [navigate]);
+  }, [go]);
 
   useEffect(() => {
     mainRef.current?.focus();
   }, [current]);
+
+  useScrolled(mainEl, current);
 
   if (hasVault === null) return <div className="boot" aria-busy="true" />;
 
@@ -90,8 +117,8 @@ export default function App() {
 
   return (
     <div className="shell">
-      <Sidebar current={current} onNavigate={navigate} />
-      <main className="main" ref={mainRef} tabIndex={-1} aria-label={route.label}>
+      <Sidebar current={current} onNavigate={navigateFromSidebar} />
+      <main className="main" ref={setMain} tabIndex={-1} aria-label={route.label}>
         {mode === "sample" && (
           <SampleBanner
             onLeft={(vaultPath) => {
