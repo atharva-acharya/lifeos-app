@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { useCountUp } from "../useCountUp";
 
 /**
  * A titled group in the style of Apple Health: the heading sits above the
@@ -119,6 +120,16 @@ export function Value({
   );
 }
 
+/** The default count format: a whole number. */
+function whole(n: number): string {
+  return String(Math.round(n));
+}
+
+/** A number that counts to each new value (ui-spec M9). */
+function CountedValue({ count, format }: { count: number; format: (n: number) => string }) {
+  return <>{format(useCountUp(count))}</>;
+}
+
 /**
  * Apple Health's summary tile: coloured label and chevron at the top, the
  * big number bottom-left, unit in grey, optional detail under it.
@@ -133,22 +144,33 @@ export function Metric({
   onOpen,
   openLabel,
   tone,
+  count,
+  format = whole,
 }: {
   label: string;
   color: string;
-  value: ReactNode;
+  /** What to show; ignored when `count` is given. */
+  value?: ReactNode;
   unit?: string;
   detail?: ReactNode;
   aside?: ReactNode;
   onOpen?: () => void;
   openLabel?: string;
   tone?: "danger";
+  /** A number to show instead of `value`; it counts to each new value. */
+  count?: number;
+  /** Formats `count` and each step of the count; whole numbers by default. */
+  format?: (n: number) => string;
 }) {
   return (
     <section className={`card metric${onOpen ? " metric--link" : ""}`} aria-label={label}>
       <MetricHead label={label} color={color} aside={aside} onOpen={onOpen} openLabel={openLabel} />
       <div className="metric__body">
-        <Value value={value} unit={unit} tone={tone} />
+        <Value
+          value={count === undefined ? value : <CountedValue count={count} format={format} />}
+          unit={unit}
+          tone={tone}
+        />
         {detail && <div className="metric__detail">{detail}</div>}
       </div>
     </section>

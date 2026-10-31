@@ -2,8 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { getProjects, onIndexUpdated, type ProjectsResponse, type Projects } from "../api";
 import { ProjectCard } from "../components/ProjectCard";
 import { EmptyHint } from "../components/EmptyHint";
+import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
+import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
 import type { Navigate } from "../routes";
+
+/** The active projects, then the others. */
+const SKELETON: SkeletonGroup[][] = [[{ cards: 2, height: 150 }], [{ cards: 2, height: 110 }]];
 
 function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate }) {
   const active = data.projects.filter((p) => p.active);
@@ -63,7 +68,7 @@ function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate 
 
 export function ProjectsPage({ onNavigate }: { onNavigate: Navigate }) {
   const [response, setResponse] = useState<ProjectsResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
 
   const load = useCallback(() => {
     getProjects()
@@ -72,9 +77,14 @@ export function ProjectsPage({ onNavigate }: { onNavigate: Navigate }) {
         setError(null);
       })
       .catch((err: unknown) => {
-        setError(typeof err === "string" ? err : "Could not load projects.");
+        setError(loadError(err));
       });
   }, []);
+
+  const retry = useCallback(() => {
+    setError(null);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -108,10 +118,9 @@ export function ProjectsPage({ onNavigate }: { onNavigate: Navigate }) {
         )}
       </header>
       {error && (
-        <p className="setting__error" role="alert">
-          {error}
-        </p>
+        <ErrorState title="Could not load projects." detail={error.detail} onRetry={retry} />
       )}
+      {response === null && error === null && <Skeleton label="projects" layout={SKELETON} />}
       {response?.status === "noVault" && (
         <NotConnected onNavigate={onNavigate}>
           Choose your Life OS vault folder to see your projects and where to resume.

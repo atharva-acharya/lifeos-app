@@ -11,6 +11,8 @@ import { ApplicationsTab } from "../components/ApplicationsTab";
 import { ChartsTab } from "../components/JobCharts";
 import { withTransition } from "../motion";
 import { EmptyHint } from "../components/EmptyHint";
+import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
+import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
 import { SegmentedTabs } from "../components/SegmentedTabs";
 import type { Navigate } from "../routes";
@@ -23,6 +25,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "outreach", label: "Outreach" },
   { id: "charts", label: "Charts" },
 ];
+
+/** The pipeline's stage columns, each with a couple of company cards. */
+const SKELETON: SkeletonGroup[][] = [Array.from({ length: 6 }, () => ({ cards: 2, height: 88 }))];
 
 const STAGE_TONE: Record<string, string> = {
   applied: "pill--read",
@@ -226,7 +231,7 @@ function Outreach({ rows, onNavigate }: { rows: OutreachEntry[]; onNavigate: Nav
 export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
   const [tab, setTab] = useState<Tab>("pipeline");
   const [response, setResponse] = useState<JobsResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
   const today = localDate();
 
   const load = useCallback(() => {
@@ -236,9 +241,14 @@ export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
         setError(null);
       })
       .catch((err: unknown) => {
-        setError(typeof err === "string" ? err : "Could not load jobs.");
+        setError(loadError(err));
       });
   }, []);
+
+  const retry = useCallback(() => {
+    setError(null);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -280,11 +290,7 @@ export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
         }}
       />
 
-      {error && (
-        <p className="setting__error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <ErrorState title="Could not load jobs." detail={error.detail} onRetry={retry} />}
 
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "applications" ? (
@@ -301,6 +307,8 @@ export function JobsPage({ onNavigate }: { onNavigate: Navigate }) {
           ) : (
             <Outreach rows={response.jobs.outreach} onNavigate={onNavigate} />
           )
+        ) : error === null ? (
+          <Skeleton label="jobs" layout={SKELETON} />
         ) : null}
       </div>
     </>
