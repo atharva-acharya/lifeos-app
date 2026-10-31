@@ -10,7 +10,7 @@ Each phase ends with a released build. Requirements ask for a signed installer, 
 
 - **Trigger:** pushing a tag `vX.Y.Z` on `main` runs `release.yml` in a protected `release` environment (manual approval).
 - **Version** from the tag; set in `package.json`, `Cargo.toml` and `tauri.conf.json` by the release workflow check (mismatch fails).
-- **Artefacts:** NSIS installer (`.exe`) and MSI from `tauri build`.
+- **Artefacts:** the NSIS installer (`.exe`) from `tauri build`. Only NSIS: an MSI is a second, separate Windows product, so owners with both saw two installs and were asked to uninstall twice on upgrade. Releases up to 0.4.0 shipped an MSI too; the NSIS installer's hook (`src-tauri/windows/installer-hooks.nsh`) removes an old MSI install quietly and updates an older NSIS install in place without the uninstall step.
 - **Code signing (Authenticode):** apply to SignPath Foundation's free open-source programme; the CI signs through SignPath's GitHub Action, so no private key is ever stored in GitHub. Until approved, releases ship unsigned and the README says so.
 - **Provenance:** GitHub artifact attestations (Sigstore, SLSA build provenance) for every artefact, verifiable with `gh attestation verify`.
 - **SBOM:** CycloneDX for both ecosystems (`@cyclonedx/cyclonedx-npm`, `cargo cyclonedx`), merged and attached to the release.
