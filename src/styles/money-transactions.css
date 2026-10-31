@@ -26,11 +26,12 @@
   background: var(--bg-card);
 }
 
+/* Day headers sit a step below the rows, so the transactions lead. */
 .money-tx__date {
   margin: 0;
-  font-size: var(--fs-label);
+  color: var(--text-muted);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .money-tx__net {
