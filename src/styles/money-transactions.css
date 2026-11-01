@@ -10,19 +10,35 @@
   margin-top: var(--space-2);
 }
 
-/* Sticks to the top of the scrolling page; the solid card colour keeps
-   rows from showing through it. */
+/* The list scrolls inside its card; the page never does. It runs to the
+   card's edges, and fades out at the bottom where more rows wait. */
+.money-tx__scroll {
+  flex: 1;
+  min-height: 0;
+  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding-bottom: var(--space-4);
+  overflow-y: auto;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  scrollbar-width: thin;
+  mask-image: linear-gradient(180deg, var(--text) calc(100% - 28px), transparent);
+}
+
+.money-tx__scroll:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+/* Sticks to the top of the list; the solid card colour keeps rows from
+   showing through it. */
 .money-tx__head {
   position: sticky;
-  /* Sticks just under the scroll-edge fade, or under the page bar while it
-     shows (L4); set on .main in layout.css. */
-  top: var(--page-top-inset, var(--scroll-edge));
+  top: 0;
   z-index: 1;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) var(--card-pad);
+  padding: var(--space-2) var(--space-5);
   background: var(--bg-card);
 }
 
@@ -49,8 +65,8 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
-  margin-left: var(--card-pad);
-  padding: var(--space-3) var(--card-pad) var(--space-3) 0;
+  margin-left: var(--space-5);
+  padding: var(--space-3) var(--space-5) var(--space-3) 0;
   border-top: 1px solid var(--border);
 }
 

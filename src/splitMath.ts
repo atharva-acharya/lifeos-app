@@ -157,3 +157,30 @@ export function summarise(balances: number[]): SplitSummary {
   }
   return { owe, owed, net: owed - owe };
 }
+
+/**
+ * What each person pays so far, in pence, for the live amounts beside each
+ * name while a split is being filled in. People whose value is not entered
+ * yet (or not readable) show 0; equal and share splits divide the whole
+ * total once every share is readable.
+ */
+export function liveShares(method: SplitMethod, total: number | null, inputs: string[]): number[] {
+  const none = inputs.map(() => 0);
+  if (method === "amounts") return inputs.map((t) => toPence(t) ?? 0);
+  if (total === null || inputs.length === 0) return none;
+  if (method === "equal")
+    return allocate(
+      total,
+      none.map(() => 1),
+    );
+  if (method === "shares") {
+    const shares = inputs.map(toShares);
+    if (shares.some((s) => s === null)) return none;
+    const weights = shares as number[];
+    return weights.some((w) => w > 0) ? allocate(total, weights) : none;
+  }
+  return inputs.map((t) => {
+    const bp = toBasisPoints(t);
+    return bp === null ? 0 : Math.round((total * bp) / WHOLE);
+  });
+}

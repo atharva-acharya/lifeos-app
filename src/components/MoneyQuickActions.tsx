@@ -1,15 +1,19 @@
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import type { FriendBalance } from "../api";
 import { useMode } from "../mode";
 import "../styles/money-actions.css";
 
-/** Ids of the elements the quick actions move focus to. */
-export const ADD_FIELD_ID = "money-add-description";
-export const SPLIT_FIELD_ID = "money-split-description";
+/** Ids of the elements Settle up and Budget move focus to. */
 export const BALANCES_ID = "money-balances";
-const BUDGETS_SELECTOR = ".money__budgets";
+export const BUDGETS_TITLE_ID = "money-budgets-title";
 
-type ActionKey = "add" | "split" | "settle" | "budget";
+type ActionKey = "add" | "split" | "import" | "settle" | "budget";
+/** The actions that open a sheet; the others move focus on the page. */
+export type SheetAction = "add" | "split" | "import";
+
+function opensSheet(action: ActionKey): action is SheetAction {
+  return action === "add" || action === "split" || action === "import";
+}
 
 /** True when a key press should be left to the element that has focus. */
 function isTyping(target: EventTarget | null): boolean {
@@ -36,37 +40,23 @@ function reveal(el: HTMLElement, smooth: boolean) {
   if ("scrollIntoView" in el) el.scrollIntoView({ behavior, block: "nearest" });
 }
 
-function findTarget(action: ActionKey): HTMLElement | null {
-  switch (action) {
-    case "add":
-      return document.getElementById(ADD_FIELD_ID);
-    case "split":
-      return document.getElementById(SPLIT_FIELD_ID);
-    case "settle": {
-      const card = document.getElementById(BALANCES_ID);
-      return (
-        card?.querySelector<HTMLElement>("button[data-settle]:not(:disabled)") ??
-        card?.querySelector<HTMLElement>("button:not(:disabled)") ??
-        null
-      );
-    }
-    case "budget": {
-      // The heading above the card, so a screen reader hears "Budgets".
-      const group = document.querySelector(BUDGETS_SELECTOR)?.closest<HTMLElement>(".group");
-      const heading = group?.querySelector<HTMLElement>(".group__title") ?? null;
-      if (heading && !heading.hasAttribute("tabindex")) heading.tabIndex = -1;
-      return heading;
-    }
+function findTarget(action: "settle" | "budget"): HTMLElement | null {
+  if (action === "settle") {
+    const card = document.getElementById(BALANCES_ID);
+    return (
+      card?.querySelector<HTMLElement>("button[data-settle]:not(:disabled)") ??
+      card?.querySelector<HTMLElement>("button:not(:disabled)") ??
+      null
+    );
   }
-}
-
-function runAction(action: ActionKey, smooth: boolean) {
-  const el = findTarget(action);
-  if (el) reveal(el, smooth);
+  // The card's heading, so a screen reader hears "Budgets".
+  const heading = document.getElementById(BUDGETS_TITLE_ID);
+  if (heading && !heading.hasAttribute("tabindex")) heading.tabIndex = -1;
+  return heading;
 }
 
 function disabledActions(sample: boolean, owed: boolean): Record<ActionKey, boolean> {
-  return { add: sample, split: sample, settle: sample || !owed, budget: false };
+  return { add: sample, split: sample, import: sample, settle: sample || !owed, budget: false };
 }
 
 function Icon({ children }: { children: ReactNode }) {
@@ -91,6 +81,7 @@ function Icon({ children }: { children: ReactNode }) {
 const ICONS: Record<ActionKey, ReactNode> = {
   add: <path d="M8 3v10M3 8h10" />,
   split: <path d="M8 2v5M8 7 3.5 13M8 7l4.5 6" />,
+  import: <path d="M8 2.5v7m0 0L5 6.5m3 3 3-3M3 12.5h10" />,
   settle: <path d="m3 8.5 3 3 7-7" />,
   budget: (
     <>
@@ -101,26 +92,54 @@ const ICONS: Record<ActionKey, ReactNode> = {
 };
 
 /** `name`, when set, is the accessible name; it starts with the visible label. */
+/** In reading order; Add, the one primary action, comes last on the right. */
 const ACTIONS: { key: ActionKey; label: string; name?: string; shortcut: string }[] = [
-  { key: "add", label: "Add", name: "Add a transaction", shortcut: "A" },
-  { key: "split", label: "Split", shortcut: "S" },
-  { key: "settle", label: "Settle up", shortcut: "U" },
   { key: "budget", label: "Budget", shortcut: "B" },
+  { key: "settle", label: "Settle up", shortcut: "U" },
+  { key: "import", label: "Import", name: "Import a bank statement", shortcut: "I" },
+  { key: "split", label: "Split", name: "Split a bill", shortcut: "S" },
+  { key: "add", label: "Add", name: "Add a transaction", shortcut: "A" },
 ];
 
 /**
- * The Money page's quick-action row (spec P5): Add, Split, Settle up and
- * Budget, each with a single-key shortcut that works while focus is not in
- * a field.
+ * The Money page's quick actions (spec P5), in its header: Add, Split and
+ * Import open their flows; Settle up and Budget move to their cards. Each
+ * has a single-key shortcut that works while focus is not in a field.
  */
-export function MoneyQuickActions({ friends }: { friends: FriendBalance[] }) {
+export function MoneyQuickActions({
+  friends,
+  onOpen,
+}: {
+  friends: FriendBalance[];
+  /** Opens a flow's sheet, growing from `trigger`. */
+  onOpen: (action: SheetAction, trigger: HTMLElement) => void;
+}) {
   const sample = useMode() === "sample";
   const reasonId = useId();
   const owed = friends.some((f) => f.balance !== 0);
+  const buttons = useRef<Partial<Record<ActionKey, HTMLButtonElement | null>>>({});
+  const openRef = useRef(onOpen);
+  useEffect(() => {
+    openRef.current = onOpen;
+  });
+
+  const act = (key: ActionKey, smooth: boolean) => {
+    const button = buttons.current[key];
+    if (opensSheet(key)) {
+      if (button) openRef.current(key, button);
+      return;
+    }
+    const el = findTarget(key);
+    if (el) reveal(el, smooth);
+  };
+  const actRef = useRef(act);
+  useEffect(() => {
+    actRef.current = act;
+  });
 
   const disabled = disabledActions(sample, owed);
   const reason = sample
-    ? "Add, Split and Settle up are off while sample data is on."
+    ? "Add, Split, Import and Settle up are off while sample data is on."
     : !owed
       ? "Settle up is off: nobody owes you and you owe nobody."
       : null;
@@ -133,7 +152,7 @@ export function MoneyQuickActions({ friends }: { friends: FriendBalance[] }) {
       const action = ACTIONS.find((a) => a.shortcut === e.key.toUpperCase());
       if (!action || off[action.key]) return;
       e.preventDefault();
-      runAction(action.key, false);
+      actRef.current(action.key, false);
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -147,15 +166,18 @@ export function MoneyQuickActions({ friends }: { friends: FriendBalance[] }) {
         {ACTIONS.map((a) => (
           <button
             key={a.key}
+            ref={(el) => {
+              buttons.current[a.key] = el;
+            }}
             type="button"
-            className="money-actions__button"
+            className={`money-actions__button${a.key === "add" ? " money-actions__button--primary" : ""}`}
             disabled={disabled[a.key]}
             aria-label={a.name}
             aria-keyshortcuts={a.shortcut}
             aria-describedby={disabled[a.key] && reason ? reasonId : undefined}
             onClick={(e) => {
               // detail is 0 when Enter or Space pressed the button.
-              runAction(a.key, e.detail > 0);
+              act(a.key, e.detail > 0);
             }}
           >
             <Icon>{ICONS[a.key]}</Icon>

@@ -49,7 +49,11 @@ describe("BarChart", () => {
       "One · Beta: 1",
       "Three · Alpha: 4",
     ]);
-    expect(bars[0].getAttribute("fill")).toBe("var(--c-read)");
+    // Each bar is filled with its series' gradient, brightest at the top.
+    const fill = bars[0].getAttribute("fill") ?? "";
+    const id = /^url\(#(.+)\)$/.exec(fill)?.[1] ?? "";
+    const stop = container.querySelector(`[id="${id}"] stop`);
+    expect(stop).toHaveStyle({ stopColor: "var(--c-read)" });
   });
 
   it("stacks segments and scales them to the axis", () => {
