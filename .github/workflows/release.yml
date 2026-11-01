@@ -22,21 +22,29 @@ jobs:
   gates:
     name: Release gates
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     permissions:
       checks: read
       statuses: read
     steps:
       # CodeQL for Rust is not a required PR check (it is slow), so a release
       # only goes out once it has passed on the exact commit being tagged.
+      # A tag pushed right after a merge finds the scan still running, so wait
+      # for it (up to 20 minutes) rather than fail.
       - name: Require CodeQL (rust) to have passed on this commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
         run: |
-          result=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CodeQL%20(rust)" \
-            --jq '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last | .conclusion')
+          for _ in $(seq 40); do
+            runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=CodeQL%20(rust)")
+            pending=$(jq '[.check_runs[] | select(.status != "completed")] | length' <<<"$runs")
+            result=$(jq -r '[.check_runs[] | select(.status == "completed")] | sort_by(.completed_at) | last | .conclusion // empty' <<<"$runs")
+            [ "$pending" -eq 0 ] && break
+            echo "CodeQL (rust) on $SHA is still running; checking again in 30s"
+            sleep 30
+          done
           echo "CodeQL (rust) on $SHA: ${result:-not run}"
           [ "$result" = "success" ]
 
