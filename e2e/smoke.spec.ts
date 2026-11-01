@@ -331,6 +331,7 @@ test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: /^Vault and Health/ }).click();
   await expect(page.getByText("Connected")).toBeVisible();
   await expect(page.getByText(vault)).toBeVisible();
 });
@@ -344,6 +345,7 @@ test("an uncaught error is logged locally and shown in Diagnostics", async () =>
   }, PROBE);
   await page.getByRole("button", { name: "Today", exact: true }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
   await expect(page.getByText("1 recent error logged")).toBeVisible();
@@ -360,6 +362,7 @@ test("an update signed with the wrong key is offered but refused", async () => {
   });
   await banner.getByRole("button", { name: "Dismiss" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 
@@ -367,6 +370,7 @@ test("an old signed release announced as new is refused (no downgrade)", async (
   const { page, offerUpdate } = running();
   offerUpdate("replay");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Updates/ }).click();
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByText("Version 9.9.9 is available.")).toBeVisible();
   await page.getByRole("button", { name: "Install and restart" }).click();
@@ -374,6 +378,7 @@ test("an old signed release announced as new is refused (no downgrade)", async (
     page.getByRole("alert").filter({ hasText: "failed its security check" }),
   ).toBeVisible({ timeout: 15_000 });
   // Nothing was installed: same process, same version.
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 

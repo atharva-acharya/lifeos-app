@@ -88,6 +88,7 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   // Settings: nothing can be changed while sample data is on.
   await goTo("Settings");
   await expect(page.getByText("Leave sample data to change settings.")).toBeVisible();
+  await page.getByRole("button", { name: /^Vault and Health/ }).click();
   // A disabled fieldset disables every control inside it (isDisabled honours that).
   const controls = page
     .locator("fieldset.settings-group")

@@ -25,10 +25,32 @@ afterEach(() => {
 });
 
 describe("SettingsPage", () => {
+  it("lists its sections, opens Setup by default and switches section on click", async () => {
+    invoke.mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
+    render(<SettingsPage />);
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(nav).toHaveTextContent("Setup");
+    expect(screen.getByRole("button", { name: /^Setup/ })).toHaveAttribute("aria-current", "true");
+    expect(screen.queryByRole("heading", { name: "Vault folder" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Vault and Health/ }));
+    expect(await screen.findByRole("heading", { name: "Vault folder" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Health export" })).toBeInTheDocument();
+  });
+
+  it("opens the section a link asks for", async () => {
+    invoke.mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
+    render(<SettingsPage open="data" />);
+    expect(await screen.findByRole("heading", { name: "Vault folder" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Vault and Health/ })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
   it("shows card shapes, not text, while settings load", () => {
     vi.useFakeTimers();
     invoke.mockReturnValueOnce(new Promise(() => undefined));
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
     act(() => {
       vi.advanceTimersByTime(SKELETON_DELAY_MS);
@@ -43,7 +65,7 @@ describe("SettingsPage", () => {
     invoke
       .mockRejectedValueOnce("the settings file could not be read")
       .mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Could not load settings.");
     expect(alert).toHaveTextContent("the settings file could not be read");
@@ -57,7 +79,7 @@ describe("SettingsPage", () => {
 
   it("asks for a vault when none is set", async () => {
     invoke.mockResolvedValueOnce({ vaultPath: null, google: NO_GOOGLE });
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     expect(await screen.findByText("Not set")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose folder" })).toBeEnabled();
     expect(invoke).toHaveBeenCalledWith("get_settings");
@@ -69,7 +91,7 @@ describe("SettingsPage", () => {
       healthPath: HEALTH,
       google: NO_GOOGLE,
     });
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     expect(await screen.findByRole("heading", { name: "Health export" })).toBeInTheDocument();
     expect(screen.getByText(HEALTH)).toBeInTheDocument();
     // The vault card keeps its own button.
@@ -81,7 +103,7 @@ describe("SettingsPage", () => {
     invoke
       .mockResolvedValueOnce({ vaultPath: VAULT, healthPath: HEALTH, google: NO_GOOGLE })
       .mockRejectedValueOnce("the chosen Health folder is a link or junction; <b>pick</b> it");
-    const { container } = render(<SettingsPage />);
+    const { container } = render(<SettingsPage open="data" />);
     fireEvent.click(await screen.findByRole("button", { name: "Change Health folder" }));
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("link or junction");
@@ -96,14 +118,14 @@ describe("SettingsPage", () => {
 
   it("treats a missing healthPath from an older backend as not chosen", async () => {
     invoke.mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     expect(await screen.findByText("Not chosen")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Choose Health folder" })).toBeEnabled();
   });
 
   it("shows the connected vault", async () => {
     invoke.mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     expect(await screen.findByText(VAULT)).toBeInTheDocument();
     expect(screen.getByText("Connected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Change folder" })).toBeInTheDocument();
@@ -113,7 +135,7 @@ describe("SettingsPage", () => {
     invoke
       .mockResolvedValueOnce({ vaultPath: null, google: NO_GOOGLE })
       .mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     fireEvent.click(await screen.findByRole("button", { name: "Choose folder" }));
     expect(await screen.findByText(VAULT)).toBeInTheDocument();
     expect(invoke).toHaveBeenLastCalledWith("choose_vault_folder");
@@ -123,7 +145,7 @@ describe("SettingsPage", () => {
     invoke
       .mockResolvedValueOnce({ vaultPath: null, google: NO_GOOGLE })
       .mockRejectedValueOnce("the chosen vault is a link or junction; pick the real folder");
-    render(<SettingsPage />);
+    render(<SettingsPage open="data" />);
     fireEvent.click(await screen.findByRole("button", { name: "Choose folder" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("link or junction");
     expect(screen.getByText("Not set")).toBeInTheDocument();
@@ -134,7 +156,7 @@ describe("SettingsPage", () => {
       vaultPath: VAULT,
       google: { ...NO_GOOGLE, clientId: "id", sheetId: SHEET, hasSecret: true, configured: true },
     });
-    render(<SettingsPage />);
+    render(<SettingsPage open="google" />);
     fireEvent.change(await screen.findByLabelText("Client ID"), { target: { value: "id" } });
     fireEvent.change(screen.getByLabelText("Client secret"), { target: { value: "s3cret" } });
     fireEvent.change(screen.getByLabelText("Sheet ID"), { target: { value: SHEET } });
@@ -160,9 +182,9 @@ describe("SettingsPage", () => {
         connected: true,
       },
     });
-    render(<SettingsPage />);
+    render(<SettingsPage open="google" />);
     expect(await screen.findByRole("button", { name: "Disconnect" })).toBeInTheDocument();
-    expect(screen.getAllByText("Connected")).toHaveLength(2);
+    expect(screen.getAllByText("Connected")).toHaveLength(1);
   });
 
   it("shows the real status when Disconnect could not reach Google", async () => {
@@ -177,7 +199,7 @@ describe("SettingsPage", () => {
       .mockResolvedValueOnce({ vaultPath: VAULT, google })
       .mockRejectedValueOnce("Disconnected here, but Google could not be reached.")
       .mockResolvedValueOnce({ vaultPath: VAULT, google: { ...google, connected: false } });
-    render(<SettingsPage />);
+    render(<SettingsPage open="google" />);
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect" }));
     expect(await screen.findByText(/Google could not be reached/)).toBeInTheDocument();
     expect(await screen.findByText("Ready to connect")).toBeInTheDocument();

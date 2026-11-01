@@ -82,7 +82,7 @@ test("a first run shows Welcome, then every page explains what is missing", asyn
   await expect(setup.getByText("0 of 6 set up · 1 skipped", { exact: true })).toBeVisible();
   await setup.getByRole("button", { name: "Undo" }).click();
   await expect(setup.getByText("0 of 6 set up", { exact: true })).toBeVisible();
-  await expect(setup.getByRole("link", { name: "Settings › Health" })).toBeVisible();
+  await expect(setup.getByRole("button", { name: "Open Vault and Health" })).toBeVisible();
   // A guide shows the exact front matter to copy.
   await setup.getByRole("button", { name: "Guide" }).first().click();
   await expect(setup.locator("pre").first()).toContainText("type:");

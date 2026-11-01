@@ -6,7 +6,6 @@ import { SampleBanner } from "./components/SampleBanner";
 import { Sidebar } from "./components/Sidebar";
 import { TitleBar } from "./components/TitleBar";
 import { UpdateBanner } from "./components/UpdateBanner";
-import type { GuideId } from "./guides";
 import { loadMode, useMode } from "./mode";
 import { FitnessPage } from "./pages/FitnessPage";
 import { HealthPage } from "./pages/HealthPage";
@@ -17,7 +16,7 @@ import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TodayPage } from "./pages/TodayPage";
 import { WelcomePage } from "./pages/WelcomePage";
-import { ALL_ROUTES, type RouteId } from "./routes";
+import { ALL_ROUTES, type RouteId, type SettingsTarget } from "./routes";
 import "./styles/global.css";
 import "./styles/layout.css";
 import "./styles/cards.css";
@@ -33,7 +32,7 @@ applyStoredTransparency();
 export default function App() {
   const mode = useMode();
   const [current, setCurrent] = useState<RouteId>("today");
-  const [guide, setGuide] = useState<GuideId | null>(null);
+  const [guide, setGuide] = useState<SettingsTarget | null>(null);
   // Known after the first read of settings and mode; until then nothing is drawn.
   const [hasVault, setHasVault] = useState<boolean | null>(null);
   // "Skip for now" lasts until the app restarts; the welcome screen returns while no vault is set.
@@ -50,7 +49,7 @@ export default function App() {
   }, []);
   const route = ALL_ROUTES.find((r) => r.id === current) ?? ALL_ROUTES[0];
 
-  const go = useCallback((id: RouteId, to?: GuideId, options?: TransitionOptions) => {
+  const go = useCallback((id: RouteId, to?: SettingsTarget, options?: TransitionOptions) => {
     withTransition(() => {
       setCurrent(id);
       setGuide(id === "settings" ? (to ?? null) : null);
@@ -59,7 +58,7 @@ export default function App() {
   // Pages navigate with the mouse transition; the sidebar and Ctrl K say
   // when the keyboard started the change (M4).
   const navigate = useCallback(
-    (id: RouteId, to?: GuideId) => {
+    (id: RouteId, to?: SettingsTarget) => {
       go(id, to);
     },
     [go],
@@ -181,7 +180,7 @@ export default function App() {
             ) : route.id === "projects" ? (
               <ProjectsPage onNavigate={navigate} />
             ) : route.id === "settings" ? (
-              <SettingsPage openGuide={guide} />
+              <SettingsPage open={guide} />
             ) : (
               <PlaceholderPage route={route} />
             )}

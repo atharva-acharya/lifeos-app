@@ -8,6 +8,7 @@ import {
   type SetupItemId,
 } from "../api";
 import { CHECKLIST_GUIDES, type GuideId } from "../guides";
+import type { SettingsSection } from "../routes";
 import { GuidePanel } from "./GuidePanel";
 
 /** "3 of 5 set up", plus "· 1 skipped" when any. */
@@ -54,6 +55,7 @@ function Row({
   onSkip,
   onUndo,
   onChooseVault,
+  onOpenSection,
 }: {
   item: SetupItem;
   disabled: boolean;
@@ -62,6 +64,8 @@ function Row({
   onSkip: () => void;
   onUndo: () => void;
   onChooseVault?: () => void;
+  /** Opens another Settings section (where the Sheet or Health folder is set). */
+  onOpenSection?: (section: SettingsSection) => void;
 }) {
   const guide = guideOf(item.id);
   const pill = pillOf(item);
@@ -77,15 +81,27 @@ function Row({
               Choose folder
             </button>
           )}
-          {!item.done && item.id === "sheet" && (
-            <a className="button button--quiet" href="#google-heading">
-              Settings › Google
-            </a>
+          {!item.done && item.id === "sheet" && onOpenSection && (
+            <button
+              type="button"
+              className="button button--quiet"
+              onClick={() => {
+                onOpenSection("google");
+              }}
+            >
+              Open Google Sheets
+            </button>
           )}
-          {!item.done && item.id === "health" && (
-            <a className="button button--quiet" href="#health-heading">
-              Settings › Health
-            </a>
+          {!item.done && item.id === "health" && onOpenSection && (
+            <button
+              type="button"
+              className="button button--quiet"
+              onClick={() => {
+                onOpenSection("data");
+              }}
+            >
+              Open Vault and Health
+            </button>
           )}
           {!item.done && guide && (
             <button
@@ -129,12 +145,15 @@ export function SetupChecklist({
   disabled = false,
   openGuide = null,
   onChooseVault,
+  onOpenSection,
   refreshKey,
 }: {
   disabled?: boolean;
   /** A guide to show open at first, for example when arriving from an empty page. */
   openGuide?: GuideId | null;
   onChooseVault?: () => void;
+  /** Opens another Settings section from a row (the Sheet, the Health folder). */
+  onOpenSection?: (section: SettingsSection) => void;
   /** Changes when something the checklist depends on changed (for example the vault). */
   refreshKey?: string | null;
 }) {
@@ -194,6 +213,7 @@ export function SetupChecklist({
                   change(unskipSetupItem(item.id));
                 }}
                 onChooseVault={onChooseVault}
+                onOpenSection={onOpenSection}
               />
             );
           })}

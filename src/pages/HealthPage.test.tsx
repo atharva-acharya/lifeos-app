@@ -170,7 +170,7 @@ describe("HealthPage", () => {
     expect(await screen.findByText("Not set up")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try with sample data" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
     expect(screen.queryByRole("heading", { name: "Trends" })).not.toBeInTheDocument();
   });
 

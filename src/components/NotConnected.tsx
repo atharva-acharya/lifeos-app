@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { enterSampleMode } from "../api";
-import type { GuideId } from "../guides";
 import { setMode, trackSwitch, useSwitching } from "../mode";
-import type { Navigate } from "../routes";
+import type { Navigate, SettingsTarget } from "../routes";
 
 /** The "Not connected" card: open settings, or look around with sample data. */
 export function NotConnected({
@@ -13,7 +12,7 @@ export function NotConnected({
 }: {
   children: string;
   onNavigate: Navigate;
-  guide?: GuideId;
+  guide?: SettingsTarget;
   pill?: string;
 }) {
   const switching = useSwitching();
@@ -40,8 +39,8 @@ export function NotConnected({
           type="button"
           className="button"
           onClick={() => {
-            if (guide) onNavigate("settings", guide);
-            else onNavigate("settings");
+            // Without a guide, the section with the vault and Health folders.
+            onNavigate("settings", guide ?? "data");
           }}
         >
           Open settings
