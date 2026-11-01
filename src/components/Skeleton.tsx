@@ -14,6 +14,8 @@ export interface SkeletonGroup {
   columns?: number;
   /** Share of the row's width, as a grid fraction (default 1). */
   weight?: number;
+  /** False for cards that sit without a group title, like Money's metric row (default true). */
+  title?: boolean;
 }
 
 /**
@@ -52,7 +54,7 @@ export function Skeleton({ label, layout }: { label: string; layout: SkeletonGro
           >
             {row.map((g, i) => (
               <div key={i} className="skeleton__group">
-                <span className="skeleton__title skeleton__shape" />
+                {g.title !== false && <span className="skeleton__title skeleton__shape" />}
                 <div
                   className="skeleton__cards"
                   style={{
@@ -65,8 +67,13 @@ export function Skeleton({ label, layout }: { label: string; layout: SkeletonGro
                       className="skeleton__card skeleton__shape"
                       style={{ height: `${String(g.height ?? 96)}px` }}
                     >
-                      <span className="skeleton__line skeleton__line--label" />
-                      <span className="skeleton__line skeleton__line--value" />
+                      {/* Button-height shapes (Money's quick actions) are too short for lines. */}
+                      {(g.height ?? 96) >= 64 && (
+                        <>
+                          <span className="skeleton__line skeleton__line--label" />
+                          <span className="skeleton__line skeleton__line--value" />
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   addTransaction,
   getMoney,
@@ -10,15 +10,28 @@ import {
 } from "../api";
 import { Group, Metric } from "../components/Card";
 import { EmptyHint } from "../components/EmptyHint";
+import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
 import { MoneyImport } from "../components/MoneyImport";
 import { ADD_FIELD_ID, MoneyQuickActions } from "../components/MoneyQuickActions";
 import { MoneySplits } from "../components/MoneySplits";
 import { MoneyTransactions } from "../components/MoneyTransactions";
 import { ChangeLine, MoneyTrends } from "../components/MoneyTrends";
 import { NotConnected } from "../components/NotConnected";
+import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { useMode } from "../mode";
 import { compareMonths, pounds, toPence } from "../money";
 import type { Navigate } from "../routes";
+
+/** Metric row, quick actions, budgets beside quick add, then transactions. */
+const SKELETON: SkeletonGroup[][] = [
+  [{ cards: 4, columns: 4, height: 110, title: false }],
+  [{ cards: 4, columns: 4, height: 40, title: false }],
+  [
+    { height: 240, weight: 3 },
+    { height: 240, weight: 2 },
+  ],
+  [{ height: 200 }],
+];
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -329,19 +342,32 @@ function Dashboard({ money, onAdded }: { money: Money; onAdded: () => void }) {
 
 export function MoneyPage({ onNavigate }: { onNavigate: Navigate }) {
   const [month, setMonth] = useState(() => localDate().slice(0, 7));
-  const [response, setResponse] = useState<MoneyResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // The month the shown response belongs to; it trails `month` while the next one loads.
+  const [loaded, setLoaded] = useState<{ month: string; response: MoneyResponse } | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
+  // Answers for a month the page has already moved on from are dropped.
+  const wanted = useRef(month);
+  useEffect(() => {
+    wanted.current = month;
+  }, [month]);
 
   const load = useCallback(() => {
     getMoney(month)
       .then((r) => {
-        setResponse(r);
+        if (wanted.current !== month) return;
+        setLoaded({ month, response: r });
         setError(null);
       })
       .catch((err: unknown) => {
-        setError(typeof err === "string" ? err : "Could not load money.");
+        if (wanted.current !== month) return;
+        setError(loadError(err));
       });
   }, [month]);
+
+  const retry = useCallback(() => {
+    setError(null);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -358,6 +384,12 @@ export function MoneyPage({ onNavigate }: { onNavigate: Navigate }) {
       unsubscribe?.();
     };
   }, [load]);
+
+  const response = loaded?.response ?? null;
+  // Changing month keeps the last month on screen, dimmed, instead of a skeleton.
+  // If that month then fails to load, only the error shows, not the old month.
+  const stale = loaded !== null && loaded.month !== month;
+  const busy = stale && error === null;
 
   return (
     <>
@@ -390,17 +422,18 @@ export function MoneyPage({ onNavigate }: { onNavigate: Navigate }) {
           </button>
         </div>
       </header>
-      {error && (
-        <p className="setting__error" role="alert">
-          {error}
-        </p>
+      {error && <ErrorState title="Could not load money." detail={error.detail} onRetry={retry} />}
+      {response === null && error === null && <Skeleton label="money" layout={SKELETON} />}
+      {response !== null && (!stale || busy) && (
+        <div className={busy ? "page-data page-data--busy" : "page-data"} aria-busy={busy}>
+          {response.status === "noVault" && (
+            <NotConnected onNavigate={onNavigate}>
+              Choose your Life OS vault folder to see your spending and budgets.
+            </NotConnected>
+          )}
+          {response.status === "ready" && <Dashboard money={response.money} onAdded={load} />}
+        </div>
       )}
-      {response?.status === "noVault" && (
-        <NotConnected onNavigate={onNavigate}>
-          Choose your Life OS vault folder to see your spending and budgets.
-        </NotConnected>
-      )}
-      {response?.status === "ready" && <Dashboard money={response.money} onAdded={load} />}
     </>
   );
 }
