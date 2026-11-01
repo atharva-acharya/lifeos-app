@@ -278,6 +278,9 @@ export async function launchApp(
       LIFEOS_UPDATE_ENDPOINT: updates.endpoint,
       LIFEOS_UPDATE_PUBKEY: readFileSync(join(FIXTURE_UPDATE, "test-key.pub"), "utf8").trim(),
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${String(PORT)}`,
+      // Its own WebView2 profile: an installed Life OS that is already open
+      // would otherwise own the browser process and ignore the debugging port.
+      WEBVIEW2_USER_DATA_FOLDER: join(work, "webview"),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
