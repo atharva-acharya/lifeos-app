@@ -145,6 +145,8 @@ export default function App() {
         expanded={railOpen}
         onToggle={toggleRail}
       />
+      {/* One soft glow in the page's own colour; it fades in on each page. */}
+      <div key={route.id} className="page-glow" data-page={route.id} aria-hidden="true" />
       <main
         className="main"
         ref={setMain}

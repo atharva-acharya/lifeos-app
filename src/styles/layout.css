@@ -235,10 +235,55 @@
   transform: translate(0, -50%);
 }
 
-.main {
-  position: relative;
+.page-glow {
   grid-column: 2;
   grid-row: 2;
+  z-index: 0;
+  background: var(--glow-quiet);
+  pointer-events: none;
+  animation: glow-in 600ms var(--ease-out) both;
+}
+
+.page-glow[data-page="today"] {
+  background: var(--glow-today);
+}
+.page-glow[data-page="money"] {
+  background: var(--glow-money);
+}
+.page-glow[data-page="health"] {
+  background: var(--glow-health);
+}
+.page-glow[data-page="fitness"] {
+  background: var(--glow-fitness);
+}
+.page-glow[data-page="jobs"] {
+  background: var(--glow-jobs);
+}
+.page-glow[data-page="projects"] {
+  background: var(--glow-projects);
+}
+
+@keyframes glow-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-glow {
+    animation: none;
+  }
+}
+
+/* A column, so a page that fits the window (.page--fit) can take the
+   height left under its header and banners. */
+.main {
+  position: relative;
+  z-index: 1;
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow-y: auto;
   /* No top padding: the 24 px scroll-edge strip below takes its place. */
@@ -503,8 +548,21 @@
   height: 18px;
   border-radius: 50%;
   border: 1px solid currentColor;
-  font-size: var(--fs-kicker);
-  font-weight: 700;
+}
+
+.habit__tick svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.habit--done .habit__tick svg {
+  opacity: 1;
 }
 
 .habit--done .habit__tick {
@@ -517,17 +575,6 @@
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-kicker);
-}
-
-.today-hero {
-  display: flex;
-  align-items: center;
-  gap: var(--gutter);
-}
-
-.today-hero .habits {
-  flex: 1;
-  min-width: 0;
 }
 
 .row__title {
@@ -561,7 +608,8 @@
 .progress {
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--bg-hover);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
   overflow: hidden;
 }
 
@@ -930,16 +978,24 @@
 
 .rings svg {
   flex: none;
+  overflow: visible;
 }
 
+/* Stroke widths are set on each circle by Rings.tsx, which also leaves room
+   around the drawing so round caps and the glow are never clipped. */
 .rings__track,
+.rings__well,
 .rings__fill {
   fill: none;
-  stroke-width: 16px;
 }
 
 .rings__track {
-  opacity: 0.22;
+  opacity: 0.16;
+}
+
+/* Darkens the track so it reads as pressed into the card. */
+.rings__well {
+  stroke: rgb(0 0 0 / 0.3);
 }
 
 .rings__fill {
@@ -990,6 +1046,7 @@
 
 .update-banner {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
@@ -1271,12 +1328,43 @@ a.button {
 }
 
 .setup,
+/* One strip above Today, so the page still fits the window: title, progress,
+   what is left, then the two actions. */
 .setup-card {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-width: 760px;
+  flex: none;
+  align-items: center;
+  gap: var(--space-4);
   margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+}
+
+.setup-card .section-head {
+  display: contents;
+}
+
+.setup-card .section-head .button {
+  order: 1;
+}
+
+.setup-card .card__title {
+  white-space: nowrap;
+}
+
+.setup-card > p {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.setup-card > .progress {
+  flex: 1;
+  min-width: 80px;
+}
+
+.setup-card > p:last-of-type {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
 }
 
 .setup__list {
@@ -1523,33 +1611,6 @@ a.button {
 }
 
 /* Home: the ring with its count under it, and habits as a compact checklist. */
-.today-hero .rings {
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.today-hero .habits {
-  flex-direction: column;
-  flex-wrap: nowrap;
-  gap: var(--space-1);
-}
-
-.today-hero .habit {
-  padding: var(--space-1) 0;
-  border-radius: 0;
-  background: none;
-}
-
-.today-hero .habit__value {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.today-metrics {
-  height: 100%;
-  grid-auto-rows: 1fr;
-}
-
 .settings-group ~ .setting {
   margin-top: var(--card-pad);
 }

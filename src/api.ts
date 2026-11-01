@@ -63,6 +63,9 @@ export interface Today {
   applications: number | null;
   gym: string | null;
   habits: Habits;
+  /** Daily goals from the fitness plan, or its defaults. */
+  stepsGoal: number;
+  proteinGoal: number;
   followUps: FollowUp[];
   project: Resume | null;
   parseErrors: number;

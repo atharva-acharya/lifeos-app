@@ -7,6 +7,16 @@
   min-width: 0;
 }
 
+/* A page that fits the window (Today, Money): it takes the height left under
+   its header and banners, and its grid shares that height out. */
+.page.page--fit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
 /* A titled group: heading above, card(s) below. */
 .group {
   display: grid;
@@ -291,4 +301,101 @@
 
 .card--flush > .muted {
   padding: var(--space-3) var(--card-pad);
+}
+
+/* A card's own title row, for cards that carry their title inside (Today,
+   Money): the title on the left, a note or link on the right. */
+.card__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.card__title {
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.card__aside {
+  color: var(--text-muted);
+  font-size: var(--fs-secondary);
+}
+
+.link-button.card__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+}
+
+.card__action svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link-button.card__action:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+}
+
+/* Large rings: a big bold number per ring, its goal in grey right after it,
+   and what is left to do underneath. */
+.rings--hero .rings__legend {
+  gap: var(--space-3);
+}
+
+.rings--hero .rings__legend li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.rings--hero .rings__name {
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+}
+
+.rings__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.rings__big {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.rings__number {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.rings__of {
+  color: var(--text-muted);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+}
+
+.rings--hero .rings__hint {
+  color: var(--text-faint);
+  font-size: var(--fs-secondary);
 }

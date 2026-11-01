@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import {
   getToday,
   localDate,
@@ -7,7 +7,7 @@ import {
   type Today,
   type TodayResponse,
 } from "../api";
-import { Group, Metric } from "../components/Card";
+import { CardHead, Metric, MoreLink } from "../components/Card";
 import { EmptyHint } from "../components/EmptyHint";
 import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
 import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
@@ -15,18 +15,22 @@ import { NotConnected } from "../components/NotConnected";
 import { Rings } from "../components/Rings";
 import { SetupCard } from "../components/SetupCard";
 import type { Navigate } from "../routes";
+import "../styles/today.css";
 
 const HABITS = 5;
 
-/** Habits beside four summary cards, then follow-ups beside the project. */
+/** Rings beside four summary cards, then the project beside follow-ups. */
 const SKELETON: SkeletonGroup[][] = [
-  [{ height: 236 }, { cards: 4, columns: 2, height: 110 }],
   [
-    { height: 180, weight: 3 },
-    { height: 180, weight: 2 },
+    { height: 340, weight: 5 },
+    { cards: 4, columns: 2, height: 160, weight: 7 },
+  ],
+  [
+    { height: 300, weight: 7 },
+    { height: 300, weight: 5 },
   ],
 ];
-/** Home must fit the minimum window without scrolling, so the list is capped. */
+/** Today fits the window without scrolling, so the list is capped. */
 const FOLLOW_UPS_SHOWN = 3;
 
 function greeting(hour: number): string {
@@ -53,14 +57,22 @@ function signed(n: number): string {
   return `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}`;
 }
 
-function Habit({ label, done, value }: { label: string; done: boolean; value?: string }) {
+/** What is left of a daily goal, in words (ui-spec P3). */
+function toGo(goal: number, value: number | null, unit = ""): string {
+  if (value === null) return "Not logged yet";
+  if (value >= goal) return "Goal reached";
+  return `${(goal - value).toLocaleString("en-GB")}${unit} to go`;
+}
+
+function Habit({ label, done }: { label: string; done: boolean }) {
   return (
     <li className={`habit${done ? " habit--done" : ""}`}>
       <span className="habit__tick" aria-hidden="true">
-        {done ? "✓" : ""}
+        <svg viewBox="0 0 12 12" focusable="false">
+          <path d="M2.5 6.2 4.9 8.6 9.5 3.6" />
+        </svg>
       </span>
       <span>{label}</span>
-      {value && <span className="habit__value">{value}</span>}
       <span className="sr-only">{done ? "done" : "not yet"}</span>
     </li>
   );
@@ -68,15 +80,18 @@ function Habit({ label, done, value }: { label: string; done: boolean; value?: s
 
 function FollowUpRow({ item, today }: { item: FollowUp; today: string }) {
   const overdue = item.nextDate < today;
+  const name = item.company ?? item.path;
   return (
-    <li className="list__row">
+    <li className="list__row today__follow-row">
+      <span className="today__mark" aria-hidden="true">
+        {name.charAt(0).toUpperCase()}
+      </span>
       <div className="list__main">
-        <span className="list__title">{item.company ?? item.path}</span>
+        <span className="list__title">{name}</span>
         <span className="list__sub">
-          {[item.role, item.nextAction].filter(Boolean).join(" · ")}
+          {[item.role, item.stage, item.nextAction].filter(Boolean).join(" · ")}
         </span>
       </div>
-      {item.stage && <span className="pill pill--read">{item.stage}</span>}
       <span className={`pill ${overdue ? "pill--danger" : "pill--progress"}`}>
         {overdue ? `Overdue · ${item.nextDate}` : "Due today"}
       </span>
@@ -95,15 +110,17 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
   ].filter(Boolean).length;
   const p = today.project;
   const pct = p && p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
+  const ringsId = useId();
+  const resumeId = useId();
+  const followId = useId();
 
   const noNote = !today.hasDailyNote;
-
   const more = today.followUps.length - FOLLOW_UPS_SHOWN;
 
   return (
-    <div className="page">
+    <div className="page page--fit today">
       {noNote && (
-        <section className="card" aria-label="Daily note">
+        <section className="card today__note" aria-label="Daily note">
           <EmptyHint
             lead={`No daily note for ${dayMonth(today.date)}.`}
             guide="daily"
@@ -113,105 +130,171 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
           </EmptyHint>
         </section>
       )}
-      <div className="grid grid--2">
-        <Group title="Habits" cardClassName="today-hero">
+      <div className="today__grid">
+        <section className="card today__rings" aria-labelledby={ringsId}>
+          <CardHead
+            id={ringsId}
+            title="Today's rings"
+            action={<span className="card__aside">{habitsDone} of 5 habits</span>}
+          />
           <Rings
-            size={96}
+            size={200}
+            variant="hero"
             rings={[
               {
                 key: "habits",
                 name: "Habits",
                 value: habitsDone,
                 goal: HABITS,
-                color: habitsDone === HABITS ? "var(--ring-exercise)" : "var(--ring-move)",
+                color: "var(--ring-habits)",
+                hint:
+                  habitsDone === HABITS ? "All done today" : `${String(HABITS - habitsDone)} to go`,
+              },
+              {
+                key: "steps",
+                name: "Steps",
+                value: h.steps ?? 0,
+                goal: today.stepsGoal,
+                color: "var(--cat-fitness)",
+                hint: toGo(today.stepsGoal, h.steps),
+              },
+              {
+                key: "protein",
+                name: "Protein",
+                value: h.proteinG ?? 0,
+                goal: today.proteinGoal,
+                unit: " g",
+                color: "var(--ring-protein)",
+                hint: toGo(today.proteinGoal, h.proteinG, " g"),
               },
             ]}
           />
-          <ul className="habits">
+          {/* The rings carry the numbers; the chips only say what is done. */}
+          <ul className="habits" aria-label="Habits">
             <Habit label="Weigh-in" done={h.weighIn} />
-            <Habit
-              label="Steps"
-              done={h.steps !== null}
-              value={h.steps !== null ? h.steps.toLocaleString("en-GB") : undefined}
-            />
-            <Habit
-              label="Protein"
-              done={h.proteinG !== null}
-              value={h.proteinG !== null ? `${String(h.proteinG)} g` : undefined}
-            />
-            <Habit label="Meals tracked" done={h.mealsTracked} />
+            <Habit label="Steps" done={h.steps !== null} />
+            <Habit label="Protein" done={h.proteinG !== null} />
+            <Habit label="Meals" done={h.mealsTracked} />
             <Habit label="Mobility" done={h.mobility} />
           </ul>
-        </Group>
+        </section>
 
-        <Group title="Summary" bare>
-          <div className="grid grid--2 today-metrics">
-            <Metric
-              label="Follow-ups due"
-              color="var(--cat-jobs)"
-              count={today.followUps.length}
-              onOpen={() => {
-                onNavigate("jobs");
-              }}
-              openLabel="Open Jobs"
-            />
-            <Metric
-              label="Weight"
-              color="var(--cat-body)"
-              value="—"
-              count={today.weight ?? undefined}
-              format={(n) => n.toFixed(1)}
-              unit={today.weight !== null ? "kg" : undefined}
-              aside={
-                today.weightChange !== null ? (
-                  <span title="Since the last weigh-in">{signed(today.weightChange)} kg</span>
-                ) : undefined
-              }
-              onOpen={() => {
-                onNavigate("fitness");
-              }}
-              openLabel="Open Fitness"
-            />
-            <Metric
-              label="Applied today"
-              color="var(--cat-jobs)"
-              value={noNote ? "—" : "0"}
-              count={today.applications ?? undefined}
-              onOpen={() => {
-                onNavigate("jobs");
-              }}
-              openLabel="Open Jobs"
-            />
-            <Metric
-              label="Gym session"
-              color="var(--cat-fitness)"
-              value={today.gym ?? (noNote ? "—" : "Rest day")}
-              onOpen={() => {
-                onNavigate("fitness");
-              }}
-              openLabel="Open Fitness"
-            />
-          </div>
-        </Group>
-      </div>
+        <div className="today__metrics">
+          <Metric
+            label="Follow-ups due"
+            color="var(--cat-jobs)"
+            count={today.followUps.length}
+            unit="due"
+            onOpen={() => {
+              onNavigate("jobs");
+            }}
+            openLabel="Open Jobs"
+          />
+          <Metric
+            label="Weight"
+            color="var(--cat-body)"
+            value="—"
+            count={today.weight ?? undefined}
+            format={(n) => n.toFixed(1)}
+            unit={today.weight !== null ? "kg" : undefined}
+            aside={
+              today.weightChange !== null ? (
+                <span title="Since the last weigh-in">{signed(today.weightChange)} kg</span>
+              ) : undefined
+            }
+            onOpen={() => {
+              onNavigate("fitness");
+            }}
+            openLabel="Open Fitness"
+          />
+          <Metric
+            label="Applied today"
+            color="var(--cat-jobs)"
+            value={noNote ? "—" : "0"}
+            count={today.applications ?? undefined}
+            unit={today.applications !== null ? "applications" : undefined}
+            onOpen={() => {
+              onNavigate("jobs");
+            }}
+            openLabel="Open Jobs"
+          />
+          <Metric
+            label="Gym session"
+            color="var(--cat-fitness)"
+            value={today.gym ?? (noNote ? "—" : "Rest day")}
+            onOpen={() => {
+              onNavigate("fitness");
+            }}
+            openLabel="Open Fitness"
+          />
+        </div>
 
-      <div className="grid grid--wide-left">
-        <Group
-          title="Follow-ups"
-          action={
-            more > 0 && (
-              <button
-                type="button"
-                className="link-button"
+        <section
+          className={`card today__resume${p ? " breathing" : ""}`}
+          aria-labelledby={resumeId}
+        >
+          <CardHead
+            id={resumeId}
+            title="Pick up where you left off"
+            action={
+              <MoreLink
                 onClick={() => {
-                  onNavigate("jobs");
+                  onNavigate("projects");
                 }}
               >
-                {more} more in Jobs
-              </button>
-            )
-          }
-        >
+                All projects
+              </MoreLink>
+            }
+          />
+          {p ? (
+            <div className="resume">
+              <div className="resume__top">
+                <p className="resume__project">{p.project ?? p.path}</p>
+                <p className="resume__step">
+                  Step {Math.min(p.done + 1, p.total)} of {p.total}
+                </p>
+              </div>
+              <div
+                className="progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={p.total}
+                aria-valuenow={p.done}
+                aria-label={`${String(p.done)} of ${String(p.total)} steps done`}
+              >
+                <span style={{ width: `${String(pct)}%` }} />
+              </div>
+              {p.nextStep && (
+                <p className="resume__next">
+                  <span className="pill pill--progress">Next</span> {p.nextStep}
+                </p>
+              )}
+              {p.lastLog && <p className="muted resume__last">Last: {p.lastLog}</p>}
+            </div>
+          ) : (
+            <EmptyHint lead="No active project." guide="projects" onNavigate={onNavigate}>
+              Add a <code>type: project</code> note with <code>status: active</code> and a{" "}
+              <code>## Steps</code> checklist.
+            </EmptyHint>
+          )}
+        </section>
+
+        <section className="card today__follow" aria-labelledby={followId}>
+          <CardHead
+            id={followId}
+            title="Follow-ups"
+            action={
+              more > 0 && (
+                <MoreLink
+                  onClick={() => {
+                    onNavigate("jobs");
+                  }}
+                >
+                  {more} more in Jobs
+                </MoreLink>
+              )
+            }
+          />
           {today.followUps.length === 0 ? (
             <EmptyHint lead="Nothing due. Nice.">
               Follow-ups come from <code>type: company</code> notes with a <code>next_date</code>.
@@ -223,39 +306,7 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
               ))}
             </ul>
           )}
-        </Group>
-
-        <Group title="Resume here" cardClassName={`card--stack${p ? " breathing" : ""}`}>
-          {p ? (
-            <div className="resume">
-              <p className="resume__project">{p.project ?? p.path}</p>
-              <div
-                className="progress"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={p.total}
-                aria-valuenow={p.done}
-                aria-label={`${String(p.done)} of ${String(p.total)} steps done`}
-              >
-                <span style={{ width: `${String(pct)}%` }} />
-              </div>
-              <p className="muted">
-                Step {Math.min(p.done + 1, p.total)} of {p.total}
-              </p>
-              {p.nextStep && (
-                <p className="resume__next">
-                  <span className="pill pill--progress">Next</span> {p.nextStep}
-                </p>
-              )}
-              {p.lastLog && <p className="muted">Last: {p.lastLog}</p>}
-            </div>
-          ) : (
-            <EmptyHint lead="No active project." guide="projects" onNavigate={onNavigate}>
-              Add a <code>type: project</code> note with <code>status: active</code> and a{" "}
-              <code>## Steps</code> checklist.
-            </EmptyHint>
-          )}
-        </Group>
+        </section>
       </div>
 
       {today.parseErrors > 0 && (
@@ -308,8 +359,8 @@ export function TodayPage({ onNavigate }: { onNavigate: Navigate }) {
   return (
     <>
       <header className="page-header">
-        <p className="page-header__sub">{longDate(date)}</p>
         <h1 className="page-title">{greeting(new Date().getHours())}</h1>
+        <p className="page-header__sub">{longDate(date)}</p>
       </header>
       {error && <ErrorState title="Could not load today." detail={error.detail} onRetry={retry} />}
       {response === null && error === null && <Skeleton label="today" layout={SKELETON} />}

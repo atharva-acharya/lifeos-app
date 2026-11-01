@@ -17,6 +17,9 @@ pub struct Today {
     pub applications: Option<i64>,
     pub gym: Option<String>,
     pub habits: Habits,
+    /// Daily goals from the fitness plan (or its defaults), for the Today rings.
+    pub steps_goal: i64,
+    pub protein_goal: i64,
     pub follow_ups: Vec<FollowUp>,
     pub project: Option<Resume>,
     /// Notes the app could not read, so the owner can fix them.
@@ -120,6 +123,8 @@ pub fn today(index: &Index, date: &str) -> rusqlite::Result<Today> {
 
     out.follow_ups = follow_ups(conn, date)?;
     out.project = resume(conn)?;
+    (out.steps_goal, out.protein_goal) = crate::fitness::daily_goals(index)?;
+
     out.parse_errors = conn.query_row(
         "SELECT COUNT(*) FROM notes WHERE error IS NOT NULL",
         [],
@@ -220,6 +225,8 @@ mod tests {
             }
         );
         assert_eq!(t.parse_errors, 1);
+        // The fixture's Fitness/Plan.md sets both goals.
+        assert_eq!((t.steps_goal, t.protein_goal), (8500, 160));
     }
 
     #[test]

@@ -14,6 +14,8 @@ const TODAY: Today = {
   applications: 4,
   gym: "Pull A",
   habits: { weighIn: true, steps: 10450, proteinG: 165, mealsTracked: true, mobility: false },
+  stepsGoal: 8000,
+  proteinGoal: 170,
   followUps: [
     {
       path: "Jobs/Companies/Example Security Ltd.md",
@@ -52,7 +54,11 @@ describe("TodayPage", () => {
     expect(screen.getByTitle("Since the last weigh-in")).toHaveTextContent("−0.2 kg");
     expect(within(screen.getByLabelText("Applied today")).getByText("4")).toBeInTheDocument();
     expect(within(screen.getByLabelText("Gym session")).getByText("Pull A")).toBeInTheDocument();
-    expect(screen.getByText("4 / 5")).toBeInTheDocument();
+    // Rings: habits done of five, then steps and protein against the plan's goals.
+    expect(screen.getByText("of 5")).toBeInTheDocument();
+    expect(screen.getByText("of 8,000")).toBeInTheDocument();
+    expect(screen.getByText("Goal reached")).toBeInTheDocument();
+    expect(screen.getByText("5 g to go")).toBeInTheDocument();
   });
 
   it("lists overdue follow-ups and where to resume", async () => {

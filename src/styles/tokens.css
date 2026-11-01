@@ -2,17 +2,30 @@
 :root {
   color-scheme: dark;
 
-  --bg-page: #000000;
-  --bg-sidebar: #111113;
-  --bg-card: #1c1c1e;
-  --bg-hover: #2c2c2e; /* also raised controls: buttons, inputs, selected tab */
-  --border: #38383a; /* separators */
-  --bg-card-hover: #232325; /* a clickable card under the pointer */
-  --bg-control-hover: #3a3a3c; /* a raised control under the pointer */
-  --bg-selected: #636366; /* the selected tab in a plain tab bar */
+  /* A deep blue-grey base, not flat black (the approved 2026-11 look). */
+  --bg-page: #0f131b;
+  --bg-page-low: #0b0e14; /* the bottom of the page gradient */
+  --bg-sidebar: #0b0e14;
+  --bg-card: #1a1f2a; /* solid card colour, for sticky rows and popovers */
+  --bg-hover: #262c38; /* also raised controls: buttons, inputs, selected tab */
+  --border: #323a48; /* separators */
+  --bg-card-hover: #20262f; /* a clickable card under the pointer */
+  --bg-control-hover: #303744; /* a raised control under the pointer */
+  --bg-selected: #4b5364; /* the selected tab in a plain tab bar */
 
-  --text: #f5f5f7;
-  --text-muted: #98989f; /* AA on page, card and raised surfaces */
+  /* Cards are lit from above: lighter at the top, darker at the bottom, a
+     1 px top highlight and a soft wide shadow. Slightly translucent, so the
+     page's glow tints them like glass (no blur: they are content, L1). */
+  --card-top: rgb(46 53 69 / 0.6);
+  --card-bottom: rgb(25 29 40 / 0.66);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 24px 48px -16px rgb(0 0 0 / 0.55);
+  --card-edge: inset 0 0 0 1px rgb(255 255 255 / 0.025);
+  /* A pressed-in track (progress bars, ring wells): shadow on its top edge. */
+  --well-bg: rgb(0 0 0 / 0.32);
+  --well-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 0 rgb(255 255 255 / 0.04);
+
+  --text: #f1f3f7;
+  --text-muted: #9aa3b3; /* AA on page, card and raised surfaces */
 
   /* Colour meaning, used consistently (Apple system colours, dark). */
   /* Purple and red use Apple's increased-contrast variants so pill text on
@@ -32,6 +45,19 @@
   --ring-move: #fa114f;
   --ring-exercise: #a6ff00;
   --ring-stand: #00e5ff;
+  --ring-habits: #ff4f6d;
+  --ring-protein: #ffb340;
+
+  /* Each page's soft glow, about 10 to 15% strength, in its own colour. */
+  --glow-today:
+    radial-gradient(45% 55% at 18% 8%, rgb(96 120 255 / 0.13), transparent 70%),
+    radial-gradient(40% 50% at 92% 95%, rgb(255 140 90 / 0.09), transparent 70%);
+  --glow-money: radial-gradient(55% 60% at 80% 0%, rgb(124 108 255 / 0.16), transparent 70%);
+  --glow-health: radial-gradient(55% 60% at 80% 0%, rgb(255 96 64 / 0.14), transparent 70%);
+  --glow-fitness: radial-gradient(55% 60% at 80% 0%, rgb(48 209 88 / 0.13), transparent 70%);
+  --glow-jobs: radial-gradient(55% 60% at 80% 0%, rgb(45 212 191 / 0.13), transparent 70%);
+  --glow-projects: radial-gradient(55% 60% at 80% 0%, rgb(255 176 32 / 0.12), transparent 70%);
+  --glow-quiet: radial-gradient(55% 60% at 80% 0%, rgb(150 160 185 / 0.08), transparent 70%);
 
   /* Category colours, as Apple Health colours each data type. Lightened
      where needed so a 15 px label stays AA (4.5:1) on a card. */
@@ -40,12 +66,12 @@
   --cat-body: #da8fff;
   --cat-sleep: #8e8cff;
   --cat-fitness: #30d158;
-  --cat-money: #63e6e2;
-  --cat-jobs: #ff9f0a;
+  --cat-money: #8b7cff; /* purple-blue, as the Money glow */
+  --cat-jobs: #2dd4bf; /* teal, as the Jobs glow */
   --cat-projects: #5eb0ff;
 
   /* Cards and spacing (docs/design-rules.md). */
-  --radius: 14px;
+  --radius: 18px;
   --card-pad: 16px; /* inside a card, and between cards */
   --gutter: 20px; /* between sections */
   --radius-control: 10px;
@@ -79,7 +105,7 @@
 
   /* Chrome glass (ui-spec L3). Only chrome (sidebar, toolbars, sheets,
      popovers, menus, toasts) uses these; content cards stay solid (L1). */
-  --glass-bg: rgb(28 28 30 / 0.72);
+  --glass-bg: rgb(22 26 36 / 0.78);
   --glass-filter: blur(24px) saturate(160%);
   --glass-edge: rgb(255 255 255 / 0.08);
   --glass-highlight: inset 0 1px 0 var(--glass-edge);
@@ -90,14 +116,14 @@
   --shadow-overlay: 0 20px 40px rgb(0 0 0 / 0.45); /* the widened rail, tooltips */
   /* Window chrome: the app's own top bar and the icon rail (canvas pixels). */
   --titlebar-height: 44px;
-  --titlebar-bg: #0b0b0d;
+  --titlebar-bg: rgb(7 9 14 / 0.55);
   --close-hover: #c42b1c; /* the Windows close button's red */
   --sidebar-width: 64px;
   --sidebar-open-width: 208px;
   --hairline: rgb(255 255 255 / 0.06);
   --raised-soft: rgb(255 255 255 / 0.08); /* the current rail item */
   --card-highlight: inset 0 1px 0 rgb(255 255 255 / 0.07); /* light from above */
-  --popover-bg: #2c2c2e;
+  --popover-bg: #252b37;
   --text-faint: #8e8e96; /* rail icons, hints; AA on page and card */
   --fs-secondary: 13px;
   --scroll-edge: 24px; /* scroll-edge fade where content meets glass (L4) */
@@ -190,6 +216,8 @@
     --glass-highlight: none;
     --glass-border: var(--border);
     --page-bar-edge: var(--border);
+    --card-top: var(--bg-card);
+    --card-bottom: var(--bg-card);
   }
 }
 
@@ -199,4 +227,6 @@
   --glass-highlight: none;
   --glass-border: var(--border);
   --page-bar-edge: var(--border);
+  --card-top: var(--bg-card);
+  --card-bottom: var(--bg-card);
 }
