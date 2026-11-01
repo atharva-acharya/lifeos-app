@@ -63,7 +63,7 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   // Health: the sample export, never the owner's own folder (which is set
   // and holds 9,120 steps today).
   await goTo("Health");
-  await expect(page.getByText("5,511 /")).toBeVisible();
+  await expect(page.getByText("5,511 of")).toBeVisible();
   await expect(page.getByText("9,120")).toHaveCount(0);
   await page.getByRole("tab", { name: "Trends", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Trends" })).toBeVisible();
