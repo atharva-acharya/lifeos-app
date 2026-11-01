@@ -19,13 +19,10 @@ const POLL: Duration = Duration::from_millis(250);
 /// ERROR_SHARING_VIOLATION: the installer still has the lock open.
 const SHARING_VIOLATION: i32 = 32;
 
-pub fn wait_for_installer() {
-    if let Some(dir) = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(Path::to_path_buf))
-    {
-        wait_for(&dir.join(LOCK_FILE), MAX_WAIT);
-    }
+/// `install_dir` is where the installer put the app (Tauri's resource folder,
+/// which on Windows is the folder holding the exe).
+pub fn wait_for_installer(install_dir: &Path) {
+    wait_for(&install_dir.join(LOCK_FILE), MAX_WAIT);
 }
 
 /// Returns once `lock` is gone (deleting it if no one holds it), on any error
@@ -48,15 +45,15 @@ mod tests {
     use super::*;
     use std::fs;
 
-    fn temp_lock(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("lifeos-install-wait-{name}"));
-        fs::create_dir_all(&dir).expect("temp dir");
-        dir.join(LOCK_FILE)
+    fn temp_lock() -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let lock = dir.path().join(LOCK_FILE);
+        (dir, lock)
     }
 
     #[test]
     fn starts_at_once_with_no_installer() {
-        let lock = temp_lock("none");
+        let (_dir, lock) = temp_lock();
         let _ = fs::remove_file(&lock);
         let start = Instant::now();
         wait_for(&lock, Duration::from_secs(5));
@@ -65,7 +62,7 @@ mod tests {
 
     #[test]
     fn removes_a_lock_left_by_a_finished_installer() {
-        let lock = temp_lock("stale");
+        let (_dir, lock) = temp_lock();
         fs::write(&lock, b"").expect("write lock");
         wait_for(&lock, Duration::from_secs(5));
         assert!(!lock.exists());
@@ -100,7 +97,7 @@ mod tests {
 
         #[test]
         fn waits_until_the_installer_exits() {
-            let lock = temp_lock("hold");
+            let (_dir, lock) = temp_lock();
             let ready = hold_lock(lock.clone(), Duration::from_millis(600));
             ready.recv().expect("installer started");
             let start = Instant::now();
@@ -111,7 +108,7 @@ mod tests {
 
         #[test]
         fn gives_up_on_a_hung_installer() {
-            let lock = temp_lock("hung");
+            let (_dir, lock) = temp_lock();
             let ready = hold_lock(lock.clone(), Duration::from_secs(3));
             ready.recv().expect("installer started");
             let start = Instant::now();

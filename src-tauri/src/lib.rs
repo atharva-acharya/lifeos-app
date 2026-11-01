@@ -26,7 +26,6 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    install_wait::wait_for_installer();
     tauri::Builder::default()
         // First, so a second copy hands over to this one before doing anything:
         // two copies would fight over the same data folder.
@@ -50,6 +49,11 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Before anything else: the window stays hidden and no data is
+            // touched until a running installer has finished.
+            if let Ok(dir) = app.path().resource_dir() {
+                install_wait::wait_for_installer(&dir);
+            }
             if let Some(main) = app.get_webview_window("main") {
                 window::place(&main)?;
             }
