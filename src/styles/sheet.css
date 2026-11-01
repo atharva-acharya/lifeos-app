@@ -5,7 +5,7 @@
    ease-out. Reduce motion: no animation, it only appears. Its ancestors are
    <body> and <html> only (it is portalled), so nothing breaks the backdrop. */
 .sheet {
-  width: min(480px, calc(100vw - 64px));
+  width: min(560px, calc(100vw - 64px));
   max-height: calc(100vh - 64px);
   padding: 0;
   overflow: auto;
@@ -36,17 +36,18 @@
   animation: scrim-out var(--dur-pop-out) var(--ease-out) both;
 }
 
+/* Grows out of the control that opened it (the origin is that control). */
 @keyframes sheet-in {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.6);
   }
 }
 
 @keyframes sheet-out {
   to {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.8);
   }
 }
 

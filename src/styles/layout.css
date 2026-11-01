@@ -86,7 +86,7 @@
 
   .titlebar__button--close:hover {
     background: var(--close-hover);
-    color: #fff;
+    color: var(--primary-edge);
   }
 }
 

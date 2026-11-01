@@ -46,6 +46,13 @@
   --ring-exercise: #a6ff00;
   --ring-stand: #00e5ff;
   --ring-habits: #ff4f6d;
+  /* Friends' avatars in Money splits (Flow.tsx avatarColour). */
+  --avatar-1: #8b7cff;
+  --avatar-2: #2dd4bf;
+  --avatar-3: #ffb340;
+  --avatar-4: #ff6b8a;
+  --avatar-5: #7dd3fc;
+  --avatar-6: #a3e635;
   --ring-protein: #ffb340;
 
   /* Each page's soft glow, about 10 to 15% strength, in its own colour. */
@@ -126,6 +133,9 @@
   --popover-bg: #252b37;
   --text-faint: #8e8e96; /* rail icons, hints; AA on page and card */
   --fs-secondary: 13px;
+  /* The one light primary button per screen (Money's Add). */
+  --primary-low: #dfe3ec;
+  --primary-edge: #ffffff;
   --scroll-edge: 24px; /* scroll-edge fade where content meets glass (L4) */
   --page-bar-height: 48px; /* the compact page toolbar (L1, L4) */
   --page-bar-edge: transparent; /* no hard divider under glass (L4) */
