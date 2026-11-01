@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SKELETON_DELAY_MS } from "../components/Skeleton";
 import { invoke } from "../test/tauri-mocks";
 import { SettingsPage } from "./SettingsPage";
 
@@ -19,7 +20,41 @@ const NO_GOOGLE = {
   connected: false,
 };
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("SettingsPage", () => {
+  it("shows card shapes, not text, while settings load", () => {
+    vi.useFakeTimers();
+    invoke.mockReturnValueOnce(new Promise(() => undefined));
+    render(<SettingsPage />);
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(SKELETON_DELAY_MS);
+    });
+    const skeleton = screen.getByTestId("skeleton");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(skeleton).toHaveTextContent("Loading settings…");
+    expect(screen.queryByRole("heading", { name: "Vault folder" })).not.toBeInTheDocument();
+  });
+
+  it("explains a failed load and tries again", async () => {
+    invoke
+      .mockRejectedValueOnce("the settings file could not be read")
+      .mockResolvedValueOnce({ vaultPath: VAULT, google: NO_GOOGLE });
+    render(<SettingsPage />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not load settings.");
+    expect(alert).toHaveTextContent("the settings file could not be read");
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(VAULT)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(invoke).toHaveBeenLastCalledWith("get_settings");
+  });
+
   it("asks for a vault when none is set", async () => {
     invoke.mockResolvedValueOnce({ vaultPath: null, google: NO_GOOGLE });
     render(<SettingsPage />);

@@ -6,6 +6,7 @@ import { mockCommands, rejected } from "../test/tauri-mocks";
 import { FitnessPage } from "./FitnessPage";
 import { HealthPage } from "./HealthPage";
 import { JobsPage } from "./JobsPage";
+import { MoneyPage } from "./MoneyPage";
 import { ProjectsPage } from "./ProjectsPage";
 import { TodayPage } from "./TodayPage";
 
@@ -51,6 +52,14 @@ const PAGES: {
     label: "health",
     empty: { status: "notConfigured" },
     emptyText: /Not set up/,
+  },
+  {
+    name: "Money",
+    command: "get_money",
+    page: () => <MoneyPage onNavigate={nav} />,
+    label: "money",
+    empty: { status: "noVault" },
+    emptyText: /Not connected/,
   },
   {
     name: "Projects",

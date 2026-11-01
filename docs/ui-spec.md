@@ -120,7 +120,7 @@ Checked against the code on main after #46, plus the ring stagger on this branch
 | C4  | Partly met | Single-series bars reach 48 px; Jobs reply rates are stacked; Jobs and Sleep bar charts have no screen-reader table. | —                |
 | C5  | Met        | Sliding segmented control, instant on arrow keys.                                                                    | #44              |
 | C6  | Partly met | One primary per screen and 32 px+ height; disabled is 60% opacity, not 50%.                                          | —                |
-| C7  | Partly met | Empty states and an error boundary with retry exist; per-page loading and error states are in #47, not merged.       | #47 (open)       |
+| C7  | Met        | Loading, error with Try again, empty and partial states on every page; Money dims the old month while loading.       | #47, this PR     |
 | C8  | Partly met | Toast with 5 s Undo for splits and settle-ups; category edits do not toast.                                          | #43              |
 | P1  | Met        | Today fits 1100 × 640.                                                                                               | #35              |
 | P2  | Met        | Habits ring, four summary cards, three follow-ups, resume here.                                                      | #36              |
