@@ -1,20 +1,31 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { localDate, type MonthTotals } from "../api";
 import {
   breakdown,
   changeSize,
   changeText,
   changeTone,
+  compareWeeks,
   direction,
+  longDate,
   monthName,
+  monthsOf,
   pounds,
+  previousWeek,
   rangeMonths,
   savingsRate,
+  weekdayName,
+  weekFor,
+  weekLabel,
+  weekTotals,
   yearIsCut,
   type BreakdownRow,
+  type DayTotals,
   type TrendRange,
+  type WeekBounds,
 } from "../money";
-import { Group, MetricHead } from "./Card";
+import { useWeekTransactions } from "../useWeekTransactions";
+import { Group, Metric, MetricHead } from "./Card";
 import { BarChart, type Series } from "./BarChart";
 import { LineChart } from "./LineChart";
 import { SegmentedTabs } from "./SegmentedTabs";
@@ -23,6 +34,10 @@ import "../styles/money-trends.css";
 const FLOWS: Series<MonthTotals>[] = [
   { key: "income", name: "Income", color: "var(--c-done)", value: (t) => t.income / 100 },
   { key: "spent", name: "Spent", color: "var(--c-progress)", value: (t) => t.spent / 100 },
+];
+
+const SPENT_BY_DAY: Series<DayTotals>[] = [
+  { key: "spent", name: "Spent", color: "var(--c-progress)", value: (d) => d.spent / 100 },
 ];
 
 const PANEL_ID = "money-trends-panel";
@@ -79,18 +94,37 @@ export function ChangeLine({
   );
 }
 
+/** How a month's breakdown names its month and the month before. */
+function monthPeriod(current: string, previous: string | null) {
+  return {
+    currentName: monthName(current),
+    previousName: previous ? monthName(previous) : null,
+    aside: previous ? (
+      <>
+        {monthName(current)} vs {shortMonth(previous)}
+      </>
+    ) : (
+      monthName(current)
+    ),
+    against: "last month",
+  };
+}
+
 /**
  * A ranked list of horizontal bars: one row per category, its bar scaled to
- * the largest, the amount right-aligned and the change against last month.
- * Every row has a screen-reader table under it (ui-spec C4).
+ * the largest, the amount right-aligned and the change against the period
+ * before. Every row has a screen-reader table under it (ui-spec C4). Months
+ * and weeks share it.
  */
 function Breakdown({
   id,
   title,
   rows,
   color,
-  current,
-  previous,
+  currentName,
+  previousName,
+  aside,
+  against,
   upIsGood,
   empty,
 }: {
@@ -98,32 +132,23 @@ function Breakdown({
   title: string;
   rows: BreakdownRow[];
   color: string;
-  current: string;
-  /** Last month's key, or null when it has no data to compare with. */
-  previous: string | null;
+  /** The period shown, e.g. "October" or "26 Oct – 1 Nov". */
+  currentName: string;
+  /** The period compared with, or null when it has no data to compare with. */
+  previousName: string | null;
+  aside: ReactNode;
+  /** How the change names the period before, e.g. "last month". */
+  against: string;
   upIsGood: boolean;
   empty: string;
 }) {
   const shown = rows.filter((r) => r.current > 0 || r.previous > 0);
   const largest = Math.max(0, ...shown.map((r) => r.current));
   const hasAny = shown.some((r) => r.current > 0);
+  const compare = previousName !== null;
   return (
     <section className="card chart-card" aria-labelledby={id}>
-      <MetricHead
-        as="h3"
-        id={id}
-        label={title}
-        color="var(--cat-money)"
-        aside={
-          previous ? (
-            <>
-              {monthName(current)} vs {shortMonth(previous)}
-            </>
-          ) : (
-            monthName(current)
-          )
-        }
-      />
+      <MetricHead as="h3" id={id} label={title} color="var(--cat-money)" aside={aside} />
       {!hasAny ? (
         <p className="muted">{empty}</p>
       ) : (
@@ -144,7 +169,7 @@ function Breakdown({
                     }}
                   />
                 </span>
-                {previous && (
+                {compare && (
                   <span className="breakdown__change">
                     <ChangeLine diff={r.current - r.previous} upIsGood={upIsGood} />
                   </span>
@@ -154,24 +179,24 @@ function Breakdown({
           </ol>
           <table className="sr-only">
             <caption>
-              {title}, {monthName(current)}
-              {previous ? ` against ${monthName(previous)}` : ""}
+              {title}, {currentName}
+              {compare ? ` against ${previousName}` : ""}
             </caption>
             <thead>
               <tr>
                 <th scope="col">Name</th>
-                {previous && <th scope="col">{monthName(previous)}</th>}
-                <th scope="col">{monthName(current)}</th>
-                {previous && <th scope="col">Change</th>}
+                {compare && <th scope="col">{previousName}</th>}
+                <th scope="col">{currentName}</th>
+                {compare && <th scope="col">Change</th>}
               </tr>
             </thead>
             <tbody>
               {shown.map((r) => (
                 <tr key={r.other ? "\u0000other" : r.category}>
                   <th scope="row">{r.category}</th>
-                  {previous && <td>{pounds(r.previous)}</td>}
+                  {compare && <td>{pounds(r.previous)}</td>}
                   <td>{pounds(r.current)}</td>
-                  {previous && <td>{changeText(r.current - r.previous, "last month", "pence")}</td>}
+                  {compare && <td>{changeText(r.current - r.previous, against, "pence")}</td>}
                 </tr>
               ))}
             </tbody>
@@ -179,6 +204,139 @@ function Breakdown({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The week range (ui-spec P7): the week holding today, or the last whole
+ * week of an earlier month. Spending per day, Spent and Income against the
+ * week before, and the week's categories. It is built from transactions, so
+ * the months the two weeks touch are fetched here; a failure is one muted
+ * line, never a page error.
+ */
+function WeekView({ month, reload }: { month: string; reload: unknown }) {
+  const today = localDate();
+  const current = today.startsWith(month);
+  const week = weekFor(month, today);
+  const before = previousWeek(week);
+  const { loading, rows, failed } = useWeekTransactions(
+    monthsOf(before.start, week.end),
+    true,
+    reload,
+  );
+  const missing = (w: WeekBounds) => monthsOf(w.start, w.end).some((m) => failed.includes(m));
+
+  if (loading) {
+    return (
+      <p className="muted money-trends__note" role="status">
+        Loading the week…
+      </p>
+    );
+  }
+  if (missing(week)) {
+    return <p className="muted money-trends__note">Could not load this week.</p>;
+  }
+
+  const lastMissing = missing(before);
+  const now = weekTotals(rows, week);
+  const then = weekTotals(rows, before);
+  const vs = lastMissing ? null : compareWeeks(now, then);
+  const label = weekLabel(week);
+  const againstName = current ? "last week" : "the week before";
+  const thisName = current ? "this week" : "that week";
+  const unavailable = <span className="muted">Could not load {againstName}</span>;
+
+  return (
+    <>
+      <div className="grid grid--2">
+        <Metric
+          label={current ? "Spent this week" : "Spent that week"}
+          color="var(--cat-money)"
+          value={pounds(now.spent)}
+          aside={label}
+          detail={
+            lastMissing
+              ? unavailable
+              : vs && <ChangeLine diff={vs.spent} previous={againstName} upIsGood={false} />
+          }
+        />
+        <Metric
+          label={current ? "Income this week" : "Income that week"}
+          color="var(--cat-money)"
+          value={pounds(now.income)}
+          aside={label}
+          detail={
+            lastMissing
+              ? unavailable
+              : vs && <ChangeLine diff={vs.income} previous={againstName} upIsGood />
+          }
+        />
+      </div>
+      <div className="grid grid--2">
+        <section className="card chart-card" aria-labelledby="chart-week-days">
+          <MetricHead
+            as="h3"
+            id="chart-week-days"
+            label="Spending by day"
+            color="var(--cat-money)"
+            aside={<>£, {label}</>}
+          />
+          {now.spent === 0 ? (
+            <p className="muted">No spending {thisName}.</p>
+          ) : (
+            <>
+              <div aria-hidden="true">
+                <BarChart
+                  data={now.days}
+                  label={(d) => weekdayName(d.date)}
+                  series={SPENT_BY_DAY}
+                />
+              </div>
+              <table className="sr-only">
+                <caption>Spending by day, {label}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Day</th>
+                    <th scope="col">Spent</th>
+                    <th scope="col">Income</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {now.days.map((d) => (
+                    <tr key={d.date}>
+                      <th scope="row">{longDate(d.date)}</th>
+                      <td>{pounds(d.spent)}</td>
+                      <td>{pounds(d.income)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </section>
+
+        <Breakdown
+          id="chart-week-categories"
+          title="Spending by category"
+          rows={breakdown(now.spending, vs ? then.spending : [])}
+          color="var(--c-progress)"
+          currentName={label}
+          previousName={vs ? weekLabel(before) : null}
+          aside={
+            vs ? (
+              <>
+                {label} vs {againstName}
+              </>
+            ) : (
+              label
+            )
+          }
+          against={againstName}
+          upIsGood={false}
+          empty={`No spending ${thisName}.`}
+        />
+      </div>
+    </>
   );
 }
 
@@ -193,7 +351,10 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
   const before = trend.length >= 2 ? trend[trend.length - 2] : null;
   const previous = before && (before.income > 0 || before.spent > 0) ? before : null;
   const year = current.month.slice(0, 4);
-  const yearLabel = localDate().startsWith(year) ? "This year" : year;
+  const today = localDate();
+  const yearLabel = today.startsWith(year) ? "This year" : year;
+  // An earlier month shows its last whole week, which is not "this" week.
+  const weekTab = today.startsWith(current.month) ? "This week" : "Week";
   const shown = rangeMonths(trend, range);
   const labels = shown.map((t) => shortMonth(t.month));
   const rates = shown.map(savingsRate);
@@ -207,6 +368,7 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
       action={
         <SegmentedTabs
           items={[
+            { id: "week", label: weekTab },
             { id: "six", label: "6 months" },
             { id: "year", label: yearLabel },
           ]}
@@ -229,100 +391,106 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
         className="money-trends"
         data-settled={settled ? "" : undefined}
       >
-        {cut && (
-          <p className="muted money-trends__note">
-            Showing {monthName(shown[0].month)} to {monthName(current.month)} only: trends cover the
-            last six months, so earlier months of {year} are not included.
-          </p>
+        {range === "week" ? (
+          <WeekView month={current.month} reload={trend} />
+        ) : (
+          <>
+            {cut && (
+              <p className="muted money-trends__note">
+                Showing {monthName(shown[0].month)} to {monthName(current.month)} only: trends cover
+                the last six months, so earlier months of {year} are not included.
+              </p>
+            )}
+            <div className="grid grid--2">
+              <section className="card chart-card" aria-labelledby="chart-flows">
+                <MetricHead
+                  as="h3"
+                  id="chart-flows"
+                  label="Income and spending"
+                  color="var(--cat-money)"
+                  aside={
+                    range === "six" ? <>£, last {shown.length} months</> : <>£, {year} so far</>
+                  }
+                />
+                <div aria-hidden="true">
+                  <BarChart
+                    data={shown}
+                    label={(t) => shortMonth(t.month)}
+                    series={FLOWS}
+                    layout="grouped"
+                  />
+                </div>
+                <table className="sr-only">
+                  <caption>Income and spending by month</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Month</th>
+                      <th scope="col">Income</th>
+                      <th scope="col">Spent</th>
+                      <th scope="col">Savings rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map((t, i) => (
+                      <tr key={t.month}>
+                        <th scope="row">{t.month}</th>
+                        <td>{pounds(t.income)}</td>
+                        <td>{pounds(t.spent)}</td>
+                        <td>{rates[i] === null ? "—" : `${String(rates[i])}%`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+
+              <section className="card chart-card" aria-labelledby="chart-savings">
+                <MetricHead
+                  as="h3"
+                  id="chart-savings"
+                  label="Savings rate"
+                  color="var(--cat-money)"
+                  aside={"Share of income kept"}
+                />
+                {/* The flows table above lists the same rates for screen readers. */}
+                <div aria-hidden="true">
+                  <LineChart
+                    labels={labels}
+                    lines={[
+                      {
+                        key: "rate",
+                        name: "Savings rate",
+                        color: "var(--c-done)",
+                        values: rates,
+                        dots: true,
+                      },
+                    ]}
+                    unit="%"
+                  />
+                </div>
+              </section>
+
+              <Breakdown
+                id="chart-categories"
+                title="Spending by category"
+                rows={breakdown(current.spending, previous?.spending ?? [])}
+                color="var(--c-progress)"
+                {...monthPeriod(current.month, previous?.month ?? null)}
+                upIsGood={false}
+                empty={`No spending in ${monthName(current.month)}.`}
+              />
+
+              <Breakdown
+                id="chart-income"
+                title="Income by source"
+                rows={breakdown(current.incomeBySource, previous?.incomeBySource ?? [])}
+                color="var(--c-done)"
+                {...monthPeriod(current.month, previous?.month ?? null)}
+                upIsGood
+                empty={`No income in ${monthName(current.month)}.`}
+              />
+            </div>
+          </>
         )}
-        <div className="grid grid--2">
-          <section className="card chart-card" aria-labelledby="chart-flows">
-            <MetricHead
-              as="h3"
-              id="chart-flows"
-              label="Income and spending"
-              color="var(--cat-money)"
-              aside={range === "six" ? <>£, last {shown.length} months</> : <>£, {year} so far</>}
-            />
-            <div aria-hidden="true">
-              <BarChart
-                data={shown}
-                label={(t) => shortMonth(t.month)}
-                series={FLOWS}
-                layout="grouped"
-              />
-            </div>
-            <table className="sr-only">
-              <caption>Income and spending by month</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Month</th>
-                  <th scope="col">Income</th>
-                  <th scope="col">Spent</th>
-                  <th scope="col">Savings rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((t, i) => (
-                  <tr key={t.month}>
-                    <th scope="row">{t.month}</th>
-                    <td>{pounds(t.income)}</td>
-                    <td>{pounds(t.spent)}</td>
-                    <td>{rates[i] === null ? "—" : `${String(rates[i])}%`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="card chart-card" aria-labelledby="chart-savings">
-            <MetricHead
-              as="h3"
-              id="chart-savings"
-              label="Savings rate"
-              color="var(--cat-money)"
-              aside={"Share of income kept"}
-            />
-            {/* The flows table above lists the same rates for screen readers. */}
-            <div aria-hidden="true">
-              <LineChart
-                labels={labels}
-                lines={[
-                  {
-                    key: "rate",
-                    name: "Savings rate",
-                    color: "var(--c-done)",
-                    values: rates,
-                    dots: true,
-                  },
-                ]}
-                unit="%"
-              />
-            </div>
-          </section>
-
-          <Breakdown
-            id="chart-categories"
-            title="Spending by category"
-            rows={breakdown(current.spending, previous?.spending ?? [])}
-            color="var(--c-progress)"
-            current={current.month}
-            previous={previous?.month ?? null}
-            upIsGood={false}
-            empty={`No spending in ${monthName(current.month)}.`}
-          />
-
-          <Breakdown
-            id="chart-income"
-            title="Income by source"
-            rows={breakdown(current.incomeBySource, previous?.incomeBySource ?? [])}
-            color="var(--c-done)"
-            current={current.month}
-            previous={previous?.month ?? null}
-            upIsGood
-            empty={`No income in ${monthName(current.month)}.`}
-          />
-        </div>
       </div>
     </Group>
   );

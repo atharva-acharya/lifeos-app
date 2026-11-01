@@ -1,7 +1,35 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { MonthTotals } from "../api";
+import type { MoneyRow, MonthTotals } from "../api";
+import { invoke } from "../test/tauri-mocks";
 import { ChangeLine, MoneyTrends } from "./MoneyTrends";
+
+function tx(date: string, amount: number, category: string | null = "Groceries"): MoneyRow {
+  return { date, description: "Synthetic", category, amount, account: "Card" };
+}
+
+/**
+ * Answers `get_money` with `rows` for every month, as a careless core might:
+ * the week view must keep each answer to the month it asked for. Months in
+ * `failing` reject.
+ */
+function serveLedger(rows: MoneyRow[], failing: string[] = []) {
+  invoke.mockImplementation((cmd: string, args?: { month?: string }) => {
+    if (cmd !== "get_money") return Promise.reject(new Error(`unexpected ${cmd}`));
+    const month = args?.month ?? "";
+    if (failing.includes(month)) return Promise.reject(new Error("vault offline"));
+    return Promise.resolve({
+      status: "ready",
+      money: { month, transactions: rows },
+    });
+  });
+}
+
+function askedMonths(): string[] {
+  return invoke.mock.calls
+    .filter(([cmd]) => cmd === "get_money")
+    .map(([, args]) => (args as { month: string }).month);
+}
 
 function month(m: string, income: number, spending: [string, number][]): MonthTotals {
   return {
@@ -177,5 +205,141 @@ describe("MoneyTrends", () => {
     }));
     render(<MoneyTrends trend={old} />);
     expect(screen.getByRole("tab", { name: "2024" })).toBeInTheDocument();
+  });
+});
+
+describe("MoneyTrends week range", () => {
+  // Today is Saturday 31 October 2026: this week is 26 Oct – 1 Nov.
+  const LEDGER = [
+    tx("2026-11-01", -300, "Transport"),
+    tx("2026-10-31", -1_499, "Fun"),
+    tx("2026-10-27", -2_900, "Health"),
+    tx("2026-10-26", -4_830, "Groceries"),
+    tx("2026-10-21", -7_210, "groceries"),
+    tx("2026-10-20", -92_500, "Rent"),
+    tx("2026-10-19", 235_000, "Salary"),
+    tx("2026-10-05", -1_099, "Subscriptions"),
+  ];
+
+  it("comes first, and fetches the months both weeks touch only when chosen", async () => {
+    serveLedger(LEDGER);
+    render(<MoneyTrends trend={TREND} />);
+    const tabs = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(tabs).toEqual(["This week", "6 months", "This year"]);
+    expect(invoke).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the week");
+    expect(await screen.findByRole("heading", { name: "Spending by day" })).toBeInTheDocument();
+    expect(askedMonths()).toEqual(["2026-10", "2026-11"]);
+    expect(screen.queryByRole("table", { name: "Income and spending by month" })).toBeNull();
+  });
+
+  it("shows spending per day, Monday to Sunday, with a screen-reader table", async () => {
+    serveLedger(LEDGER);
+    render(<MoneyTrends trend={TREND} />);
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    const table = await screen.findByRole("table", { name: "Spending by day, 26 Oct – 1 Nov" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(7);
+    expect(rows[0]).toHaveTextContent(/Monday,? 26 October 2026/);
+    expect(rows[0]).toHaveTextContent("£48.30");
+    // Sunday is in November, and counted once though both answers hold it.
+    expect(rows[6]).toHaveTextContent(/Sunday,? 1 November 2026£3.00£0.00/);
+    expect(rows[3]).toHaveTextContent("£0.00£0.00");
+    expect(document.querySelectorAll(".bar-chart__bar").length).toBeGreaterThan(0);
+  });
+
+  it("compares Spent and Income with last week in the metric row's words", async () => {
+    serveLedger(LEDGER);
+    render(<MoneyTrends trend={TREND} />);
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    const spent = await screen.findByRole("region", { name: "Spent this week" });
+    expect(spent).toHaveTextContent("£95.29");
+    expect(spent).toHaveTextContent("↓ £901.81 less than last week");
+    expect(within(spent).getByText("less")).toHaveClass("change__mark--good");
+
+    const income = screen.getByRole("region", { name: "Income this week" });
+    expect(income).toHaveTextContent("£0.00");
+    expect(income).toHaveTextContent("↓ £2,350.00 less than last week");
+    expect(within(income).getByText("less")).toHaveClass("change__mark--bad");
+  });
+
+  it("ranks the week's categories with the shared breakdown", async () => {
+    serveLedger(LEDGER);
+    render(<MoneyTrends trend={TREND} />);
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    const table = await screen.findByRole("table", {
+      name: "Spending by category, 26 Oct – 1 Nov against 19–25 Oct",
+    });
+    const card = table.closest("section");
+    if (!card) throw new Error("no card");
+    expect(card).toHaveTextContent("26 Oct – 1 Nov vs last week");
+    const names = [...card.querySelectorAll(".breakdown__name")].map((n) => n.textContent);
+    expect(names).toEqual(["Groceries", "Health", "Fun", "Transport", "Rent"]);
+    expect(within(table).getByRole("row", { name: /Groceries/ })).toHaveTextContent(
+      "£23.80 less than last week",
+    );
+    expect(within(table).getByRole("row", { name: /Rent/ })).toHaveTextContent(
+      "£925.00 less than last week",
+    );
+    expect(within(table).queryByRole("row", { name: /Subscriptions/ })).toBeNull();
+  });
+
+  it("switches to the week from the keyboard at once", async () => {
+    serveLedger(LEDGER);
+    render(<MoneyTrends trend={TREND} />);
+    const six = screen.getByRole("tab", { name: "6 months" });
+    fireEvent.keyDown(six, { key: "ArrowLeft" });
+    const week = screen.getByRole("tab", { name: "This week" });
+    expect(week).toHaveAttribute("aria-selected", "true");
+    expect(week).toHaveFocus();
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("data-settled");
+    expect(await screen.findByRole("heading", { name: "Spending by day" })).toBeInTheDocument();
+  });
+
+  it("says so quietly when last week cannot be loaded", async () => {
+    // Tuesday 3 November: last week is 26 Oct – 1 Nov, partly in October.
+    vi.setSystemTime(new Date(2026, 10, 3, 12));
+    serveLedger([tx("2026-11-02", -1_000), tx("2026-10-27", -2_000)], ["2026-10"]);
+    render(
+      <MoneyTrends trend={[...TREND.slice(1), month("2026-11", 0, [["Groceries", 1_000]])]} />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    const spent = await screen.findByRole("region", { name: "Spent this week" });
+    expect(spent).toHaveTextContent("£10.00");
+    expect(within(spent).getByText("Could not load last week")).toHaveClass("muted");
+    expect(
+      screen.getByRole("table", { name: "Spending by category, 2–8 Nov" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector(".breakdown__change")).toBeNull();
+  });
+
+  it("says so quietly when this week cannot be loaded", async () => {
+    serveLedger(LEDGER, ["2026-11"]);
+    render(<MoneyTrends trend={TREND} />);
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    expect(await screen.findByText("Could not load this week.")).toHaveClass("muted");
+    expect(screen.queryByRole("heading", { name: "Spending by day" })).toBeNull();
+  });
+
+  it("shows an earlier month's last whole week against the week before", async () => {
+    serveLedger([tx("2026-09-22", -1_500), tx("2026-09-15", -1_000)]);
+    render(<MoneyTrends trend={TREND.slice(0, 5)} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Week" }));
+    const spent = await screen.findByRole("region", { name: "Spent that week" });
+    expect(spent).toHaveTextContent("21–27 Sep");
+    expect(spent).toHaveTextContent("↑ £5.00 more than the week before");
+    expect(askedMonths()).toEqual(["2026-09"]);
+  });
+
+  it("handles an empty week", async () => {
+    serveLedger([]);
+    render(<MoneyTrends trend={TREND} />);
+    fireEvent.click(screen.getByRole("tab", { name: "This week" }));
+    expect(await screen.findAllByText("No spending this week.")).toHaveLength(2);
+    const spent = screen.getByRole("region", { name: "Spent this week" });
+    expect(spent).toHaveTextContent("£0.00");
+    expect(spent.querySelector(".change")).toBeNull();
   });
 });
