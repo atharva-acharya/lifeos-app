@@ -36,10 +36,13 @@ test("a first run shows Welcome, then every page explains what is missing", asyn
   await expect(page.getByRole("button", { name: "Try with sample data" })).toBeVisible();
   await page.getByRole("button", { name: "Skip for now" }).click();
 
-  await expect(page.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("button", { name: "Today", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expectNotConnected(page, "Choose your Life OS vault folder to see today's dashboard.");
 
-  await page.getByRole("button", { name: "Jobs" }).click();
+  await page.getByRole("button", { name: "Jobs", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Jobs" })).toBeVisible();
   await expectNotConnected(page, "pipeline and outreach");
   await page.getByRole("tab", { name: "Outreach" }).click();
@@ -49,18 +52,18 @@ test("a first run shows Welcome, then every page explains what is missing", asyn
   await page.getByRole("tab", { name: "Charts" }).click();
   await expect(page.getByText("Google Sheet").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Fitness" }).click();
+  await page.getByRole("button", { name: "Fitness", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Fitness" })).toBeVisible();
   await expectNotConnected(page, "weight, workouts and lifts");
 
-  await page.getByRole("button", { name: "Health" }).click();
+  await page.getByRole("button", { name: "Health", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Health" })).toBeVisible();
   const health = page.locator("section.placeholder");
   await expect(health.getByText("Not set up", { exact: true })).toBeVisible();
   await expect(health).toContainText("Choose the folder where Health Auto Export saves its files");
   await expect(health.getByRole("button", { name: "Try with sample data" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Projects" }).click();
+  await page.getByRole("button", { name: "Projects", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await expectNotConnected(page, "projects and where to resume");
 
