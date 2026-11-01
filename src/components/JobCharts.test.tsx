@@ -138,7 +138,7 @@ describe("ChartsTab", () => {
     const onNavigate = vi.fn();
     render(<ChartsTab onNavigate={onNavigate} />);
     (await screen.findByRole("button", { name: "Open settings" })).click();
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
   });
 
   it("asks to load the Sheet when connected but nothing is saved", async () => {

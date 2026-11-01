@@ -88,7 +88,7 @@ describe("FitnessPage", () => {
     const onNavigate = vi.fn();
     render(<FitnessPage onNavigate={onNavigate} />);
     fireEvent.click(await screen.findByRole("button", { name: "Open settings" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
     expect(invoke).toHaveBeenCalledWith("get_fitness", { date: DATE });
     expect(listen).toHaveBeenCalledWith("index-updated", expect.any(Function));
   });

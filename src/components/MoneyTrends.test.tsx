@@ -108,15 +108,15 @@ describe("ChangeLine", () => {
 });
 
 describe("MoneyTrends", () => {
-  it("renders nothing without any money in the window", () => {
-    const { container } = render(<MoneyTrends trend={[month("2026-10", 0, [])]} />);
-    expect(container).toBeEmptyDOMElement();
+  it("says how to start when there is no money in the window", () => {
+    render(<MoneyTrends trend={[month("2026-10", 0, [])]} />);
+    expect(screen.getByText(/No income or spending yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).toBeNull();
   });
 
   it("shows the flows chart with its accessible table", () => {
     render(<MoneyTrends trend={TREND} />);
     expect(screen.getByRole("heading", { name: "Income and spending" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Savings rate" })).toBeInTheDocument();
 
     const flows = screen.getByRole("table", { name: "Income and spending by month" });
     const oct = within(flows).getByRole("row", { name: /2026-10/ });
@@ -158,6 +158,8 @@ describe("MoneyTrends", () => {
 
   it("shows income by source with the change", () => {
     render(<MoneyTrends trend={TREND} />);
+    // One breakdown at a time: spending first, income one click away.
+    fireEvent.click(screen.getByRole("button", { name: "Show income by source" }));
     const table = screen.getByRole("table", {
       name: "Income by source, October against September",
     });

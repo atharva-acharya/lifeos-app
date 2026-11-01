@@ -171,7 +171,7 @@ export function HealthPage({ onNavigate }: { onNavigate: Navigate }) {
             type="button"
             className="button"
             onClick={() => {
-              onNavigate("settings");
+              onNavigate("settings", "data");
             }}
           >
             Open settings

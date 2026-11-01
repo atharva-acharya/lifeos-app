@@ -43,7 +43,7 @@ describe("TodayPage", () => {
     const onNavigate = vi.fn();
     render(<TodayPage onNavigate={onNavigate} />);
     fireEvent.click(await screen.findByRole("button", { name: "Open settings" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
     expect(invoke).toHaveBeenCalledWith("get_today", { date: DATE });
   });
 

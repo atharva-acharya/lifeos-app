@@ -52,13 +52,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The flow sheet that is open, by its title. */
+const sheet = (name: string) => screen.queryByRole("dialog", { name });
+
 describe("MoneyQuickActions", () => {
-  it("focuses each action's target", async () => {
+  it("opens each flow, and moves to settle-ups and budgets", async () => {
     await renderPage();
     fireEvent.click(action("Add a transaction"));
-    expect(screen.getByLabelText("Description")).toHaveFocus();
-    fireEvent.click(action("Split"));
-    expect(screen.getByLabelText("What for")).toHaveFocus();
+    expect(sheet("Add a transaction")).toBeInTheDocument();
+    fireEvent.click(action("Split a bill"));
+    expect(sheet("Split a bill")).toBeInTheDocument();
+    fireEvent.click(action("Import a bank statement"));
+    expect(sheet("Import a bank statement")).toBeInTheDocument();
     fireEvent.click(action("Settle up"));
     expect(screen.getByRole("button", { name: "Settle up with Alex" })).toHaveFocus();
     fireEvent.click(action("Budget"));
@@ -69,11 +74,11 @@ describe("MoneyQuickActions", () => {
     const scroll = vi.fn();
     Element.prototype.scrollIntoView = scroll;
     await renderPage();
-    fireEvent.click(action("Add a transaction"), { detail: 1 });
+    fireEvent.click(action("Budget"), { detail: 1 });
     expect(scroll).toHaveBeenLastCalledWith({ behavior: "smooth", block: "nearest" });
     fireEvent.keyDown(document.body, { key: "b" });
     expect(scroll).toHaveBeenLastCalledWith({ behavior: "instant", block: "nearest" });
-    fireEvent.click(action("Add a transaction"), { detail: 0 });
+    fireEvent.click(action("Budget"), { detail: 0 });
     expect(scroll).toHaveBeenLastCalledWith({ behavior: "instant", block: "nearest" });
   });
 
@@ -81,7 +86,8 @@ describe("MoneyQuickActions", () => {
     await renderPage();
     for (const [name, key] of [
       ["Add a transaction", "A"],
-      ["Split", "S"],
+      ["Split a bill", "S"],
+      ["Import a bank statement", "I"],
       ["Settle up", "U"],
       ["Budget", "B"],
     ]) {
@@ -93,10 +99,11 @@ describe("MoneyQuickActions", () => {
   it("runs the shortcuts", async () => {
     await renderPage();
     fireEvent.keyDown(document.body, { key: "a" });
-    expect(screen.getByLabelText("Description")).toHaveFocus();
-    (document.activeElement as HTMLElement).blur();
+    expect(sheet("Add a transaction")).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "S" });
-    expect(screen.getByLabelText("What for")).toHaveFocus();
+    expect(sheet("Split a bill")).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "i" });
+    expect(sheet("Import a bank statement")).toBeInTheDocument();
     (document.activeElement as HTMLElement).blur();
     fireEvent.keyDown(document.body, { key: "u" });
     const settle = screen.getByRole("button", { name: "Settle up with Alex" });
@@ -108,18 +115,16 @@ describe("MoneyQuickActions", () => {
 
   it("ignores shortcuts while typing or with a modifier held", async () => {
     await renderPage();
-    const field = screen.getByLabelText("Category");
+    fireEvent.keyDown(document.body, { key: "a" });
+    const field = screen.getByLabelText("Description");
     field.focus();
     fireEvent.keyDown(field, { key: "s" });
     expect(field).toHaveFocus();
-    const select = screen.getByLabelText("Who paid");
-    select.focus();
-    fireEvent.keyDown(select, { key: "a" });
-    expect(select).toHaveFocus();
-    select.blur();
+    expect(sheet("Split a bill")).toBeNull();
+    field.blur();
     for (const mod of ["ctrlKey", "altKey", "metaKey"]) {
-      fireEvent.keyDown(document.body, { key: "a", [mod]: true });
-      expect(screen.getByLabelText("Description")).not.toHaveFocus();
+      fireEvent.keyDown(document.body, { key: "i", [mod]: true });
+      expect(sheet("Import a bank statement")).toBeNull();
     }
   });
 
@@ -135,17 +140,22 @@ describe("MoneyQuickActions", () => {
     expect(document.body).toHaveFocus();
   });
 
-  it("turns Add, Split and Settle up off in sample mode", async () => {
+  it("turns Add, Split, Import and Settle up off in sample mode", async () => {
     setMode("sample");
     await renderPage();
-    const reason = "Add, Split and Settle up are off while sample data is on.";
-    for (const name of ["Add a transaction", "Split", "Settle up"]) {
+    const reason = "Add, Split, Import and Settle up are off while sample data is on.";
+    for (const name of [
+      "Add a transaction",
+      "Split a bill",
+      "Import a bank statement",
+      "Settle up",
+    ]) {
       expect(action(name)).toBeDisabled();
       expect(action(name)).toHaveAccessibleDescription(reason);
     }
     expect(action("Budget")).toBeEnabled();
     fireEvent.keyDown(document.body, { key: "a" });
-    expect(screen.getByLabelText("Description")).not.toHaveFocus();
+    expect(sheet("Add a transaction")).toBeNull();
     fireEvent.keyDown(document.body, { key: "b" });
     expect(screen.getByRole("heading", { name: "Budgets" })).toHaveFocus();
   });

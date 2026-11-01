@@ -81,7 +81,7 @@ describe("ProjectsPage", () => {
     const onNavigate = vi.fn();
     render(<ProjectsPage onNavigate={onNavigate} />);
     fireEvent.click(await screen.findByRole("button", { name: "Open settings" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
     expect(invoke).toHaveBeenCalledWith("get_projects");
     expect(listen).toHaveBeenCalledWith("index-updated", expect.any(Function));
   });

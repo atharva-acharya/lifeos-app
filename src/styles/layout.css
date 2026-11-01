@@ -86,7 +86,7 @@
 
   .titlebar__button--close:hover {
     background: var(--close-hover);
-    color: #fff;
+    color: var(--primary-edge);
   }
 }
 
@@ -1327,7 +1327,13 @@ a.button {
   opacity: 0.5;
 }
 
-.setup,
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 760px;
+}
+
 /* One strip above Today, so the page still fits the window: title, progress,
    what is left, then the two actions. */
 .setup-card {
