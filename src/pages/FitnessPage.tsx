@@ -9,6 +9,7 @@ import { DEFAULT_PROTEIN_GOAL, weekSummary } from "../fitnessStats";
 import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
 import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
+import { PageTabs } from "../components/PageTabs";
 import type { Navigate } from "../routes";
 
 /** This week's cards, then the weight, activity and history groups. */
@@ -33,28 +34,55 @@ function Dashboard({
     protein: fitness.plan === null || fitness.plan.proteinGoalDefault === true,
   };
   return (
-    <div className="fitness">
-      <FitnessWeek summary={summary} defaults={defaults} />
-      <FitnessWeight
-        days={fitness.days}
-        plan={fitness.plan}
-        today={today}
-        onNavigate={onNavigate}
-      />
-      <FitnessActivity
-        days={fitness.days}
-        proteinGoal={fitness.plan?.proteinGoal ?? DEFAULT_PROTEIN_GOAL}
-        today={today}
-      />
-      <FitnessHistory workouts={fitness.workouts} onNavigate={onNavigate} />
-      <FitnessLifts lifts={fitness.lifts} />
-      {fitness.parseErrors > 0 && (
-        <p className="notice" role="status">
-          {fitness.parseErrors} daily or fitness note{fitness.parseErrors === 1 ? "" : "s"} could
-          not be read. Check their fields.
-        </p>
-      )}
-    </div>
+    <PageTabs
+      label="Fitness view"
+      tabs={[
+        {
+          id: "week",
+          label: "This week",
+          content: (
+            <>
+              <FitnessWeek summary={summary} defaults={defaults} />
+              {fitness.parseErrors > 0 && (
+                <p className="notice" role="status">
+                  {fitness.parseErrors} daily or fitness note
+                  {fitness.parseErrors === 1 ? "" : "s"} could not be read. Check their fields.
+                </p>
+              )}
+            </>
+          ),
+        },
+        {
+          id: "activity",
+          label: "Steps and protein",
+          content: (
+            <FitnessActivity
+              days={fitness.days}
+              proteinGoal={fitness.plan?.proteinGoal ?? DEFAULT_PROTEIN_GOAL}
+              today={today}
+            />
+          ),
+        },
+        {
+          id: "weight",
+          label: "Weight",
+          content: (
+            <FitnessWeight
+              days={fitness.days}
+              plan={fitness.plan}
+              today={today}
+              onNavigate={onNavigate}
+            />
+          ),
+        },
+        {
+          id: "workouts",
+          label: "Workouts",
+          content: <FitnessHistory workouts={fitness.workouts} onNavigate={onNavigate} />,
+        },
+        { id: "lifts", label: "Lifts", content: <FitnessLifts lifts={fitness.lifts} /> },
+      ]}
+    />
   );
 }
 
@@ -98,7 +126,6 @@ export function FitnessPage({ onNavigate }: { onNavigate: Navigate }) {
   return (
     <>
       <header className="page-header">
-        <p className="kicker">Training</p>
         <h1 className="page-title">Fitness</h1>
       </header>
       {error && (

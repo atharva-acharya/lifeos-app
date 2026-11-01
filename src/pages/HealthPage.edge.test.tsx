@@ -337,8 +337,11 @@ describe("HealthPage motion and keyboard", () => {
   it("only the selected tab is in the tab order", async () => {
     ready();
     render(<HealthPage onNavigate={vi.fn()} />);
-    await screen.findByRole("tab", { name: "Week" });
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs.map((t) => t.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
+    // The page's own view tabs and the trend range tabs are two separate tablists.
+    for (const first of ["Today", "Week"]) {
+      const list = (await screen.findByRole("tab", { name: first })).closest('[role="tablist"]');
+      const tabs = Array.from(list?.querySelectorAll('[role="tab"]') ?? []);
+      expect(tabs.map((t) => t.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
+    }
   });
 });

@@ -56,15 +56,18 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
 
   // Fitness
   await goTo("Fitness");
+  await page.getByRole("tab", { name: "Weight", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Weight trend" })).toBeVisible();
   await expect(page.locator(".line-chart__dot").first()).toBeVisible();
 
   // Health: the sample export, never the owner's own folder (which is set
   // and holds 9,120 steps today).
   await goTo("Health");
-  await expect(page.getByRole("heading", { name: "Trends" })).toBeVisible();
   await expect(page.getByText("5,511 /")).toBeVisible();
   await expect(page.getByText("9,120")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Trends", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Trends" })).toBeVisible();
+  await page.getByRole("tab", { name: "Workouts", exact: true }).click();
   await expect(page.getByText("Outdoor Run").first()).toBeVisible();
   await expect(page.locator("section.placeholder")).toHaveCount(0);
 
