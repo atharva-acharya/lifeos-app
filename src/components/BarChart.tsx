@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { useWidth } from "./useWidth";
 
 /** One part of each bar (stacked) or one bar of each group (grouped); `color` is a CSS colour or token. */
@@ -65,6 +66,7 @@ export function BarChart<T>({
 }: BarChartProps<T>) {
   const grouped = layout === "grouped" && series.length > 1;
   const [ref, width] = useWidth<HTMLDivElement>(FALLBACK_WIDTH);
+  const gradient = `bars-${useId().replace(/:/g, "")}`;
 
   const totals = data.map((d) =>
     grouped
@@ -92,6 +94,15 @@ export function BarChart<T>({
   return (
     <div ref={ref} className="bar-chart">
       <svg width={width} height={height} role="presentation" focusable="false">
+        <defs>
+          {/* Lit from above: each bar is brightest at its top and fades down. */}
+          {series.map((s) => (
+            <linearGradient key={s.key} id={`${gradient}-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" style={{ stopColor: s.color }} />
+              <stop offset="1" style={{ stopColor: s.color, stopOpacity: 0.28 }} />
+            </linearGradient>
+          ))}
+        </defs>
         {ticks.map((t) => (
           <g key={t}>
             <line
@@ -164,7 +175,7 @@ export function BarChart<T>({
                     <path
                       key={b.s.key}
                       className="bar-chart__bar"
-                      fill={b.s.color}
+                      fill={`url(#${gradient}-${b.s.key})`}
                       style={{ transformOrigin: `0 ${String(y(0))}px` }}
                       d={barPath(b.x, b.w, b.y0, b.y0 - b.h, r)}
                     >

@@ -78,7 +78,7 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   await expect(page.getByRole("heading", { name: "Spending by category" })).toBeVisible();
   await expect(page.getByText("You owe Alex £7.30")).toBeVisible();
   await expect(page.getByText("Settled up with Sam")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Add a transaction" })).toBeDisabled();
 
   // Projects
   await goTo("Projects");
@@ -88,6 +88,7 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   // Settings: nothing can be changed while sample data is on.
   await goTo("Settings");
   await expect(page.getByText("Leave sample data to change settings.")).toBeVisible();
+  await page.getByRole("button", { name: /^Vault and Health/ }).click();
   // A disabled fieldset disables every control inside it (isDisabled honours that).
   const controls = page
     .locator("fieldset.settings-group")

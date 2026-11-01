@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import {
   getBanks,
   importCsv,
@@ -8,16 +8,19 @@ import {
   type ImportRow,
 } from "../api";
 import { pounds } from "../money";
-import { Group } from "./Card";
+import { FlowPane, FlowSteps, Tick } from "./Flow";
+import { Sheet } from "./Sheet";
 
 /** Largest statement the app reads (the Rust core enforces the same cap). */
 const MAX_BYTES = 2 * 1024 * 1024;
-/** Rows shown in the preview table; the counts cover every row. */
+/** Rows shown in the preview; the counts cover every row. */
 const SHOWN = 50;
+
+const STEPS = ["Statement", "Check", "Done"];
 
 const STATUS: Record<ImportRow["status"], { label: string; tone: string }> = {
   new: { label: "New", tone: "done" },
-  duplicate: { label: "Already in ledger", tone: "read" },
+  duplicate: { label: "Already in Life OS", tone: "progress" },
   error: { label: "Skipped", tone: "danger" },
 };
 
@@ -39,8 +42,8 @@ function ColumnSelect({
   onChange: (v: string | null) => void;
 }) {
   return (
-    <label>
-      <span className="kicker">{label}</span>
+    <label className="flow-select">
+      <span className="flow__label">{label}</span>
       <select
         value={value ?? ""}
         onChange={(e) => {
@@ -58,15 +61,34 @@ function ColumnSelect({
   );
 }
 
-/** Bank statement import: pick a CSV, check the columns and preview, then import. */
-export function MoneyImport({ onImported }: { onImported: () => void }) {
+/**
+ * Bank statement import as a flow: name the bank and drop the CSV onto the
+ * card, check the rows found (rows already in Life OS are flagged and left
+ * out), then confirm. Columns are guessed or remembered per bank; they can
+ * be changed under "Columns" when a bank is new.
+ */
+export function MoneyImport({
+  open,
+  onClose,
+  trigger,
+  onImported,
+}: {
+  open: boolean;
+  onClose: () => void;
+  trigger: RefObject<HTMLElement | null>;
+  onImported: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [back, setBack] = useState(false);
   const [banks, setBanks] = useState<string[]>([]);
   const [bank, setBank] = useState("");
   const [account, setAccount] = useState("");
   const [file, setFile] = useState<{ name: string; text: string } | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ error: boolean; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
     getBanks()
@@ -74,29 +96,46 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
       .catch(() => undefined);
   }, []);
 
+  const go = (to: number) => {
+    setBack(to < step);
+    setStep(to);
+  };
+
+  const close = () => {
+    onClose();
+    // Start again next time, but keep the bank: it is usually the same one.
+    setStep(0);
+    setFile(null);
+    setPreview(null);
+    setError(null);
+    setDone(null);
+  };
+
   const runPreview = (text: string, mapping: ImportMapping | null) => {
-    if (bank.trim() === "") {
-      setMessage({ error: true, text: "Name the bank first, so its columns can be remembered." });
-      return;
-    }
     setBusy(true);
-    setMessage(null);
+    setError(null);
     previewImport(text, bank, mapping, account.trim() || null)
-      .then(setPreview)
+      .then((p) => {
+        setPreview(p);
+        go(1);
+      })
       .catch((err: unknown) => {
         setPreview(null);
-        setMessage({ error: true, text: errorText(err, "Could not read the file.") });
+        setError(errorText(err, "Could not read the file."));
       })
       .finally(() => {
         setBusy(false);
       });
   };
 
-  const pick = (input: HTMLInputElement) => {
-    const chosen = input.files?.[0];
+  const read = (chosen: File | undefined) => {
     if (!chosen) return;
+    if (bank.trim() === "") {
+      setError("Name the bank first, so its columns can be remembered.");
+      return;
+    }
     if (chosen.size > MAX_BYTES) {
-      setMessage({ error: true, text: "The file is larger than 2 MB." });
+      setError("The file is larger than 2 MB.");
       return;
     }
     chosen
@@ -106,31 +145,38 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
         runPreview(text, null);
       })
       .catch(() => {
-        setMessage({ error: true, text: "Could not read the file." });
+        setError("Could not read the file.");
       });
   };
 
   const change = (patch: Partial<ImportMapping>) => {
     if (!file || !preview) return;
-    runPreview(file.text, { ...preview.mapping, ...patch });
+    setBusy(true);
+    previewImport(file.text, bank, { ...preview.mapping, ...patch }, account.trim() || null)
+      .then(setPreview)
+      .catch((err: unknown) => {
+        setError(errorText(err, "Could not read the file."));
+      })
+      .finally(() => {
+        setBusy(false);
+      });
   };
 
   const run = () => {
     if (!file || !preview) return;
     setBusy(true);
+    setError(null);
     importCsv(file.text, bank, preview.mapping, account.trim() || null)
       .then((r) => {
-        setMessage({
-          error: false,
-          text: `Imported ${String(r.imported)} row${r.imported === 1 ? "" : "s"}; skipped ${String(r.duplicates)} already in the ledger and ${String(r.errors)} unreadable.`,
-        });
-        setPreview(null);
-        setFile(null);
+        setDone(
+          `Imported ${String(r.imported)} transaction${r.imported === 1 ? "" : "s"}. Skipped ${String(r.duplicates)} already in Life OS and ${String(r.errors)} unreadable.`,
+        );
         if (!banks.includes(bank)) setBanks([...banks, bank]);
+        go(2);
         onImported();
       })
       .catch((err: unknown) => {
-        setMessage({ error: true, text: errorText(err, "Could not import.") });
+        setError(errorText(err, "Could not import."));
       })
       .finally(() => {
         setBusy(false);
@@ -139,207 +185,259 @@ export function MoneyImport({ onImported }: { onImported: () => void }) {
 
   const m = preview?.mapping;
   return (
-    <Group title="Import bank statement" cardClassName="card--stack">
-      <p className="muted">
-        Export a CSV from your bank. Rows already in your ledger are skipped, so importing the same
-        statement twice is safe.
-      </p>
-      <div className="form money__import">
-        <label>
-          <span className="kicker">Bank</span>
-          <input
-            list="money-banks"
-            maxLength={60}
-            value={bank}
-            onChange={(e) => {
-              setBank(e.target.value);
-            }}
-          />
-          <datalist id="money-banks">
-            {banks.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
-        </label>
-        <label>
-          <span className="kicker">Account (optional)</span>
-          <input
-            maxLength={60}
-            placeholder="Defaults to the bank"
-            value={account}
-            onChange={(e) => {
-              setAccount(e.target.value);
-            }}
-            onBlur={() => {
-              // Duplicates are matched within the account, so check again.
-              if (file && preview) runPreview(file.text, preview.mapping);
-            }}
-          />
-        </label>
-        <label>
-          <span className="kicker">CSV file</span>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            disabled={busy}
-            onChange={(e) => {
-              pick(e.currentTarget);
-            }}
-          />
-        </label>
-      </div>
+    <Sheet open={open} onClose={close} title="Import a bank statement" trigger={trigger}>
+      <div className="flow">
+        <FlowSteps steps={STEPS} current={step} />
 
-      {preview && m && (
-        <>
-          <p className="muted">
-            {file?.name}:{" "}
-            {preview.saved ? "using the columns saved for this bank." : "check the columns below."}
-          </p>
-          <div className="form money__mapping">
-            <ColumnSelect
-              label="Date"
-              value={m.date}
-              headers={preview.headers}
-              onChange={(v) => {
-                change({ date: v ?? "" });
+        {step === 0 && (
+          <FlowPane back={back} label="Statement">
+            <div className="flow__pane">
+              <p className="flow__label" id="import-bank">
+                Bank
+              </p>
+              {banks.length > 0 && (
+                <div className="chips" role="radiogroup" aria-labelledby="import-bank">
+                  {banks.map((b) => (
+                    <button
+                      key={b}
+                      type="button"
+                      role="radio"
+                      className="chip"
+                      aria-checked={bank === b}
+                      onClick={() => {
+                        setBank(b);
+                      }}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flow-field">
+                <input
+                  aria-label="Bank"
+                  placeholder={banks.length > 0 ? "Or type a new bank" : "Your bank's name"}
+                  maxLength={60}
+                  value={bank}
+                  onChange={(e) => {
+                    setBank(e.target.value);
+                  }}
+                />
+                <input
+                  aria-label="Account (optional)"
+                  placeholder="Account (optional)"
+                  maxLength={60}
+                  value={account}
+                  onChange={(e) => {
+                    setAccount(e.target.value);
+                  }}
+                />
+              </div>
+            </div>
+            <label
+              className="drop-zone"
+              data-over={over ? "" : undefined}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOver(true);
               }}
-            />
-            <label>
-              <span className="kicker">Date format</span>
-              <select
-                value={m.dateFormat}
-                onChange={(e) => {
-                  change({ dateFormat: e.target.value as ImportMapping["dateFormat"] });
-                }}
-              >
-                <option value="dmy">31/10/2026</option>
-                <option value="ymd">2026-10-31</option>
-                <option value="mdy">10/31/2026</option>
-              </select>
-            </label>
-            <ColumnSelect
-              label="Description"
-              value={m.description}
-              headers={preview.headers}
-              onChange={(v) => {
-                change({ description: v ?? "" });
+              onDragLeave={() => {
+                setOver(false);
               }}
-            />
-            <ColumnSelect
-              label="Amount (signed)"
-              value={m.amount}
-              headers={preview.headers}
-              optional
-              onChange={(v) => {
-                change({ amount: v });
+              onDrop={(e) => {
+                e.preventDefault();
+                setOver(false);
+                read(e.dataTransfer.files[0]);
               }}
-            />
-            <ColumnSelect
-              label="Money out"
-              value={m.moneyOut}
-              headers={preview.headers}
-              optional
-              onChange={(v) => {
-                change({ moneyOut: v });
-              }}
-            />
-            <ColumnSelect
-              label="Money in"
-              value={m.moneyIn}
-              headers={preview.headers}
-              optional
-              onChange={(v) => {
-                change({ moneyIn: v });
-              }}
-            />
-            <ColumnSelect
-              label="Category"
-              value={m.category}
-              headers={preview.headers}
-              optional
-              onChange={(v) => {
-                change({ category: v });
-              }}
-            />
-            <label className="setting__check">
+            >
+              <span className="drop-zone__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" />
+                </svg>
+              </span>
+              <span className="drop-zone__title">
+                {busy ? "Reading the statement…" : "Drop your bank statement here"}
+              </span>
+              <span className="drop-zone__hint">
+                A CSV from your bank&apos;s website or app, or click to choose one. Rows already in
+                Life OS are found and left out.
+              </span>
               <input
-                type="checkbox"
-                checked={m.flipSign}
+                type="file"
+                className="sr-only"
+                aria-label="CSV file"
+                accept=".csv,text/csv"
+                disabled={busy}
                 onChange={(e) => {
-                  change({ flipSign: e.target.checked });
+                  read(e.currentTarget.files?.[0]);
                 }}
               />
-              Spending is shown as positive
             </label>
-          </div>
+          </FlowPane>
+        )}
 
-          <ul className="counts" aria-label="Import summary" aria-live="polite">
-            <li>
-              <strong>{preview.new}</strong> new
-            </li>
-            <li>
-              <strong>{preview.duplicates}</strong> already in ledger
-            </li>
-            <li>
-              <strong>{preview.errors}</strong> skipped
-            </li>
-          </ul>
-
-          <table className="table">
-            <caption className="sr-only">Preview of {file?.name}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Row</th>
-                <th scope="col">Date</th>
-                <th scope="col">Description</th>
-                <th scope="col" className="table__num">
-                  Amount
-                </th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
+        {step === 1 && preview && m && (
+          <FlowPane back={back} label="Check">
+            <ul className="chips" aria-label="Rows found" aria-live="polite">
+              <li className="pill">{file?.name}</li>
+              <li className="pill pill--done">{preview.new} new</li>
+              <li className="pill pill--progress">{preview.duplicates} already in Life OS</li>
+              {preview.errors > 0 && (
+                <li className="pill pill--danger">{preview.errors} skipped</li>
+              )}
+            </ul>
+            <ul className="preview-rows" aria-label={`Preview of ${file?.name ?? "the file"}`}>
               {preview.rows.slice(0, SHOWN).map((r) => (
-                <tr key={r.line}>
-                  <td>{r.line}</td>
-                  <td>{r.date ?? "—"}</td>
-                  <td>{r.description || "—"}</td>
-                  <td className="table__num">{r.amount === null ? "—" : pounds(r.amount)}</td>
-                  <td>
-                    <span className={`pill pill--${STATUS[r.status].tone}`}>
-                      {r.error ?? STATUS[r.status].label}
-                    </span>
-                  </td>
-                </tr>
+                <li
+                  key={r.line}
+                  className={`preview-row${r.status === "new" ? "" : " preview-row--skip"}`}
+                >
+                  <span className="preview-row__date">{r.date ?? "—"}</span>
+                  <span className="preview-row__text">{r.description || "—"}</span>
+                  <span className={`pill pill--${STATUS[r.status].tone}`}>
+                    {r.error ?? STATUS[r.status].label}
+                  </span>
+                  <span className="preview-row__amount">
+                    {r.amount === null ? "—" : pounds(r.amount)}
+                  </span>
+                </li>
               ))}
-            </tbody>
-          </table>
-          {preview.rows.length > SHOWN && (
-            <p className="muted">
-              Showing the first {SHOWN} of {preview.rows.length} rows.
-            </p>
-          )}
-          <div className="form__actions">
-            <button
-              type="button"
-              className="button button--primary"
-              disabled={busy || preview.new === 0}
-              onClick={run}
-            >
-              Import {preview.new} new row{preview.new === 1 ? "" : "s"}
-            </button>
-          </div>
-        </>
-      )}
+            </ul>
+            {preview.rows.length > SHOWN && (
+              <p className="flow__reason">
+                Showing the first {SHOWN} of {preview.rows.length} rows.
+              </p>
+            )}
+            <details className="flow-columns" open={!preview.saved}>
+              <summary>
+                {preview.saved ? "Columns remembered for this bank" : "Check the columns"}
+              </summary>
+              <div className="flow-columns__grid">
+                <ColumnSelect
+                  label="Date"
+                  value={m.date}
+                  headers={preview.headers}
+                  onChange={(v) => {
+                    change({ date: v ?? "" });
+                  }}
+                />
+                <label className="flow-select">
+                  <span className="flow__label">Date format</span>
+                  <select
+                    value={m.dateFormat}
+                    onChange={(e) => {
+                      change({ dateFormat: e.target.value as ImportMapping["dateFormat"] });
+                    }}
+                  >
+                    <option value="dmy">31/10/2026</option>
+                    <option value="ymd">2026-10-31</option>
+                    <option value="mdy">10/31/2026</option>
+                  </select>
+                </label>
+                <ColumnSelect
+                  label="Description"
+                  value={m.description}
+                  headers={preview.headers}
+                  onChange={(v) => {
+                    change({ description: v ?? "" });
+                  }}
+                />
+                <ColumnSelect
+                  label="Amount (signed)"
+                  value={m.amount}
+                  headers={preview.headers}
+                  optional
+                  onChange={(v) => {
+                    change({ amount: v });
+                  }}
+                />
+                <ColumnSelect
+                  label="Money out"
+                  value={m.moneyOut}
+                  headers={preview.headers}
+                  optional
+                  onChange={(v) => {
+                    change({ moneyOut: v });
+                  }}
+                />
+                <ColumnSelect
+                  label="Money in"
+                  value={m.moneyIn}
+                  headers={preview.headers}
+                  optional
+                  onChange={(v) => {
+                    change({ moneyIn: v });
+                  }}
+                />
+                <ColumnSelect
+                  label="Category"
+                  value={m.category}
+                  headers={preview.headers}
+                  optional
+                  onChange={(v) => {
+                    change({ category: v });
+                  }}
+                />
+                <label className="setting__check">
+                  <input
+                    type="checkbox"
+                    checked={m.flipSign}
+                    onChange={(e) => {
+                      change({ flipSign: e.target.checked });
+                    }}
+                  />
+                  Spending is shown as positive
+                </label>
+              </div>
+            </details>
+            <div className="flow__actions">
+              <button
+                type="button"
+                className="button"
+                onClick={() => {
+                  setPreview(null);
+                  setFile(null);
+                  go(0);
+                }}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className="button button--primary"
+                disabled={busy || preview.new === 0}
+                onClick={run}
+              >
+                {preview.new === 0
+                  ? "Nothing new to import"
+                  : `Import ${String(preview.new)} transaction${preview.new === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </FlowPane>
+        )}
 
-      {message && (
-        <p
-          className={message.error ? "setting__error" : "muted"}
-          role={message.error ? "alert" : "status"}
-        >
-          {message.text}
-        </p>
-      )}
-    </Group>
+        {step === 2 && (
+          <FlowPane back={back} label="Done">
+            <div className="flow-done" role="status">
+              <span className="flow-done__mark" aria-hidden="true">
+                <Tick />
+              </span>
+              <p className="flow__label">{done}</p>
+            </div>
+            <div className="flow__actions">
+              <button type="button" className="button button--primary" onClick={close}>
+                Done
+              </button>
+            </div>
+          </FlowPane>
+        )}
+
+        {error && (
+          <p className="setting__error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </Sheet>
   );
 }

@@ -25,22 +25,23 @@ import {
   type WeekBounds,
 } from "../money";
 import { useWeekTransactions } from "../useWeekTransactions";
-import { Group, Metric, MetricHead } from "./Card";
+import { CardHead, Metric, MetricHead } from "./Card";
 import { BarChart, type Series } from "./BarChart";
-import { LineChart } from "./LineChart";
 import { SegmentedTabs } from "./SegmentedTabs";
 import "../styles/money-trends.css";
 
 const FLOWS: Series<MonthTotals>[] = [
   { key: "income", name: "Income", color: "var(--c-done)", value: (t) => t.income / 100 },
-  { key: "spent", name: "Spent", color: "var(--c-progress)", value: (t) => t.spent / 100 },
+  { key: "spent", name: "Spent", color: "var(--cat-money)", value: (t) => t.spent / 100 },
 ];
 
 const SPENT_BY_DAY: Series<DayTotals>[] = [
-  { key: "spent", name: "Spent", color: "var(--c-progress)", value: (d) => d.spent / 100 },
+  { key: "spent", name: "Spent", color: "var(--cat-money)", value: (d) => d.spent / 100 },
 ];
 
 const PANEL_ID = "money-trends-panel";
+/** Charts are this tall so the card fits beside the transactions. */
+const CHART_HEIGHT = 180;
 const tabId = (r: TrendRange) => `money-range-${r}`;
 
 function shortMonth(month: string): string {
@@ -147,7 +148,7 @@ function Breakdown({
   const hasAny = shown.some((r) => r.current > 0);
   const compare = previousName !== null;
   return (
-    <section className="card chart-card" aria-labelledby={id}>
+    <section className="chart-block" aria-labelledby={id}>
       <MetricHead as="h3" id={id} label={title} color="var(--cat-money)" aside={aside} />
       {!hasAny ? (
         <p className="muted">{empty}</p>
@@ -248,7 +249,7 @@ function WeekView({ month, reload }: { month: string; reload: unknown }) {
 
   return (
     <>
-      <div className="grid grid--2">
+      <div className="money-trends__totals">
         <Metric
           label={current ? "Spent this week" : "Spent that week"}
           color="var(--cat-money)"
@@ -272,8 +273,8 @@ function WeekView({ month, reload }: { month: string; reload: unknown }) {
           }
         />
       </div>
-      <div className="grid grid--2">
-        <section className="card chart-card" aria-labelledby="chart-week-days">
+      <div className="money-trends__blocks">
+        <section className="chart-block" aria-labelledby="chart-week-days">
           <MetricHead
             as="h3"
             id="chart-week-days"
@@ -290,6 +291,7 @@ function WeekView({ month, reload }: { month: string; reload: unknown }) {
                   data={now.days}
                   label={(d) => weekdayName(d.date)}
                   series={SPENT_BY_DAY}
+                  height={CHART_HEIGHT}
                 />
               </div>
               <table className="sr-only">
@@ -344,8 +346,18 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
   const [range, setRange] = useState<TrendRange>("six");
   // After the first change of range, charts no longer draw in (ui-spec M7).
   const [settled, setSettled] = useState(false);
+  // One breakdown at a time, so the card fits beside the transactions.
+  const [kind, setKind] = useState<"spending" | "income">("spending");
   const anything = trend.some((t) => t.income > 0 || t.spent > 0);
-  if (!anything) return null;
+  if (!anything)
+    return (
+      <section className="card money__trends" aria-labelledby="money-trends-title">
+        <CardHead id="money-trends-title" title="Income and spending" />
+        <p className="muted">
+          No income or spending yet. Add a transaction or import a statement to see your trends.
+        </p>
+      </section>
+    );
 
   const current = trend[trend.length - 1];
   const before = trend.length >= 2 ? trend[trend.length - 2] : null;
@@ -356,34 +368,33 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
   // An earlier month shows its last whole week, which is not "this" week.
   const weekTab = today.startsWith(current.month) ? "This week" : "Week";
   const shown = rangeMonths(trend, range);
-  const labels = shown.map((t) => shortMonth(t.month));
   const rates = shown.map(savingsRate);
   const cut = range === "year" && yearIsCut(trend);
 
   return (
-    <Group
-      title="Trends"
-      className="money__trends"
-      bare
-      action={
-        <SegmentedTabs
-          items={[
-            { id: "week", label: weekTab },
-            { id: "six", label: "6 months" },
-            { id: "year", label: yearLabel },
-          ]}
-          value={range}
-          label="Trend range"
-          tabId={tabId}
-          panelId={() => PANEL_ID}
-          onChange={(next) => {
-            // Applied at once for mouse and keyboard alike (ui-spec M4).
-            setSettled(true);
-            setRange(next);
-          }}
-        />
-      }
-    >
+    <section className="card money__trends" aria-labelledby="money-trends-title">
+      <CardHead
+        id="money-trends-title"
+        title="Income and spending"
+        action={
+          <SegmentedTabs
+            items={[
+              { id: "week", label: weekTab },
+              { id: "six", label: "6 months" },
+              { id: "year", label: yearLabel },
+            ]}
+            value={range}
+            label="Trend range"
+            tabId={tabId}
+            panelId={() => PANEL_ID}
+            onChange={(next) => {
+              // Applied at once for mouse and keyboard alike (ui-spec M4).
+              setSettled(true);
+              setRange(next);
+            }}
+          />
+        }
+      />
       <div
         role="tabpanel"
         id={PANEL_ID}
@@ -401,12 +412,12 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
                 the last six months, so earlier months of {year} are not included.
               </p>
             )}
-            <div className="grid grid--2">
-              <section className="card chart-card" aria-labelledby="chart-flows">
+            <div className="money-trends__blocks">
+              <section className="chart-block" aria-labelledby="chart-flows">
                 <MetricHead
                   as="h3"
                   id="chart-flows"
-                  label="Income and spending"
+                  label="By month"
                   color="var(--cat-money)"
                   aside={
                     range === "six" ? <>£, last {shown.length} months</> : <>£, {year} so far</>
@@ -418,6 +429,7 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
                     label={(t) => shortMonth(t.month)}
                     series={FLOWS}
                     layout="grouped"
+                    height={CHART_HEIGHT}
                   />
                 </div>
                 <table className="sr-only">
@@ -443,55 +455,40 @@ export function MoneyTrends({ trend }: { trend: MonthTotals[] }) {
                 </table>
               </section>
 
-              <section className="card chart-card" aria-labelledby="chart-savings">
-                <MetricHead
-                  as="h3"
-                  id="chart-savings"
-                  label="Savings rate"
+              {kind === "spending" ? (
+                <Breakdown
+                  id="chart-categories"
+                  title="Spending by category"
+                  rows={breakdown(current.spending, previous?.spending ?? [])}
                   color="var(--cat-money)"
-                  aside={"Share of income kept"}
+                  {...monthPeriod(current.month, previous?.month ?? null)}
+                  upIsGood={false}
+                  empty={`No spending in ${monthName(current.month)}.`}
                 />
-                {/* The flows table above lists the same rates for screen readers. */}
-                <div aria-hidden="true">
-                  <LineChart
-                    labels={labels}
-                    lines={[
-                      {
-                        key: "rate",
-                        name: "Savings rate",
-                        color: "var(--c-done)",
-                        values: rates,
-                        dots: true,
-                      },
-                    ]}
-                    unit="%"
-                  />
-                </div>
-              </section>
-
-              <Breakdown
-                id="chart-categories"
-                title="Spending by category"
-                rows={breakdown(current.spending, previous?.spending ?? [])}
-                color="var(--c-progress)"
-                {...monthPeriod(current.month, previous?.month ?? null)}
-                upIsGood={false}
-                empty={`No spending in ${monthName(current.month)}.`}
-              />
-
-              <Breakdown
-                id="chart-income"
-                title="Income by source"
-                rows={breakdown(current.incomeBySource, previous?.incomeBySource ?? [])}
-                color="var(--c-done)"
-                {...monthPeriod(current.month, previous?.month ?? null)}
-                upIsGood
-                empty={`No income in ${monthName(current.month)}.`}
-              />
+              ) : (
+                <Breakdown
+                  id="chart-income"
+                  title="Income by source"
+                  rows={breakdown(current.incomeBySource, previous?.incomeBySource ?? [])}
+                  color="var(--c-done)"
+                  {...monthPeriod(current.month, previous?.month ?? null)}
+                  upIsGood
+                  empty={`No income in ${monthName(current.month)}.`}
+                />
+              )}
+              <button
+                type="button"
+                className="link-button card__action money-trends__switch"
+                onClick={() => {
+                  setKind(kind === "spending" ? "income" : "spending");
+                }}
+              >
+                {kind === "spending" ? "Show income by source" : "Show spending by category"}
+              </button>
             </div>
           </>
         )}
       </div>
-    </Group>
+    </section>
   );
 }

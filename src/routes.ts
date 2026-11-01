@@ -73,5 +73,12 @@ export const SETTINGS_ROUTE: Route = {
 
 export const ALL_ROUTES: readonly Route[] = [...MAIN_ROUTES, SETTINGS_ROUTE];
 
-/** Moves to a page; for Settings, `guide` opens that setup item's guide. */
-export type Navigate = (id: RouteId, guide?: GuideId) => void;
+/** The sections of Settings, one shown at a time. */
+export type SettingsSection =
+  "setup" | "data" | "google" | "updates" | "appearance" | "diagnostics";
+
+/** Where a link into Settings lands: a setup guide, or a section. */
+export type SettingsTarget = GuideId | SettingsSection;
+
+/** Moves to a page; for Settings, `to` opens a setup guide or a section. */
+export type Navigate = (id: RouteId, to?: SettingsTarget) => void;

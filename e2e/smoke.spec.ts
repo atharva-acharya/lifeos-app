@@ -164,11 +164,15 @@ test("Money quick add writes a ledger row to the vault", async () => {
   await expect(page.getByRole("heading", { level: 1, name: "Money" })).toBeVisible();
   await expect(page.getByText("No money notes yet.")).toBeVisible();
 
-  await page.getByLabel("Description").fill("E2E coffee | test");
-  await page.getByLabel("Amount (£)").fill("3.20");
-  await page.getByLabel("Category").fill("Eating out");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(page.getByText(/Saved to Money\/Ledger\//)).toBeVisible();
+  // Quick add is a sheet: the amount, a category, done.
+  await page.getByRole("button", { name: "Add a transaction" }).click();
+  const sheet = page.getByRole("dialog", { name: "Add a transaction" });
+  await sheet.getByLabel("Amount in pounds").fill("3.20");
+  await sheet.getByLabel("Description").fill("E2E coffee | test");
+  await sheet.getByLabel("Another category").fill("Eating out");
+  await sheet.getByRole("button", { name: "Add £3.20 to Eating out" }).click();
+  await expect(page.getByText("Added −£3.20 · Eating out")).toBeVisible();
+  await expect(sheet).toBeHidden();
   const today = page.getByRole("list", { name: "Transactions on Today" });
   await expect(today.getByRole("listitem").filter({ hasText: "E2E coffee / test" })).toContainText(
     "Eating out",
@@ -192,31 +196,44 @@ test("Money imports a bank CSV once and skips it the second time", async () => {
       'Date,Description,Paid out,Paid in\r\n15/01/2026,"Corner Grocer, Leeds",12.50,\r\n16/01/2026,Example payroll,,2400.00\r\n',
     ),
   };
-  await page.getByLabel("Bank", { exact: true }).fill("Example Bank");
-  await page.getByLabel("CSV file").setInputFiles(csv);
-  await expect(page.getByRole("list", { name: "Import summary" })).toContainText("2 new");
-  await page.getByRole("button", { name: "Import 2 new rows" }).click();
-  await expect(page.getByText("Imported 2 rows;")).toBeVisible();
+  // Import is a flow: the bank and the file, a check of the rows, then confirm.
+  await page.getByRole("button", { name: "Import a bank statement" }).click();
+  const sheet = page.getByRole("dialog", { name: "Import a bank statement" });
+  await sheet.getByLabel("Bank", { exact: true }).fill("Example Bank");
+  await sheet.getByLabel("CSV file").setInputFiles(csv);
+  await expect(sheet.getByRole("list", { name: "Rows found" })).toContainText("2 new");
+  await sheet.getByRole("button", { name: "Import 2 transactions" }).click();
+  await expect(sheet.getByText("Imported 2 transactions.")).toBeVisible();
+  await sheet.getByRole("button", { name: "Done" }).click();
 
   const text = readFileSync(join(vault, "Money", "Ledger", "2026-01.md"), "utf8");
   expect(text).toContain("| 2026-01-15 | Corner Grocer, Leeds |  | -12.50 | Example Bank |");
   expect(text).toContain("| 2026-01-16 | Example payroll |  | 2400.00 | Example Bank |");
 
-  // The same statement again: both rows are already in the ledger.
-  await page.getByLabel("CSV file").setInputFiles(csv);
-  await expect(page.getByRole("list", { name: "Import summary" })).toContainText(
-    "2 already in ledger",
+  // The same statement again: both rows are already in Life OS.
+  await page.getByRole("button", { name: "Import a bank statement" }).click();
+  await sheet.getByLabel("CSV file").setInputFiles(csv);
+  await expect(sheet.getByRole("list", { name: "Rows found" })).toContainText(
+    "2 already in Life OS",
   );
-  await expect(page.getByRole("button", { name: "Import 0 new rows" })).toBeDisabled();
+  await expect(sheet.getByRole("button", { name: "Nothing new to import" })).toBeDisabled();
+  await page.keyboard.press("Escape");
 });
 
 test("Money splits a bill and settles up", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Money", exact: true }).click();
-  await page.getByLabel("What for").fill("E2E dinner");
-  await page.getByLabel("Total (£)").fill("30");
-  await page.getByLabel("Friends (comma-separated)").fill("Sam, Alex");
-  await page.getByRole("button", { name: "Save split" }).click();
+  // Split is three steps: amount, who, how.
+  await page.getByRole("button", { name: "Split a bill" }).click();
+  const sheet = page.getByRole("dialog", { name: "Split a bill" });
+  await sheet.getByLabel("Bill total in pounds").fill("30");
+  await sheet.getByLabel("What it was for").fill("E2E dinner");
+  await sheet.getByRole("button", { name: "Next: who was there" }).click();
+  await sheet.getByLabel("Add someone new").fill("Sam, Alex");
+  await sheet.getByRole("button", { name: "Add", exact: true }).click();
+  await sheet.getByRole("button", { name: "Next: split between 3" }).click();
+  await sheet.getByRole("button", { name: "Split £30.00 with 2" }).click();
+  await expect(sheet).toBeHidden();
   await expect(page.getByText("Sam owes you £10.00")).toBeVisible();
   await expect(page.getByText("Alex owes you £10.00")).toBeVisible();
 
@@ -314,6 +331,7 @@ test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: /^Vault and Health/ }).click();
   await expect(page.getByText("Connected")).toBeVisible();
   await expect(page.getByText(vault)).toBeVisible();
 });
@@ -327,6 +345,7 @@ test("an uncaught error is logged locally and shown in Diagnostics", async () =>
   }, PROBE);
   await page.getByRole("button", { name: "Today", exact: true }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
   await expect(page.getByText("1 recent error logged")).toBeVisible();
@@ -343,6 +362,7 @@ test("an update signed with the wrong key is offered but refused", async () => {
   });
   await banner.getByRole("button", { name: "Dismiss" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 
@@ -350,6 +370,7 @@ test("an old signed release announced as new is refused (no downgrade)", async (
   const { page, offerUpdate } = running();
   offerUpdate("replay");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Updates/ }).click();
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByText("Version 9.9.9 is available.")).toBeVisible();
   await page.getByRole("button", { name: "Install and restart" }).click();
@@ -357,6 +378,7 @@ test("an old signed release announced as new is refused (no downgrade)", async (
     page.getByRole("alert").filter({ hasText: "failed its security check" }),
   ).toBeVisible({ timeout: 15_000 });
   // Nothing was installed: same process, same version.
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 

@@ -116,6 +116,6 @@ describe("JobsPage", () => {
     render(<JobsPage onNavigate={onNavigate} />);
     fireEvent.click(screen.getByRole("tab", { name: "Applications" }));
     fireEvent.click(await screen.findByRole("button", { name: "Open settings" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
   });
 });
