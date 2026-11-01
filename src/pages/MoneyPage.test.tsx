@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { localDate, type Money } from "../api";
+import { SKELETON_DELAY_MS } from "../components/Skeleton";
 import { setMode } from "../mode";
 import { invoke, mockCommands, rejected } from "../test/tauri-mocks";
 import { pounds, toPence } from "../money";
@@ -135,6 +136,68 @@ describe("MoneyPage", () => {
     const [y, m] = MONTH.split("-").map(Number);
     const prev = m === 1 ? `${String(y - 1)}-12` : `${String(y)}-${String(m - 1).padStart(2, "0")}`;
     expect(invoke).toHaveBeenCalledWith("get_money", { month: prev });
+  });
+
+  it("keeps the last month on screen, dimmed, while the next one loads", async () => {
+    let finish: ((r: unknown) => void) | undefined;
+    mockCommands({
+      get_money: (args?: Record<string, unknown>) =>
+        args?.month === MONTH
+          ? { status: "ready", money: MONEY }
+          : new Promise((r) => {
+              finish = r;
+            }),
+    });
+    render(<MoneyPage onNavigate={vi.fn()} />);
+    const spent = await screen.findByLabelText("Spent");
+    const view = spent.closest(".page-data");
+    expect(view).toHaveAttribute("aria-busy", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    // Still last month's numbers, marked busy and dimmed; no skeleton.
+    expect(screen.getByLabelText("Spent")).toHaveTextContent(pounds(MONEY.spent));
+    expect(view).toHaveAttribute("aria-busy", "true");
+    expect(view).toHaveClass("page-data--busy");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, SKELETON_DELAY_MS + 20));
+    });
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
+    await act(async () => {
+      finish?.({ status: "ready", money: { ...MONEY, spent: 1_234 } });
+      await Promise.resolve();
+    });
+    expect(await screen.findByText(pounds(1_234))).toBeInTheDocument();
+    expect(screen.getByLabelText("Spent").closest(".page-data")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+  });
+
+  it("shows only the error when the next month fails, and retries it", async () => {
+    let failNext = true;
+    mockCommands({
+      get_money: (args?: Record<string, unknown>) => {
+        if (args?.month === MONTH) return { status: "ready", money: MONEY };
+        if (failNext) {
+          failNext = false;
+          return rejected("the ledger could not be read");
+        }
+        return { status: "ready", money: { ...MONEY, spent: 1_234 } };
+      },
+    });
+    render(<MoneyPage onNavigate={vi.fn()} />);
+    await screen.findByLabelText("Spent");
+    fireEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not load money.");
+    expect(alert).toHaveTextContent("the ledger could not be read");
+    // The old month is not left on screen under the new month's name.
+    expect(screen.queryByLabelText("Spent")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(pounds(1_234))).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("quick add sends money out as negative pence and reloads", async () => {

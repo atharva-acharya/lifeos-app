@@ -283,6 +283,8 @@ describe("HealthPage", () => {
 
   it("fetches again on window focus and every five minutes", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Midday, so the date check cannot add a fetch when run near midnight.
+    vi.setSystemTime(new Date(2026, 9, 29, 12, 0, 0));
     ready();
     render(<HealthPage onNavigate={vi.fn()} />);
     await screen.findByRole("heading", { name: "Trends" });

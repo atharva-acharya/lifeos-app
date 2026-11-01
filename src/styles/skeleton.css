@@ -92,3 +92,18 @@
     animation: none;
   }
 }
+
+/* A page swapping to new data (Money's month change) keeps the old data on
+   screen, dimmed, rather than flashing the skeleton again. */
+.page-data {
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.page-data--busy {
+  opacity: 0.6;
+}
+
+/* Settings cards stop at 760 px (layout.css .setting); so do their shapes. */
+.settings-skeleton {
+  max-width: 760px;
+}

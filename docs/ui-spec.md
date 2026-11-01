@@ -120,7 +120,7 @@ Checked against the code on main after #46, plus the ring stagger on this branch
 | C4  | Met        | Bars capped at 24 px; two-value charts side by side; every chart has a screen-reader table.                                        | #48, #50      |
 | C5  | Met        | Sliding segmented control, instant on arrow keys.                                                                                  | #44           |
 | C6  | Met        | One primary per screen, 32 px+ tall, disabled at 50% with the reason shown.                                                        | #40, #43, #50 |
-| C7  | Partly met | Loading, error with Try again, empty and partial states on Today, Jobs, Fitness, Health and Projects; Money and Settings follow.   | #47           |
+| C7  | Met        | Loading, error with Try again, empty and partial states on every page; Money keeps the previous month dimmed while the next loads. | #47, #53      |
 | C8  | Met        | Toast with 5 s Undo for settle-ups and category changes.                                                                           | #43, #50      |
 | P1  | Met        | Today fits 1100 × 640.                                                                                                             | #35           |
 | P2  | Met        | Habits ring, four summary cards, three follow-ups, resume here.                                                                    | #36           |
