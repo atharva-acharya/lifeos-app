@@ -44,7 +44,10 @@ test.afterAll(async () => {
 
 test("Today shows the synthetic vault", async () => {
   const { page } = running();
-  await expect(page.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("button", { name: "Today", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(page.getByText("Example Security Ltd")).toBeVisible();
   await expect(page.getByText(/Overdue/)).toBeVisible();
   await expect(page.getByText("home-lab")).toBeVisible();
@@ -63,14 +66,15 @@ test("Today refreshes when a note changes on disk", async () => {
 
 test("Today fits the smallest window without scrolling", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Today" }).click();
+  await page.getByRole("button", { name: "Today", exact: true }).click();
   await expect(page.getByText("home-lab")).toBeVisible();
-  // The setup checklist and the unreadable-note notice are one-off messages
-  // (the fixture has both); Home's own content is what has to fit.
+  // The setup checklist, the unreadable-note notice and the update banner are
+  // one-off messages (the fixture has all three); Home's own content is what
+  // has to fit.
   await page.evaluate(() => {
     const style = document.createElement("style");
     style.id = "e2e-hide-messages";
-    style.textContent = ".setup-card, .notice { display: none; }";
+    style.textContent = ".setup-card, .notice, .update-banner { display: none; }";
     document.head.append(style);
   });
   try {
@@ -90,7 +94,7 @@ test("Today fits the smallest window without scrolling", async () => {
 
 test("Jobs shows the pipeline, outreach and saved applications", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Jobs" }).click();
+  await page.getByRole("button", { name: "Jobs", exact: true }).click();
   await expect(page.getByRole("listitem", { name: "Screen" })).toContainText(
     "Example Security Ltd",
   );
@@ -106,7 +110,7 @@ test("Jobs shows the pipeline, outreach and saved applications", async () => {
 
 test("Sheet values are shown as text, never run as markup", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Jobs" }).click();
+  await page.getByRole("button", { name: "Jobs", exact: true }).click();
   await page.getByRole("tab", { name: "Applications" }).click();
   await page.getByPlaceholder("Company, role or notes").fill("Contoso");
   await expect(page.getByRole("cell", { name: "Contoso Group" })).toBeVisible();
@@ -115,7 +119,7 @@ test("Sheet values are shown as text, never run as markup", async () => {
 
 test("Charts are drawn from the saved copy", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Jobs" }).click();
+  await page.getByRole("button", { name: "Jobs", exact: true }).click();
   await page.getByRole("tab", { name: "Charts" }).click();
   await expect(page.getByRole("heading", { name: "Applications per week" })).toBeVisible();
   await expect(page.getByText(/This week/)).toContainText("This week 1");
@@ -127,7 +131,7 @@ test("Charts are drawn from the saved copy", async () => {
 
 test("Fitness shows weight, workout history and lift progress", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Fitness" }).click();
+  await page.getByRole("button", { name: "Fitness", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Fitness" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Weight trend" })).toBeVisible();
   // Today's synthetic weigh-in is the latest reading.
@@ -222,7 +226,7 @@ test("Money splits a bill and settles up", async () => {
 
 test("Projects shows progress and where to resume", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Projects" }).click();
+  await page.getByRole("button", { name: "Projects", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
 
   const card = page.locator("section.project", {
@@ -261,7 +265,7 @@ test("Projects shows progress and where to resume", async () => {
 
 test("Health shows rings, trends and workouts", async () => {
   const { page } = running();
-  await page.getByRole("button", { name: "Health" }).click();
+  await page.getByRole("button", { name: "Health", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Health" })).toBeVisible();
   await expect(page.getByText(/Last export arrived/)).toBeVisible();
 
@@ -304,7 +308,7 @@ test("Health shows rings, trends and workouts", async () => {
 
 test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
-  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page.getByText("Connected")).toBeVisible();
   await expect(page.getByText(vault)).toBeVisible();
@@ -317,8 +321,8 @@ test("an uncaught error is logged locally and shown in Diagnostics", async () =>
       throw new Error(probe);
     });
   }, PROBE);
-  await page.getByRole("button", { name: "Today" }).click();
-  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Today", exact: true }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
   await expect(page.getByText("1 recent error logged")).toBeVisible();
@@ -334,14 +338,14 @@ test("an update signed with the wrong key is offered but refused", async () => {
     timeout: 15_000,
   });
   await banner.getByRole("button", { name: "Dismiss" }).click();
-  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 
 test("an old signed release announced as new is refused (no downgrade)", async () => {
   const { page, offerUpdate } = running();
   offerUpdate("replay");
-  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByText("Version 9.9.9 is available.")).toBeVisible();
   await page.getByRole("button", { name: "Install and restart" }).click();
@@ -369,7 +373,7 @@ test("an export folder with nothing new for three days shows the stale warning",
   const { page, healthDir } = running();
   ageHealthExport(healthDir, 3 * 24 * 60 * 60 * 1000 + 60_000);
   await page.reload();
-  await page.getByRole("button", { name: "Health" }).click();
+  await page.getByRole("button", { name: "Health", exact: true }).click();
   await expect(page.getByText(/No new export for 3 days/)).toContainText(
     "Check Health Auto Export on your iPhone and iCloud for Windows.",
   );

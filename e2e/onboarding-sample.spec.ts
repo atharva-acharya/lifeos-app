@@ -33,7 +33,10 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   };
 
   // Today
-  await expect(page.getByRole("button", { name: "Today" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("button", { name: "Today", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(banner).toBeVisible();
   await expect(page.getByText("Set up log forwarding")).toBeVisible();
   await expect(page.locator("section.placeholder")).toHaveCount(0);
@@ -68,9 +71,11 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   // Money: the sample ledger and budgets; quick add is off.
   await goTo("Money");
   await expect(page.getByRole("heading", { name: "Budgets" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "Bookshop" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Transactions" }).getByText("Bookshop").first(),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Income and spending" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Month on month" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Spending by category" })).toBeVisible();
   await expect(page.getByText("You owe Alex £7.30")).toBeVisible();
   await expect(page.getByText("Settled up with Sam")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
