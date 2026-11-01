@@ -7,12 +7,12 @@ const CONFIG = JSON.parse(
   readFileSync(join(import.meta.dirname, "..", "src-tauri", "tauri.conf.json"), "utf8"),
 ) as {
   version: string;
-  app: { windows: { width: number; height: number; minWidth: number; minHeight: number }[] };
 };
 
 /** The version under test, so these tests survive version bumps. */
 const APP_VERSION = CONFIG.version;
-const WINDOW = CONFIG.app.windows[0];
+/** The canvas every page is laid out for (src-tauri/src/window.rs). */
+const CANVAS = { width: 1440, height: 900 };
 
 let app: RunningApp | undefined;
 
@@ -64,10 +64,16 @@ test("Today refreshes when a note changes on disk", async () => {
   });
 });
 
-test("Today fits the smallest window without scrolling", async () => {
+test("the window scales the 1440 x 900 canvas and Today fits it without scrolling", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Today", exact: true }).click();
   await expect(page.getByText("home-lab")).toBeVisible();
+  // The app draws its own top bar in place of the Windows title bar.
+  await expect(page.getByRole("button", { name: "Minimise" })).toBeVisible();
+  // The webview zoom fits the canvas: one side matches it, the other has at
+  // least its room, whatever size the screen gave the window.
+  const [w, h] = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
+  expect(Math.min(w / CANVAS.width, h / CANVAS.height)).toBeCloseTo(1, 1);
   // The setup checklist, the unreadable-note notice and the update banner are
   // one-off messages (the fixture has all three); Home's own content is what
   // has to fit.
@@ -78,14 +84,12 @@ test("Today fits the smallest window without scrolling", async () => {
     document.head.append(style);
   });
   try {
-    await page.setViewportSize({ width: WINDOW.minWidth, height: WINDOW.minHeight });
     const main = page.locator("main");
     await expect
       .poll(() => main.evaluate((m) => m.scrollHeight - m.clientHeight))
       .toBeLessThanOrEqual(0);
     expect(await main.evaluate((m) => m.scrollWidth - m.clientWidth)).toBeLessThanOrEqual(0);
   } finally {
-    await page.setViewportSize({ width: WINDOW.width, height: WINDOW.height });
     await page.evaluate(() => {
       document.getElementById("e2e-hide-messages")?.remove();
     });

@@ -41,7 +41,7 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   await expect(page.getByText("Set up log forwarding")).toBeVisible();
   await expect(page.locator("section.placeholder")).toHaveCount(0);
   // The pill in the sidebar and the real data folder: sample mode writes no settings.
-  await expect(page.locator(".sidebar__mode").getByText("Sample", { exact: true })).toBeVisible();
+  await expect(page.locator(".titlebar").getByText("Sample data", { exact: true })).toBeVisible();
   expect(existsSync(join(data, "sample"))).toBe(true);
 
   // Jobs

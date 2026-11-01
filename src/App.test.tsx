@@ -2,7 +2,14 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
 import { setMode } from "./mode";
-import { invoke, mockCommands, NO_GOOGLE, READY_SETTINGS, rejected } from "./test/tauri-mocks";
+import {
+  appWindow,
+  invoke,
+  mockCommands,
+  NO_GOOGLE,
+  READY_SETTINGS,
+  rejected,
+} from "./test/tauri-mocks";
 
 const NO_VAULT = { vaultPath: null, google: NO_GOOGLE, autoUpdate: false };
 
@@ -23,20 +30,37 @@ describe("App shell", () => {
     expect(await screen.findByText("Not connected")).toBeInTheDocument();
   });
 
-  it("lists every module in the sidebar with settings at the bottom", async () => {
+  it("lists every module in the rail with settings at the bottom", async () => {
     render(<App />);
     const main = await screen.findByRole("navigation", { name: "Main" });
-    const labels = Array.from(main.querySelectorAll("button")).map((b) => b.textContent);
-    expect(labels).toEqual([
-      "Today",
-      "Jobs",
-      "Fitness",
-      "Health",
-      "Money",
-      "Projects",
-      "SearchCtrl K",
-    ]);
+    const labels = Array.from(main.querySelectorAll("button")).map((b) =>
+      b.getAttribute("aria-label"),
+    );
+    expect(labels).toEqual(["Today", "Jobs", "Money", "Fitness", "Health", "Projects", "Search"]);
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+  });
+
+  it("shows page names with Ctrl B and hides them again", async () => {
+    render(<App />);
+    const toggle = await screen.findByRole("button", { name: "Show page names" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    expect(screen.getByRole("button", { name: "Hide page names" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Hide page names" }));
+    expect(screen.getByRole("button", { name: "Show page names" })).toBeInTheDocument();
+  });
+
+  it("has its own window buttons in place of the Windows title bar", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Minimise" }));
+    fireEvent.click(screen.getByRole("button", { name: "Maximise" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(appWindow.minimize).toHaveBeenCalled();
+    expect(appWindow.toggleMaximize).toHaveBeenCalled();
+    expect(appWindow.close).toHaveBeenCalled();
   });
 
   it("navigates when a sidebar item is chosen", async () => {
@@ -146,7 +170,7 @@ describe("Sample data", () => {
     expect(
       await screen.findByText("You're looking at sample data. None of it is yours."),
     ).toBeVisible();
-    expect(screen.getByText("Sample", { selector: ".sidebar__mode *" })).toBeInTheDocument();
+    expect(screen.getByText("Sample data", { selector: ".titlebar *" })).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("enter_sample_mode", {
       date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
     });

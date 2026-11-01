@@ -4,6 +4,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PageBar, usePageBar } from "./components/PageBar";
 import { SampleBanner } from "./components/SampleBanner";
 import { Sidebar } from "./components/Sidebar";
+import { TitleBar } from "./components/TitleBar";
 import { UpdateBanner } from "./components/UpdateBanner";
 import type { GuideId } from "./guides";
 import { loadMode, useMode } from "./mode";
@@ -37,6 +38,10 @@ export default function App() {
   const [hasVault, setHasVault] = useState<boolean | null>(null);
   // "Skip for now" lasts until the app restarts; the welcome screen returns while no vault is set.
   const [skipped, setSkipped] = useState(false);
+  const [railOpen, setRailOpen] = useState(false);
+  const toggleRail = useCallback(() => {
+    setRailOpen((open) => !open);
+  }, []);
   const mainRef = useRef<HTMLElement | null>(null);
   const [mainEl, setMainEl] = useState<HTMLElement | null>(null);
   const setMain = useCallback((el: HTMLElement | null) => {
@@ -86,13 +91,16 @@ export default function App() {
       if (e.ctrlKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         go("search", undefined, { instant: true });
+      } else if (e.ctrlKey && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleRail();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [go]);
+  }, [go, toggleRail]);
 
   useEffect(() => {
     mainRef.current?.focus();
@@ -101,25 +109,42 @@ export default function App() {
   useScrolled(mainEl, current);
   const pageBar = usePageBar(mainEl, current);
 
-  if (hasVault === null) return <div className="boot" aria-busy="true" />;
+  // Every state keeps the app's own top bar: without it the window could not
+  // be moved, minimised or closed.
+  if (hasVault === null)
+    return (
+      <div className="shell shell--bare">
+        <TitleBar />
+        <div className="boot" aria-busy="true" />
+      </div>
+    );
 
   if (!hasVault && mode === "real" && !skipped) {
     return (
-      <WelcomePage
-        onChosen={() => {
-          setHasVault(true);
-          setCurrent("today");
-        }}
-        onSkip={() => {
-          setSkipped(true);
-        }}
-      />
+      <div className="shell shell--bare">
+        <TitleBar />
+        <WelcomePage
+          onChosen={() => {
+            setHasVault(true);
+            setCurrent("today");
+          }}
+          onSkip={() => {
+            setSkipped(true);
+          }}
+        />
+      </div>
     );
   }
 
   return (
     <div className="shell">
-      <Sidebar current={current} onNavigate={navigateFromSidebar} />
+      <TitleBar />
+      <Sidebar
+        current={current}
+        onNavigate={navigateFromSidebar}
+        expanded={railOpen}
+        onToggle={toggleRail}
+      />
       <main
         className="main"
         ref={setMain}

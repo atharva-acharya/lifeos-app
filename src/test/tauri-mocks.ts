@@ -5,6 +5,15 @@ import type { Setup } from "../api";
 export const invoke = vi.fn();
 export const listen = vi.fn(() => Promise.resolve(() => undefined));
 
+/** The current window, for the app's own title bar. */
+export const appWindow = {
+  isMaximized: vi.fn(() => Promise.resolve(false)),
+  onResized: vi.fn(() => Promise.resolve(() => undefined)),
+  minimize: vi.fn(() => Promise.resolve()),
+  toggleMaximize: vi.fn(() => Promise.resolve()),
+  close: vi.fn(() => Promise.resolve()),
+};
+
 export const NO_GOOGLE = {
   clientId: "",
   sheetId: "",

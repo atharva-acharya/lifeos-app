@@ -13,10 +13,13 @@
     "windows": [
       {
         "title": "Life OS",
-        "width": 1280,
-        "height": 800,
-        "minWidth": 1100,
-        "minHeight": 640
+        "width": 1440,
+        "height": 900,
+        "resizable": false,
+        "maximizable": true,
+        "decorations": false,
+        "center": true,
+        "visible": false
       }
     ],
     "security": {
