@@ -82,14 +82,13 @@ describe("SetupChecklist", () => {
     expect(invoke).toHaveBeenCalledWith("unskip_setup_item", { id: "projects" });
   });
 
-  it("links the Health item to its settings and lets it be skipped", async () => {
+  it("opens the Health item's settings section and lets it be skipped", async () => {
     mockCommands({ get_setup: setup({ health: { done: false } }) });
-    render(<SetupChecklist />);
+    const onOpenSection = vi.fn();
+    render(<SetupChecklist onOpenSection={onOpenSection} />);
     expect(await screen.findByText("Health export")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Settings › Health" })).toHaveAttribute(
-      "href",
-      "#health-heading",
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Open Vault and Health" }));
+    expect(onOpenSection).toHaveBeenCalledWith("data");
     expect(screen.getByRole("button", { name: "Skip" })).toBeEnabled();
   });
 
@@ -172,7 +171,7 @@ describe("SetupCard", () => {
       screen.getByText(/Still to do: Daily notes, Fitness plan, Projects/),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open setup" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "setup");
   });
 
   it("can be dismissed", async () => {
@@ -250,7 +249,7 @@ describe("NotConnected", () => {
     const onNavigate = vi.fn();
     render(<NotConnected onNavigate={onNavigate}>Choose a vault.</NotConnected>);
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    expect(onNavigate).toHaveBeenCalledWith("settings");
+    expect(onNavigate).toHaveBeenCalledWith("settings", "data");
     fireEvent.click(screen.getByRole("button", { name: "Try with sample data" }));
     await vi.waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("enter_sample_mode", expect.anything());
