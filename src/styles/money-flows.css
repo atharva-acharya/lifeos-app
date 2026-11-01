@@ -563,3 +563,26 @@
 .drop-zone {
   cursor: pointer;
 }
+
+/* The caret shows where typing goes; no focus box around the big number. */
+.amount-entry input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* The flow's next step: the same light primary as Money's Add. */
+.flow .button--primary {
+  border: 0;
+  background: linear-gradient(180deg, var(--text), var(--primary-low));
+  box-shadow:
+    inset 0 1px 0 var(--primary-edge),
+    0 6px 18px -6px rgb(255 255 255 / 0.35);
+  color: var(--bg-page);
+}
+
+.flow .button--primary:disabled {
+  background: var(--raised-soft);
+  box-shadow: none;
+  color: var(--text-muted);
+  opacity: 1;
+}
