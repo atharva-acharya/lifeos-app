@@ -1,0 +1,158 @@
+/* Today fits the window without scrolling: rings beside four summary cards,
+   then where to resume beside follow-ups. Laid out once for the 1440 x 900
+   canvas (src-tauri/src/window.rs); rows share whatever height is left. */
+
+.page--fit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.today__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: var(--card-pad);
+  min-height: 0;
+}
+
+.today__grid > .card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-5);
+  overflow: hidden;
+}
+
+.today__rings {
+  grid-column: span 5;
+}
+
+.today__metrics {
+  grid-column: span 7;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--card-pad);
+  min-height: 0;
+}
+
+.today__metrics .metric {
+  padding: var(--space-5);
+}
+
+.today__resume {
+  grid-column: span 7;
+}
+
+.today__follow {
+  grid-column: span 5;
+}
+
+.today__rings .rings {
+  flex: 1;
+  justify-content: center;
+  gap: 40px;
+  min-height: 0;
+}
+
+/* The rings give way first when banners above take height. */
+.today__rings .rings svg {
+  width: auto;
+  height: 100%;
+  max-height: 200px;
+  aspect-ratio: 1;
+}
+
+.today__rings .habits {
+  flex: none;
+  flex-wrap: nowrap;
+}
+
+/* Habits as chips: a recessed well until done, then lit in the ring's colour. */
+.today .habit {
+  height: 30px;
+  white-space: nowrap;
+  padding: 0 10px 0 6px;
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+}
+
+.today .habit__tick {
+  border-color: var(--text-faint);
+}
+
+.today .habit--done {
+  background: color-mix(in srgb, var(--ring-habits) 13%, transparent);
+  box-shadow: none;
+}
+
+.today .habit--done .habit__tick {
+  border-color: var(--ring-habits);
+  background: var(--ring-habits);
+  color: var(--bg-page);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ring-habits) 50%, transparent);
+}
+
+.today .resume {
+  flex: 1;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: calc(var(--radius) - 4px);
+  background: color-mix(in srgb, var(--cat-projects) 6%, var(--well-bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cat-projects) 28%, transparent);
+}
+
+.resume__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.today .resume__project {
+  font-family: var(--font-display);
+  font-size: var(--fs-group);
+  font-weight: 700;
+}
+
+.resume__step,
+.resume__last {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-secondary);
+}
+
+.today__follow .list {
+  flex: 1;
+  min-height: 0;
+}
+
+.today__follow-row {
+  gap: var(--space-3);
+}
+
+.today__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--cat-jobs) 14%, transparent);
+  color: var(--cat-jobs);
+  font-weight: 700;
+}
+
+.today__note,
+.today .notice {
+  flex: none;
+  margin: 0;
+}

@@ -163,6 +163,15 @@ pub(crate) fn days(index: &Index, today: &str) -> rusqlite::Result<Vec<Day>> {
         .collect())
 }
 
+/// The daily steps and protein goals: the plan's, or the defaults.
+pub(crate) fn daily_goals(index: &Index) -> rusqlite::Result<(i64, i64)> {
+    Ok(
+        plan(index)?.map_or((DEFAULT_STEPS_GOAL, DEFAULT_PROTEIN_GOAL), |p| {
+            (p.steps_goal, p.protein_goal)
+        }),
+    )
+}
+
 fn plan(index: &Index) -> rusqlite::Result<Option<PlanView>> {
     index
         .conn()

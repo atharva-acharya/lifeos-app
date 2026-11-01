@@ -18,6 +18,8 @@ const BLANK_TODAY: Today = {
   applications: null,
   gym: null,
   habits: { weighIn: false, steps: null, proteinG: null, mealsTracked: false, mobility: false },
+  stepsGoal: 8000,
+  proteinGoal: 170,
   followUps: [],
   project: null,
   parseErrors: 0,
