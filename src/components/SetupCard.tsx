@@ -49,7 +49,7 @@ export function SetupCard({ onNavigate }: { onNavigate: Navigate }) {
         type="button"
         className="button"
         onClick={() => {
-          onNavigate("settings");
+          onNavigate("settings", "setup");
         }}
       >
         Open setup

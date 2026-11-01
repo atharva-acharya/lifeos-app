@@ -137,17 +137,23 @@ test("Fitness shows weight, workout history and lift progress", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Fitness", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Fitness" })).toBeVisible();
+  // One view at a time, so the page fits the window; This week comes first.
+  const view = (name: string) => page.getByRole("tab", { name, exact: true });
+  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await view("Weight").click();
   await expect(page.getByRole("heading", { name: "Weight trend" })).toBeVisible();
   // Today's synthetic weigh-in is the latest reading.
   await expect(page.getByText("Latest 82.0 kg")).toBeVisible();
   await expect(page.locator(".line-chart__dot").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await view("Steps and protein").click();
   await expect(page.getByRole("heading", { name: "Steps and protein" })).toBeVisible();
 
+  await view("Workouts").click();
   await page.getByRole("tab", { name: "Pull A" }).click();
   await expect(page.getByText("Deadlift 3 × 5 @ 130 kg")).toBeVisible();
   await expect(page.getByText("Barbell row 3 × 8 @ 70 kg")).toBeVisible();
 
+  await view("Lifts").click();
   await expect(page.getByRole("combobox", { name: "Exercise" })).toHaveValue("Deadlift");
   await expect(
     page.getByRole("table", { name: "Deadlift: top set per session" }).getByRole("row"),
@@ -301,6 +307,7 @@ test("Health shows rings, trends and workouts", async () => {
   await expect(page.getByText(/export files? could not be read/)).toHaveCount(0);
 
   // Ten days of resting heart rate: a week shows 7 of them, a month all 10.
+  await page.getByRole("tab", { name: "Trends", exact: true }).click();
   const heartRate = page.getByRole("table", { name: "Resting heart rate" }).getByRole("row");
   await expect(heartRate).toHaveCount(8);
   await page.getByRole("tab", { name: "Month", exact: true }).click();
@@ -318,6 +325,7 @@ test("Health shows rings, trends and workouts", async () => {
   );
 
   // An Apple Health workout beside a vault workout, each with its source.
+  await page.getByRole("tab", { name: "Workouts", exact: true }).click();
   const workouts = page.getByRole("list", { name: "Workouts, newest first" });
   await expect(workouts.getByRole("listitem").filter({ hasText: "Outdoor Run" })).toContainText(
     "Apple Health",
@@ -331,6 +339,7 @@ test("Settings shows the connected vault", async () => {
   const { page, vault } = running();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: /^Vault and Health/ }).click();
   await expect(page.getByText("Connected")).toBeVisible();
   await expect(page.getByText(vault)).toBeVisible();
 });
@@ -344,6 +353,7 @@ test("an uncaught error is logged locally and shown in Diagnostics", async () =>
   }, PROBE);
   await page.getByRole("button", { name: "Today", exact: true }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByRole("heading", { name: "Diagnostics" })).toBeVisible();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
   await expect(page.getByText("1 recent error logged")).toBeVisible();
@@ -360,6 +370,7 @@ test("an update signed with the wrong key is offered but refused", async () => {
   });
   await banner.getByRole("button", { name: "Dismiss" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 
@@ -367,6 +378,7 @@ test("an old signed release announced as new is refused (no downgrade)", async (
   const { page, offerUpdate } = running();
   offerUpdate("replay");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Updates/ }).click();
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByText("Version 9.9.9 is available.")).toBeVisible();
   await page.getByRole("button", { name: "Install and restart" }).click();
@@ -374,6 +386,7 @@ test("an old signed release announced as new is refused (no downgrade)", async (
     page.getByRole("alert").filter({ hasText: "failed its security check" }),
   ).toBeVisible({ timeout: 15_000 });
   // Nothing was installed: same process, same version.
+  await page.getByRole("button", { name: /^Diagnostics/ }).click();
   await expect(page.getByText(`Version ${APP_VERSION}`)).toBeVisible();
 });
 

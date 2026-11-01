@@ -1,0 +1,83 @@
+/* Settings fits the window: sections listed on the left, one shown at a
+   time on the right. A long section (an open setup guide) scrolls inside
+   its panel; the page never does. */
+
+.settings__layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--space-5);
+  min-height: 0;
+}
+
+.settings__nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings__tab {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .settings__tab:hover {
+    background: var(--glass-hover);
+    color: var(--text);
+  }
+}
+
+.settings__tab[aria-current="true"] {
+  background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
+  box-shadow: var(--card-highlight), var(--card-edge);
+  color: var(--text);
+}
+
+.settings__tab-label {
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+
+.settings__tab-hint {
+  color: var(--text-faint);
+  font-size: var(--fs-secondary);
+}
+
+.settings__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-pad);
+  min-height: 0;
+  padding-right: var(--space-2);
+  overflow-y: auto;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  scrollbar-width: thin;
+}
+
+.settings__panel:focus-visible {
+  outline: none;
+}
+
+.settings__panel > * {
+  flex: none;
+}
+
+.settings .notice {
+  flex: none;
+  margin: 0;
+}
