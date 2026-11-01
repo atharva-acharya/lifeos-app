@@ -93,6 +93,14 @@ fn capability_grants_only_events_window_and_app_commands() {
         [
             "core:event:default",
             "core:window:default",
+            // The app's own title bar: drag, double-click to maximise, and
+            // the three window buttons. Nothing that resizes or moves the
+            // window from script.
+            "core:window:allow-start-dragging",
+            "core:window:allow-internal-toggle-maximize",
+            "core:window:allow-minimize",
+            "core:window:allow-toggle-maximize",
+            "core:window:allow-close",
             "allow-get-settings",
             "allow-choose-vault-folder",
             "allow-choose-health-folder",
