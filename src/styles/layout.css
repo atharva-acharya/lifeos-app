@@ -1,54 +1,118 @@
-/* The sidebar is chrome: a glass panel floating over the page (ui-spec L1,
-   L3). The main area spans the whole window underneath it, so content
-   scrolls beneath the sidebar's edge (L4); its left padding keeps the page
-   clear of the panel. DOM order (sidebar, then main) keeps focus order. */
+/* Shell: the app's own top bar across the window, an icon rail on the left
+   and the page area. The window has no Windows title bar (tauri.conf.json),
+   and the webview zoom scales a 1440 x 900 canvas to the window
+   (src-tauri/src/window.rs), so these sizes are canvas pixels. */
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: var(--titlebar-height) minmax(0, 1fr);
   height: 100%;
 }
 
+.shell--bare {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.titlebar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--titlebar-bg);
+  box-shadow: inset 0 -1px 0 var(--hairline);
+  user-select: none;
+}
+
+.titlebar__brand {
+  display: grid;
+  place-items: center;
+  width: var(--sidebar-width);
+  height: 100%;
+  color: var(--text);
+}
+
+.titlebar__mark {
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.titlebar__name {
+  color: var(--text-muted);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+}
+
+.titlebar__mode {
+  margin-left: var(--space-3);
+}
+
+.titlebar__drag {
+  flex: 1;
+  align-self: stretch;
+}
+
+.titlebar__controls {
+  display: flex;
+  align-self: stretch;
+}
+
+/* Sized and placed like the Windows caption buttons, so the hands already know them. */
+.titlebar__button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.titlebar__button svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .titlebar__button:hover {
+    background: var(--glass-hover);
+    color: var(--text);
+  }
+
+  .titlebar__button--close:hover {
+    background: var(--close-hover);
+    color: #fff;
+  }
+}
+
+/* The rail: icons only. Hovering names an icon; Ctrl B (or the chevron)
+   widens it over the page as glass, so the page layout never moves. */
 .sidebar {
   position: relative;
   z-index: 2;
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  width: var(--sidebar-width);
   min-height: 0;
-  margin: var(--space-2);
-  padding: var(--space-4) var(--space-3);
-  overflow-y: auto;
-  /* Concentric with the nav items: their radius plus the 12 px inset. */
-  border-radius: calc(var(--radius-control) + var(--space-3));
-  border: 1px solid var(--glass-border);
+  padding: var(--space-3) 0;
+  box-shadow: inset -1px 0 0 var(--hairline);
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.sidebar[data-expanded] {
+  width: var(--sidebar-open-width);
+  border-right: 1px solid var(--glass-border);
   background: var(--glass-bg);
-  box-shadow: var(--glass-highlight);
+  box-shadow: var(--glass-highlight), var(--shadow-overlay);
+  -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-3);
-  font-family: var(--font-display);
-  font-size: var(--fs-label);
-  font-weight: 600;
-}
-
-.brand__mark {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-small);
-  background: conic-gradient(
-    var(--ring-move),
-    var(--ring-exercise),
-    var(--ring-stand),
-    var(--ring-move)
-  );
 }
 
 .nav {
@@ -56,7 +120,7 @@
   flex-direction: column;
   gap: var(--space-1);
   margin: 0;
-  padding: 0;
+  padding: 0 var(--space-2);
   list-style: none;
 }
 
@@ -65,16 +129,19 @@
 }
 
 .nav__item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   width: 100%;
-  padding: var(--space-2) var(--space-3);
+  height: 44px;
+  padding: 0 14px;
   border: 0;
   border-radius: var(--radius-control);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-faint);
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -86,34 +153,102 @@
 }
 
 .nav__item[aria-current="page"] {
-  background: color-mix(in srgb, var(--accent) 24%, var(--bg-sidebar));
+  background: var(--raised-soft);
+  box-shadow: var(--card-highlight);
   color: var(--text);
-  font-weight: 600;
 }
 
-.nav__item[aria-current="page"] .nav__icon {
-  color: var(--accent);
+/* A short white bar on the window edge marks the current page. */
+.nav__item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: calc(-1 * var(--space-2));
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--text);
 }
 
 .nav__icon {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   flex: none;
 }
 
-.nav__hint {
-  margin-left: auto;
-  font-size: var(--fs-kicker);
-  color: var(--text-muted);
+.nav__toggle .nav__icon {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.sidebar[data-expanded] .nav__toggle .nav__icon {
+  transform: rotate(180deg);
+}
+
+.nav__label {
+  overflow: hidden;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.sidebar[data-expanded] .nav__label {
+  opacity: 1;
+}
+
+.nav__tip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--space-3));
+  display: flex;
+  gap: var(--space-2);
+  padding: 6px 10px;
+  border-radius: var(--radius-small);
+  background: var(--popover-bg);
+  box-shadow: var(--card-highlight), var(--shadow-overlay);
+  color: var(--text);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition:
+    opacity var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+.nav__tip kbd {
+  color: var(--text-faint);
+  font: inherit;
+  font-weight: 500;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebar:not([data-expanded]) .nav__item:hover .nav__tip {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+.sidebar:not([data-expanded]) .nav__item:focus-visible .nav__tip {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
 .main {
-  grid-column: 1 / -1;
-  grid-row: 1;
+  position: relative;
+  grid-column: 2;
+  grid-row: 2;
   min-width: 0;
   overflow-y: auto;
   /* No top padding: the 24 px scroll-edge strip below takes its place. */
-  padding: 0 var(--space-6) var(--space-5) calc(var(--sidebar-width) + var(--space-6));
+  padding: 0 var(--space-6) var(--space-5);
+}
+
+.shell--bare > .welcome,
+.shell--bare > .boot {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 /* Scroll-edge fade (L4): where content meets the window's top edge it fades
@@ -126,7 +261,7 @@
   z-index: 1;
   display: block;
   height: var(--scroll-edge);
-  margin-inline: calc(-1 * (var(--sidebar-width) + var(--space-6))) calc(-1 * var(--space-6));
+  margin-inline: calc(-1 * var(--space-6));
   background: linear-gradient(to bottom, var(--bg-page), transparent);
   opacity: 0;
   pointer-events: none;
@@ -1114,11 +1249,6 @@ a.button {
 .sample-banner p {
   flex: 1;
   margin: 0;
-}
-
-.sidebar__mode {
-  margin: calc(-1 * var(--space-3)) 0 0;
-  padding: 0 var(--space-3);
 }
 
 /* Settings cards stack with one gap; no margins of their own. */

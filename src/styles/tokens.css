@@ -87,7 +87,19 @@
   --glass-hover: rgb(255 255 255 / 0.08);
   --scrim: rgb(0 0 0 / 0.5); /* dims the page behind a sheet */
   --shadow-float: 0 8px 24px rgb(0 0 0 / 0.4); /* toasts float over content */
-  --sidebar-width: 232px;
+  --shadow-overlay: 0 20px 40px rgb(0 0 0 / 0.45); /* the widened rail, tooltips */
+  /* Window chrome: the app's own top bar and the icon rail (canvas pixels). */
+  --titlebar-height: 44px;
+  --titlebar-bg: #0b0b0d;
+  --close-hover: #c42b1c; /* the Windows close button's red */
+  --sidebar-width: 64px;
+  --sidebar-open-width: 208px;
+  --hairline: rgb(255 255 255 / 0.06);
+  --raised-soft: rgb(255 255 255 / 0.08); /* the current rail item */
+  --card-highlight: inset 0 1px 0 rgb(255 255 255 / 0.07); /* light from above */
+  --popover-bg: #2c2c2e;
+  --text-faint: #8e8e96; /* rail icons, hints; AA on page and card */
+  --fs-secondary: 13px;
   --scroll-edge: 24px; /* scroll-edge fade where content meets glass (L4) */
   --page-bar-height: 48px; /* the compact page toolbar (L1, L4) */
   --page-bar-edge: transparent; /* no hard divider under glass (L4) */

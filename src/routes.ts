@@ -27,6 +27,13 @@ export const MAIN_ROUTES: readonly Route[] = [
     summary: "Applications from your sheet, company pipeline, outreach log and reply rates.",
   },
   {
+    id: "money",
+    label: "Money",
+    kicker: "Budget",
+    phase: 4,
+    summary: "Spending and income by month, budgets by category, and quick add.",
+  },
+  {
     id: "fitness",
     label: "Fitness",
     kicker: "Training",
@@ -39,13 +46,6 @@ export const MAIN_ROUTES: readonly Route[] = [
     kicker: "Body",
     phase: 3,
     summary: "Steps, sleep, heart rate, weight and workouts from Apple Health exports.",
-  },
-  {
-    id: "money",
-    label: "Money",
-    kicker: "Budget",
-    phase: 4,
-    summary: "Spending and income by month, budgets by category, and quick add.",
   },
   {
     id: "projects",

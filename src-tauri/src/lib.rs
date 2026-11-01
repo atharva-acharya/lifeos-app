@@ -19,6 +19,9 @@ pub mod settings;
 pub mod today;
 mod updates;
 pub mod vault;
+mod window;
+
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,7 +30,18 @@ pub fn run() {
         .manage(live::LiveState::default())
         .manage(updates::Pending::default())
         .manage(health::HealthState::default())
+        .on_window_event(|w, event| {
+            if matches!(
+                event,
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. }
+            ) {
+                window::on_resized(w);
+            }
+        })
         .setup(|app| {
+            if let Some(main) = app.get_webview_window("main") {
+                window::place(&main)?;
+            }
             // Panics go to the local error log as well as stderr.
             if let Ok(dir) = commands::cache_dir(app.handle()) {
                 let default = std::panic::take_hook();
