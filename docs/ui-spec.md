@@ -11,7 +11,7 @@ The strict requirements every screen is checked against. `docs/design-rules.md` 
 | ID  | Requirement                                                                                                                                                                                                                                                   |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | L1  | Two layers. **Content** (cards, lists, charts) is solid. **Chrome** (sidebar, page toolbar, sheets, popovers, menus, toasts) is glass. No content card uses `backdrop-filter`.                                                                                |
-| L2  | Met                                                                                                                                                                                                                                                           | No popover opens over a sheet or toast; the unused `--popover-solid` token was removed. | #50 |
+| L2  | Glass never sits on glass. A popover over a sheet is solid `#2C2C2E`.                                                                                                                                                                                         |
 | L3  | Glass: `background: rgb(28 28 30 / 0.72)`, `backdrop-filter: blur(24px) saturate(160%)`, inner top edge `inset 0 1px 0 rgb(255 255 255 / 0.08)`. No glass element's ancestor may have `filter`, `opacity < 1` or a running animation, or the backdrop breaks. |
 | L4  | Content scrolls beneath the sidebar and the page toolbar. Where content meets glass, a 24 px scroll-edge fade replaces any hard divider. The fade shows only once the area has scrolled.                                                                      |
 | L5  | Reduce transparency (system setting or the app's own toggle): every glass surface becomes solid `#1C1C1E` with a 1 px `#38383A` border.                                                                                                                       |
@@ -19,16 +19,16 @@ The strict requirements every screen is checked against. `docs/design-rules.md` 
 
 ## 2. Tokens
 
-| ID  | Requirement                                                                                                                                                                                                                                                                   |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | Colours come only from `tokens.css`. No hex value appears in a component stylesheet or TSX file.                                                                                                                                                                              |
-| T2  | Surfaces: page `#000`, card `#1C1C1E`, raised control `#2C2C2E`, separator `#38383A`. A card is always lighter than what it sits on.                                                                                                                                          |
-| T3  | Colour is for data and state, not decoration: about 5% of a screen's pixels or less. Headings, labels and numbers are text colours. A series or category is marked by a swatch or label colour, never by dyeing the number.                                                   |
-| T4  | Category colours (labels and chart series): Activity and Jobs `#FF9F0A`, Heart `#FF6482`, Body `#DA8FFF`, Sleep `#8E8CFF`, Fitness `#30D158`, Money `#63E6E2`, Projects `#5EB0FF`. Positive money is green; amounts you owe are orange, always with text, never colour alone. |
-| T5  | Met                                                                                                                                                                                                                                                                           | Every radius is a token: card, control, pill, `--radius-small` (4 px floor) and `--radius-inset` (6 px, concentric segments only). | #36, #50 |
-| T6  | Met                                                                                                                                                                                                                                                                           | Only the listed steps are used; 24 px is the documented page-section step.                                                         | #36, #50 |
-| T7  | Met                                                                                                                                                                                                                                                                           | Every size is a token; documented exceptions: chart ticks 12 px, page bar title 17 px.                                             | #36, #50 |
-| T8  | Met                                                                                                                                                                                                                                                                           | Tabular figures on every number (tables, pills, ticks, metrics, lists); `—` for missing values.                                    | #36, #50 |
+| ID  | Requirement                                                                                                                                                                                                                                                                                                           |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | Colours come only from `tokens.css`. No hex value appears in a component stylesheet or TSX file.                                                                                                                                                                                                                      |
+| T2  | Surfaces: page `#000`, card `#1C1C1E`, raised control `#2C2C2E`, separator `#38383A`. A card is always lighter than what it sits on.                                                                                                                                                                                  |
+| T3  | Colour is for data and state, not decoration: about 5% of a screen's pixels or less. Headings, labels and numbers are text colours. A series or category is marked by a swatch or label colour, never by dyeing the number.                                                                                           |
+| T4  | Category colours (labels and chart series): Activity and Jobs `#FF9F0A`, Heart `#FF6482`, Body `#DA8FFF`, Sleep `#8E8CFF`, Fitness `#30D158`, Money `#63E6E2`, Projects `#5EB0FF`. Positive money is green; amounts you owe are orange, always with text, never colour alone.                                         |
+| T5  | Radii are concentric: inner radius = outer radius − inset, floor 4 px. Card 14, control in a card 10, pill 999; 6 only for a segment inside a 10 px control with a 4 px inset.                                                                                                                                        |
+| T6  | Spacing uses only 4, 8, 12, 16, 20, 24 and 32 px: 16 inside cards and between cards, 20 between sections, 32 under the page title. 24 is the larger in-component step only (sidebar groups, ring to legend, setting text to its control, list indent, page bottom).                                                   |
+| T7  | Type scale: page title 34/1.1 bold −0.02 em; group title 20/1.3 bold; metric value 30/1.1 bold, tabular; label 15 semibold; body 14/1.5; secondary 13; page bar title 17 semibold (as iOS); chart tick 12 (axis ticks only). Sizes come from tokens. Sentence case everywhere. No uppercase, no letter-spaced labels. |
+| T8  | Every number uses tabular figures. Zero prints as `0`, a missing value as `—`, never blank.                                                                                                                                                                                                                           |
 
 ## 3. Motion
 
@@ -44,22 +44,22 @@ Durations come from tokens. Reduce motion sets them all to 0, and no element the
 | M6  | Rings                                                                                               | fill 800 ms spring, 60 ms stagger between rings                                                                 |
 | M7  | Line charts draw in 480 ms; bars grow 320 ms spring                                                 | first paint only, never on every data refresh                                                                   |
 | M8  | Lists                                                                                               | new rows fade and rise 6 px, 200 ms, stagger 30 ms, at most 8 rows staggered                                    |
-| M9  | Met                                                                                                 | Today summary numbers count to new values over 400 ms; instant on first load and under reduce motion.           | #47 |
+| M9  | Number changes (balance, totals)                                                                    | count to the new value over 400 ms ease-out                                                                     |
 | M10 | Nothing loops except a loading indicator and the single "active project" highlight                  |                                                                                                                 |
 | M11 | Only `transform`, `opacity` and colours animate. Never `transition: all`, never `ease-in` on entry. |                                                                                                                 |
 
 ## 4. Components
 
-| ID  | Requirement                                                                                                                                                                                                     |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1  | **Group:** the title sits above its card, never inside it. An optional action (link or control) goes right-aligned on the same line.                                                                            |
-| C2  | **Metric card:** coloured label top-left; note and chevron top-right; big value bottom-left with its unit in grey; one optional detail line. Clickable cards open their page, and the whole card is the target. |
-| C3  | **List row:** title plus one secondary line, a trailing value right-aligned at least 64 px wide, a hairline between rows (none above the first). No card or bordered box inside a row.                          |
-| C4  | Met                                                                                                                                                                                                             | Bars capped at 24 px; two-value charts side by side; every chart has a screen-reader table.                                                         | #48, #50      |
-| C5  | **Segmented control** (tabs, ranges, money in/out): glass-free, raised `#2C2C2E` track, selected segment slides (M1 spring), arrow keys move instantly (M4).                                                    |
-| C6  | Met                                                                                                                                                                                                             | One primary per screen, 32 px+ tall, disabled at 50% with the reason shown.                                                                         | #40, #43, #50 |
-| C7  | Partly met                                                                                                                                                                                                      | Loading, error with Try again, empty and partial states on Today, Jobs, Fitness, Health and Projects; Money and Settings keep their older handling. | #47           |
-| C8  | Met                                                                                                                                                                                                             | Toast with 5 s Undo for settle-ups and category changes.                                                                                            | #43, #50      |
+| ID  | Requirement                                                                                                                                                                                                            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | **Group:** the title sits above its card, never inside it. An optional action (link or control) goes right-aligned on the same line.                                                                                   |
+| C2  | **Metric card:** coloured label top-left; note and chevron top-right; big value bottom-left with its unit in grey; one optional detail line. Clickable cards open their page, and the whole card is the target.        |
+| C3  | **List row:** title plus one secondary line, a trailing value right-aligned at least 64 px wide, a hairline between rows (none above the first). No card or bordered box inside a row.                                 |
+| C4  | **Charts:** one y axis, baseline at zero, 3–5 solid gridlines. Two values per period are bars side by side, not stacked. Bars at most 24 px wide, rounded only at the data end. Every chart has a screen-reader table. |
+| C5  | **Segmented control** (tabs, ranges, money in/out): glass-free, raised `#2C2C2E` track, selected segment slides (M1 spring), arrow keys move instantly (M4).                                                           |
+| C6  | **Buttons:** one primary style per screen; at least 32 px tall with the mouse target at least 24 × 24. Disabled is 50% opacity and says why nearby.                                                                    |
+| C7  | **Every screen has five states:** loading, empty (one line plus one action), error (what happened plus a retry), partial (some data missing, shown as `—`), and full.                                                  |
+| C8  | **Toasts** confirm saved actions and offer Undo for 5 s when the action can be undone.                                                                                                                                 |
 
 ## 5. Pages
 
@@ -71,7 +71,7 @@ Durations come from tokens. Reduce motion sets them all to 0, and no element the
 | P4  | Health          | Clicking a score or ring opens a **contributors** sheet: each input, its value, and up or down against your own 30-day average.                                     |
 | P5  | Money           | Top: balance-style metric row, then a quick-action row (Add, Split, Settle up, Budget), each with a keyboard shortcut.                                              |
 | P6  | Money           | Transactions grouped by day under sticky day headers showing the date and the day's net. Category editable in at most 2 clicks from the row.                        |
-| P7  | Partly met      | Totals vs last month, category breakdown with change, 6 months / this year; no week range yet (needs a new data command).                                           | #48 |
+| P7  | Money           | Analytics: week, month and year ranges; "vs previous period" change; breakdown by category.                                                                         |
 | P8  | Money           | Splitting: equal, exact amounts, percentages and shares. Save stays disabled until the parts add up; a live "£X left to assign" shows the gap.                      |
 | P9  | Money           | Friends: one net balance per friend; header shows you owe, you are owed and net. Settle up pre-fills the full amount and records a payment that can be undone (C8). |
 
@@ -87,47 +87,47 @@ Durations come from tokens. Reduce motion sets them all to 0, and no element the
 
 Checked against the code on main after #46, plus the ring stagger on this branch. #47 (loading and error states, count-up) and #48 (Money analytics) were still open when this was written. Nothing here has been checked on Windows yet (blur, motion feel, colour); that is the owner check in §6.
 
-| ID  | Status     | Note                                                                                                                 | PR               |
-| --- | ---------- | -------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| L1  | Met        | Glass only on sidebar, page bar, sheets, category popover and toasts; no card uses `backdrop-filter`.                | #42, #46         |
-| L2  | Partly met | `--popover-solid` token exists but nothing uses it yet; no popover opens over a sheet today.                         | —                |
-| L3  | Met        | Glass tokens match; blur not checked on Windows.                                                                     | #42              |
-| L4  | Met        | 24 px scroll-edge fade under the page bar, shown only once scrolled.                                                 | #42, #46         |
-| L5  | Met        | System setting and the app's own toggle both switch glass to solid.                                                  | #42              |
-| L6  | Met        | `prefers-contrast: more` lifts muted text and glass edges; not checked on Windows.                                   | #42              |
-| T1  | Met        | No hex outside `tokens.css`.                                                                                         | #46              |
-| T2  | Met        | Surface tokens match.                                                                                                | #36              |
-| T3  | Partly met | Category colour is on labels and swatches; the 5% budget has not been measured.                                      | #36              |
-| T4  | Met        | Category tokens match; owed amounts carry text.                                                                      | #36, #43         |
-| T5  | Partly met | Card, control and pill radii are tokens; a few fixed 3–8 px radii not yet audited.                                   | #36              |
-| T6  | Partly met | Card and section spacing follow the scale; some 2, 3, 6 and 10 px paddings remain, and `--space-5` is 24 px.         | —                |
-| T7  | Partly met | Title, group, metric and label sizes match; some 11, 12, 16 and 17 px sizes remain. No uppercase.                    | #36              |
-| T8  | Partly met | Tabular figures on metrics, lists and charts, `—` for missing values; not audited on every number.                   | #36              |
-| M1  | Met        | Press and release timings from tokens.                                                                               | #42              |
-| M2  | Met        | Hover is colour only, behind the hover media query.                                                                  | #42              |
-| M3  | Met        | View Transitions page fade and rise.                                                                                 | #42              |
-| M4  | Met        | Keyboard changes skip animation.                                                                                     | #42              |
-| M5  | Met        | Sheets grow from their trigger; close faster.                                                                        | #44              |
-| M6  | Met        | 800 ms spring fill, 60 ms stagger per ring (`--ring-stagger`).                                                       | #46, this branch |
-| M7  | Met        | Line draw 480 ms, bars 320 ms spring, on mount only.                                                                 | #46              |
-| M8  | Met        | Rows rise 6 px, 30 ms stagger, capped at 8.                                                                          | #42              |
-| M9  | Not yet    | Count-up is in #47, not merged.                                                                                      | #47 (open)       |
-| M10 | Met        | Only the active-project highlight loops.                                                                             | #42              |
-| M11 | Met        | No `transition: all` or ease-in on entry; ring and line drawing animate `stroke-dashoffset`, which M6 and M7 need.   | #42, #46         |
-| C1  | Met        | `Group` puts the title above the card.                                                                               | #36              |
-| C2  | Met        | `Metric` layout; clickable cards open their page.                                                                    | #36              |
-| C3  | Met        | List rows with a 64 px trailing value and hairlines.                                                                 | #36              |
-| C4  | Partly met | Single-series bars reach 48 px; Jobs reply rates are stacked; Jobs and Sleep bar charts have no screen-reader table. | —                |
-| C5  | Met        | Sliding segmented control, instant on arrow keys.                                                                    | #44              |
-| C6  | Partly met | One primary per screen and 32 px+ height; disabled is 60% opacity, not 50%.                                          | —                |
-| C7  | Partly met | Empty states and an error boundary with retry exist; per-page loading and error states are in #47, not merged.       | #47 (open)       |
-| C8  | Partly met | Toast with 5 s Undo for splits and settle-ups; category edits do not toast.                                          | #43              |
-| P1  | Met        | Today fits 1100 × 640.                                                                                               | #35              |
-| P2  | Met        | Habits ring, four summary cards, three follow-ups, resume here.                                                      | #36              |
-| P3  | Met        | Fitness and Health rings show actual / target with a next-step line.                                                 | #44              |
-| P4  | Met        | Contributors sheet against the 30-day average.                                                                       | #44              |
-| P5  | Met        | Add, Split, Settle up and Budget with shortcuts.                                                                     | #40              |
-| P6  | Met        | Sticky day headers with net; category edit from the row.                                                             | #41, #45         |
-| P7  | Partly met | Monthly trend and month-on-month by category only; week and year ranges are in #48, not merged.                      | #48 (open)       |
-| P8  | Met        | Equal, exact, percentage and share splits with a live remainder.                                                     | #43              |
-| P9  | Met        | Per-friend net, summary header, pre-filled settle-up with Undo.                                                      | #43              |
+| ID  | Status     | Note                                                                                                                               | PR            |
+| --- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| L1  | Met        | Glass only on sidebar, page bar, sheets, category popover and toasts; no card uses `backdrop-filter`.                              | #42, #46      |
+| L2  | Met        | No popover opens over a sheet or toast; the unused `--popover-solid` token was removed.                                            | #50           |
+| L3  | Met        | Glass tokens match; blur not checked on Windows.                                                                                   | #42           |
+| L4  | Met        | 24 px scroll-edge fade under the page bar, shown only once scrolled.                                                               | #42, #46      |
+| L5  | Met        | System setting and the app's own toggle both switch glass to solid.                                                                | #42           |
+| L6  | Met        | `prefers-contrast: more` lifts muted text and glass edges; not checked on Windows.                                                 | #42           |
+| T1  | Met        | No hex outside `tokens.css`.                                                                                                       | #46           |
+| T2  | Met        | Surface tokens match.                                                                                                              | #36           |
+| T3  | Partly met | Category colour is on labels and swatches; the 5% budget has not been measured.                                                    | #36           |
+| T4  | Met        | Category tokens match; owed amounts carry text.                                                                                    | #36, #43      |
+| T5  | Met        | Every radius is a token: card, control, pill, `--radius-small` (4 px floor) and `--radius-inset` (6 px, concentric segments only). | #36, #50      |
+| T6  | Met        | Only the listed steps are used; 24 px is the documented page-section step.                                                         | #36, #50      |
+| T7  | Met        | Every size is a token; documented exceptions: chart ticks 12 px, page bar title 17 px.                                             | #36, #50      |
+| T8  | Met        | Tabular figures on every number (tables, pills, ticks, metrics, lists); `—` for missing values.                                    | #36, #50      |
+| M1  | Met        | Press and release timings from tokens.                                                                                             | #42           |
+| M2  | Met        | Hover is colour only, behind the hover media query.                                                                                | #42           |
+| M3  | Met        | View Transitions page fade and rise.                                                                                               | #42           |
+| M4  | Met        | Keyboard changes skip animation.                                                                                                   | #42           |
+| M5  | Met        | Sheets grow from their trigger; close faster.                                                                                      | #44           |
+| M6  | Met        | Rings fill over 800 ms, 60 ms apart; instant under reduce motion.                                                                  | #46, #51      |
+| M7  | Met        | Line draw 480 ms, bars 320 ms spring, on mount only.                                                                               | #46           |
+| M8  | Met        | Rows rise 6 px, 30 ms stagger, capped at 8.                                                                                        | #42           |
+| M9  | Met        | Today summary numbers count to new values over 400 ms; instant on first load and under reduce motion.                              | #47           |
+| M10 | Met        | Only the active-project highlight loops.                                                                                           | #42           |
+| M11 | Met        | No `transition: all` or ease-in on entry; ring and line drawing animate `stroke-dashoffset`, which M6 and M7 need.                 | #42, #46      |
+| C1  | Met        | `Group` puts the title above the card.                                                                                             | #36           |
+| C2  | Met        | `Metric` layout; clickable cards open their page.                                                                                  | #36           |
+| C3  | Met        | List rows with a 64 px trailing value and hairlines.                                                                               | #36           |
+| C4  | Met        | Bars capped at 24 px; two-value charts side by side; every chart has a screen-reader table.                                        | #48, #50      |
+| C5  | Met        | Sliding segmented control, instant on arrow keys.                                                                                  | #44           |
+| C6  | Met        | One primary per screen, 32 px+ tall, disabled at 50% with the reason shown.                                                        | #40, #43, #50 |
+| C7  | Partly met | Loading, error with Try again, empty and partial states on Today, Jobs, Fitness, Health and Projects; Money and Settings follow.   | #47           |
+| C8  | Met        | Toast with 5 s Undo for settle-ups and category changes.                                                                           | #43, #50      |
+| P1  | Met        | Today fits 1100 × 640.                                                                                                             | #35           |
+| P2  | Met        | Habits ring, four summary cards, three follow-ups, resume here.                                                                    | #36           |
+| P3  | Met        | Fitness and Health rings show actual / target with a next-step line.                                                               | #44           |
+| P4  | Met        | Contributors sheet against the 30-day average.                                                                                     | #44           |
+| P5  | Met        | Add, Split, Settle up and Budget with shortcuts.                                                                                   | #40           |
+| P6  | Met        | Sticky day headers with net; category edit from the row.                                                                           | #41, #45      |
+| P7  | Partly met | Totals vs last month, category breakdown with change, 6 months / this year; week range follows.                                    | #48           |
+| P8  | Met        | Equal, exact, percentage and share splits with a live remainder.                                                                   | #43           |
+| P9  | Met        | Per-friend net, summary header, pre-filled settle-up with Undo.                                                                    | #43           |
