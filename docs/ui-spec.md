@@ -128,6 +128,6 @@ Checked against the code on main after #46, plus the ring stagger on this branch
 | P4  | Met        | Contributors sheet against the 30-day average.                                                                                     | #44           |
 | P5  | Met        | Add, Split, Settle up and Budget with shortcuts.                                                                                   | #40           |
 | P6  | Met        | Sticky day headers with net; category edit from the row.                                                                           | #41, #45      |
-| P7  | Partly met | Totals vs last month, category breakdown with change, 6 months / this year; week range follows.                                    | #48           |
+| P7  | Met        | This week, 6 months and this year; totals and categories vs the previous period.                                                   | #48, #54      |
 | P8  | Met        | Equal, exact, percentage and share splits with a live remainder.                                                                   | #43           |
 | P9  | Met        | Per-friend net, summary header, pre-filled settle-up with Undo.                                                                    | #43           |
