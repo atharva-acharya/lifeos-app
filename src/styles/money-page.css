@@ -1,0 +1,230 @@
+/* Money fits the window without scrolling: four figures across the top, then
+   analytics, the transactions list (the only part that scrolls, inside its
+   card) and budgets with splits. Laid out once for the 1440 x 900 canvas. */
+
+/* Title and month on the left, the quick actions on the right. */
+.page-header.page-header--row {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.page-header--row .month-nav {
+  margin-top: var(--space-1);
+}
+
+.month-nav .button svg {
+  display: block;
+}
+
+/* The loaded month fills the height left under the header. */
+.main > .page-data {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.money__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--card-pad);
+  min-height: 0;
+}
+
+/* Fixed places, so a missing card never lets the others slide over. */
+.money__trends {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.money-tx {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.money__side {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.money__metrics {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--card-pad);
+}
+
+.money__metrics .metric {
+  min-height: 104px;
+  padding: var(--space-4) var(--space-5);
+}
+
+.money__grid > .card,
+.money__side > .card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-5);
+  overflow: hidden;
+}
+
+.money__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-pad);
+  min-height: 0;
+}
+
+/* Budgets and splits share the column; a long list scrolls inside its card. */
+.money__side > .card {
+  flex: 1 1 0;
+}
+
+.money__budgets .budgets,
+.money__balances {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.money__empty {
+  flex: none;
+}
+
+.money .notice {
+  flex: none;
+  margin: 0;
+}
+
+/* Budgets: name and what is left on one line, the bar under it. */
+.money__budgets .budgets {
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.budget__left {
+  color: var(--text-muted);
+  font-size: var(--fs-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Splits: what you are owed and owe as two recessed figures. */
+.money__splits .splits-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  background: none;
+}
+
+.money__splits .splits-summary__item {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+
+.money__splits .splits-summary__item:last-child {
+  display: none;
+}
+
+.money__splits .splits-summary dd {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* Analytics: the range switch in the card head, chart, then one breakdown. */
+.money__trends .money-trends {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.money-trends__blocks {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.money-trends__switch {
+  align-self: flex-start;
+}
+
+.money-trends__totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.money-trends__totals .metric {
+  padding: var(--space-3) var(--space-4);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
+}
+
+/* Each breakdown row on one line: name, bar, amount, change. */
+.money__trends .breakdown {
+  gap: var(--space-2);
+}
+
+.money__trends .breakdown__row {
+  grid-template-columns: 96px minmax(40px, 1fr) 72px minmax(0, auto);
+  row-gap: 0;
+}
+
+.money__trends .breakdown__name,
+.money__trends .breakdown__track,
+.money__trends .breakdown__value,
+.money__trends .breakdown__change {
+  grid-row: 1;
+  min-width: 0;
+}
+
+.money__trends .breakdown__name {
+  grid-column: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.money__trends .breakdown__track {
+  grid-column: 2;
+}
+
+.money__trends .breakdown__value {
+  grid-column: 3;
+}
+
+.money__trends .breakdown__change {
+  grid-column: 4;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Blocks keep their height; a short window clips the card, never overlaps. */
+.chart-block {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Maximised on a wide screen the canvas gains width: the transactions list
+   takes it, so more of each row shows. */
+@media (min-width: 1600px) {
+  .money__grid {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 5fr) minmax(0, 3fr);
+  }
+}

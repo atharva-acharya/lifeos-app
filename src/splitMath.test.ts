@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { allocate, checkSplit, percentText, summarise, toBasisPoints, toShares } from "./splitMath";
+import {
+  allocate,
+  checkSplit,
+  liveShares,
+  percentText,
+  summarise,
+  toBasisPoints,
+  toShares,
+} from "./splitMath";
 
 const sum = (xs: number[]) => xs.reduce((a, x) => a + x, 0);
 
@@ -118,5 +126,28 @@ describe("summarise", () => {
   it("totals what you owe, are owed and the net", () => {
     expect(summarise([1200, -500, 0, -200])).toEqual({ owe: 700, owed: 1200, net: 500 });
     expect(summarise([])).toEqual({ owe: 0, owed: 0, net: 0 });
+  });
+});
+
+describe("liveShares", () => {
+  it("splits equally to the penny", () => {
+    expect(liveShares("equal", 1000, ["", "", ""])).toEqual([334, 333, 333]);
+  });
+
+  it("shows typed amounts as they are entered", () => {
+    expect(liveShares("amounts", 1000, ["4.50", "", "x"])).toEqual([450, 0, 0]);
+  });
+
+  it("divides by shares once every share is readable", () => {
+    expect(liveShares("shares", 900, ["2", "1"])).toEqual([600, 300]);
+    expect(liveShares("shares", 900, ["2", ""])).toEqual([0, 0]);
+  });
+
+  it("works out percentages of the total", () => {
+    expect(liveShares("percent", 2000, ["25", "75%", ""])).toEqual([500, 1500, 0]);
+  });
+
+  it("shows nothing until there is a total", () => {
+    expect(liveShares("equal", null, ["", ""])).toEqual([0, 0]);
   });
 });

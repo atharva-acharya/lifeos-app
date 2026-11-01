@@ -78,7 +78,7 @@ test("sample data is labelled everywhere, read-only, and leaves no trace", async
   await expect(page.getByRole("heading", { name: "Spending by category" })).toBeVisible();
   await expect(page.getByText("You owe Alex £7.30")).toBeVisible();
   await expect(page.getByText("Settled up with Sam")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Add a transaction" })).toBeDisabled();
 
   // Projects
   await goTo("Projects");

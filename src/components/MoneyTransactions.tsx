@@ -3,7 +3,7 @@ import { localDate, setTransactionCategory, type MoneyRow } from "../api";
 import { useMode } from "../mode";
 import { pounds } from "../money";
 import { fromKeyboard } from "../motion";
-import { Group } from "./Card";
+import { CardHead } from "./Card";
 import { Toast, type ToastMessage } from "./Toast";
 import "../styles/money-transactions.css";
 
@@ -497,11 +497,18 @@ export function MoneyTransactions({
     });
   };
   return (
-    <Group title="Transactions" cardClassName="card--flush money-tx">
+    <section className="card money-tx" aria-labelledby="money-tx-title">
+      <CardHead
+        id="money-tx-title"
+        title="Transactions"
+        action={<span className="card__aside">{monthLabel}</span>}
+      />
       {days.length === 0 ? (
         <p className="muted">Nothing recorded in {monthLabel}.</p>
       ) : (
-        <>
+        // The one part of Money that scrolls: the list, inside its card.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- scrollable by keyboard
+        <div className="money-tx__scroll" tabIndex={0} aria-label="Transactions list">
           {sample && (
             <p id={reasonId} className="muted money-tx__note">
               Categories cannot be changed while sample data is on.
@@ -520,7 +527,7 @@ export function MoneyTransactions({
               />
             ))}
           </ul>
-        </>
+        </div>
       )}
       <Toast
         toast={toast}
@@ -529,6 +536,6 @@ export function MoneyTransactions({
           setToast(null);
         }}
       />
-    </Group>
+    </section>
   );
 }
