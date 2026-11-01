@@ -176,3 +176,26 @@ export function Metric({
     </section>
   );
 }
+
+/** A card's own title row: the title inside the card, an action on the right. */
+export function CardHead({ id, title, action }: { id: string; title: string; action?: ReactNode }) {
+  return (
+    <div className="card__head">
+      <h2 id={id} className="card__title">
+        {title}
+      </h2>
+      {action}
+    </div>
+  );
+}
+
+export function MoreLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" className="link-button card__action" onClick={onClick}>
+      {children}
+      <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+        <path d="M4.5 2.5 8 6l-3.5 3.5" />
+      </svg>
+    </button>
+  );
+}

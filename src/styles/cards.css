@@ -7,6 +7,16 @@
   min-width: 0;
 }
 
+/* A page that fits the window (Today, Money): it takes the height left under
+   its header and banners, and its grid shares that height out. */
+.page.page--fit {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
 /* A titled group: heading above, card(s) below. */
 .group {
   display: grid;

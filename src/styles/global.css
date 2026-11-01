@@ -40,7 +40,10 @@ button {
   color: var(--text-muted);
 }
 
+/* Positioned, so hidden screen-reader tables inside a card stay inside its
+   clipping and never make the page scroll. */
 .card {
+  position: relative;
   background: linear-gradient(180deg, var(--card-top), var(--card-bottom));
   /* No outline; the transparent border keeps room for coloured ones. */
   border: 1px solid transparent;
