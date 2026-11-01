@@ -21,6 +21,23 @@
 
 !define MUI_CUSTOMFUNCTION_GUIINIT LifeOsQuickUpgrade
 
+; Held open from before the first file is copied until this installer exits
+; (the handle is never closed). The installer reopens the app from its last
+; step; the app waits until it can delete this file, so it only opens once the
+; install is complete (src-tauri/src/install_wait.rs, same name).
+!define LIFEOS_INSTALL_LOCK "installing.lock"
+
+!macro NSIS_HOOK_PREINSTALL
+  Push $0
+  FileOpen $0 "$INSTDIR\${LIFEOS_INSTALL_LOCK}" w
+  Pop $0
+!macroend
+
+; Before the uninstaller removes the install folder, which must be empty.
+!macro NSIS_HOOK_PREUNINSTALL
+  Delete "$INSTDIR\${LIFEOS_INSTALL_LOCK}"
+!macroend
+
 ; Sets $R6 to the product code of an MSI install of Life OS, or "".
 Function LifeOsFindMsi
   StrCpy $R6 ""

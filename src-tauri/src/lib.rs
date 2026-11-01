@@ -5,6 +5,7 @@ pub mod fitness;
 pub mod google;
 pub mod health;
 pub mod index;
+mod install_wait;
 pub mod jobs;
 mod live;
 pub mod money;
@@ -26,6 +27,15 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // First, so a second copy hands over to this one before doing anything:
+        // two copies would fight over the same data folder.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(main) = app.get_webview_window("main") {
+                let _ = main.unminimize();
+                let _ = main.show();
+                let _ = main.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(live::LiveState::default())
         .manage(updates::Pending::default())
@@ -39,6 +49,11 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Before anything else: the window stays hidden and no data is
+            // touched until a running installer has finished.
+            if let Ok(dir) = app.path().resource_dir() {
+                install_wait::wait_for_installer(&dir);
+            }
             if let Some(main) = app.get_webview_window("main") {
                 window::place(&main)?;
             }
