@@ -137,17 +137,23 @@ test("Fitness shows weight, workout history and lift progress", async () => {
   const { page } = running();
   await page.getByRole("button", { name: "Fitness", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Fitness" })).toBeVisible();
+  // One view at a time, so the page fits the window; This week comes first.
+  const view = (name: string) => page.getByRole("tab", { name, exact: true });
+  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await view("Weight").click();
   await expect(page.getByRole("heading", { name: "Weight trend" })).toBeVisible();
   // Today's synthetic weigh-in is the latest reading.
   await expect(page.getByText("Latest 82.0 kg")).toBeVisible();
   await expect(page.locator(".line-chart__dot").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "This week" })).toBeVisible();
+  await view("Steps and protein").click();
   await expect(page.getByRole("heading", { name: "Steps and protein" })).toBeVisible();
 
+  await view("Workouts").click();
   await page.getByRole("tab", { name: "Pull A" }).click();
   await expect(page.getByText("Deadlift 3 × 5 @ 130 kg")).toBeVisible();
   await expect(page.getByText("Barbell row 3 × 8 @ 70 kg")).toBeVisible();
 
+  await view("Lifts").click();
   await expect(page.getByRole("combobox", { name: "Exercise" })).toHaveValue("Deadlift");
   await expect(
     page.getByRole("table", { name: "Deadlift: top set per session" }).getByRole("row"),
@@ -284,6 +290,7 @@ test("Health shows rings, trends and workouts", async () => {
   await expect(page.getByText(/export files? could not be read/)).toHaveCount(0);
 
   // Ten days of resting heart rate: a week shows 7 of them, a month all 10.
+  await page.getByRole("tab", { name: "Trends", exact: true }).click();
   const heartRate = page.getByRole("table", { name: "Resting heart rate" }).getByRole("row");
   await expect(heartRate).toHaveCount(8);
   await page.getByRole("tab", { name: "Month", exact: true }).click();
@@ -301,6 +308,7 @@ test("Health shows rings, trends and workouts", async () => {
   );
 
   // An Apple Health workout beside a vault workout, each with its source.
+  await page.getByRole("tab", { name: "Workouts", exact: true }).click();
   const workouts = page.getByRole("list", { name: "Workouts, newest first" });
   await expect(workouts.getByRole("listitem").filter({ hasText: "Outdoor Run" })).toContainText(
     "Apple Health",

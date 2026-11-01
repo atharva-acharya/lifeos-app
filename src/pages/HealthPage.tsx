@@ -7,6 +7,7 @@ import { HealthWorkouts } from "../components/HealthWorkouts";
 import { ErrorState, loadError, type LoadError } from "../components/ErrorState";
 import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
+import { PageTabs } from "../components/PageTabs";
 import { ago, dateTime, wholeDays } from "../healthStats";
 import type { Navigate } from "../routes";
 
@@ -54,17 +55,34 @@ function Notices({ health, now }: { health: Health; now: number }) {
 
 function Dashboard({ health, now }: { health: Health; now: number }) {
   return (
-    <div className="fitness">
+    <>
       <Notices health={health} now={now} />
       {health.latestData === null && (
         <EmptyHint lead="The export files have no steps, energy, sleep, heart or weight data yet.">
           In Health Auto Export, add those metrics to the export, then let it run once.
         </EmptyHint>
       )}
-      <HealthToday day={health.ringsDay} goals={health.goals} days={health.days} />
-      <HealthTrends days={health.days} sleepGoal={health.goals.sleepHours} />
-      <HealthWorkouts workouts={health.workouts} />
-    </div>
+      <PageTabs
+        label="Health view"
+        tabs={[
+          {
+            id: "today",
+            label: "Today",
+            content: <HealthToday day={health.ringsDay} goals={health.goals} days={health.days} />,
+          },
+          {
+            id: "trends",
+            label: "Trends",
+            content: <HealthTrends days={health.days} sleepGoal={health.goals.sleepHours} />,
+          },
+          {
+            id: "workouts",
+            label: "Workouts",
+            content: <HealthWorkouts workouts={health.workouts} />,
+          },
+        ]}
+      />
+    </>
   );
 }
 
@@ -127,7 +145,6 @@ export function HealthPage({ onNavigate }: { onNavigate: Navigate }) {
   return (
     <>
       <header className="page-header">
-        <p className="kicker">Body</p>
         <h1 className="page-title">Health</h1>
         {health !== null && lastExport !== null && (
           <p className="muted">
