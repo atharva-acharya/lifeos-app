@@ -298,9 +298,9 @@ test("Health shows rings, trends and workouts", async () => {
 
   // Today's rings against the plan's step goal (8,500) and the default goals.
   await expect(page.getByRole("heading", { name: "Today" })).toBeVisible();
-  await expect(page.getByText("9,120 / 8,500")).toBeVisible();
-  await expect(page.getByText("410 kcal / 500 kcal")).toBeVisible();
-  await expect(page.getByText("7 h 12 min / 8 h")).toBeVisible();
+  await expect(page.getByText("9,120 of 8,500")).toBeVisible();
+  await expect(page.getByText("410 of 500 kcal")).toBeVisible();
+  await expect(page.getByText("7 h 12 min of 8 h")).toBeVisible();
 
   // The synthetic export is fresh and every file reads cleanly.
   await expect(page.getByText(/No new export/)).toHaveCount(0);

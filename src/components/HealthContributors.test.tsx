@@ -71,6 +71,49 @@ describe("HealthToday", () => {
   it("has no sheet with no data", () => {
     render(<HealthToday day={null} goals={GOALS} />);
     expect(screen.queryByRole("button", { name: /What’s behind/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Today" })).toHaveClass("card", "rings-card");
+  });
+
+  it("draws the large rings in a lit card titled inside it, like Today's", () => {
+    render(<HealthToday day={TODAY} goals={GOALS} days={DAYS} />);
+    const card = screen.getByRole("region", { name: "Today" });
+    expect(card).toHaveClass("card", "rings-card");
+    expect(within(card).getByRole("heading", { name: "Today" })).toHaveClass("card__title");
+    expect(card.querySelector(".rings--hero")).not.toBeNull();
+    expect(card.querySelector(".rings--hero svg")).toHaveAttribute("width", "200");
+    // The big number with its goal in grey after it.
+    expect(bigNumbers(card)).toEqual(["7,600 of 10,000", "0 of 500 kcal", "6 h 30 min of 8 h"]);
+  });
+});
+
+/** Each large ring's number with its goal, e.g. "4 of 7". */
+function bigNumbers(card: HTMLElement): string[] {
+  return [...card.querySelectorAll(".rings__big")].map((e) => e.textContent);
+}
+
+describe("FitnessWeek", () => {
+  const SUMMARY = {
+    avgSteps: 9120,
+    proteinDays: 4,
+    sessions: 3,
+    stepsGoal: 8000,
+    proteinGoal: 170,
+  };
+
+  it("draws the large rings in a lit card titled inside it, like Today's", () => {
+    render(<FitnessWeek summary={SUMMARY} />);
+    const card = screen.getByRole("region", { name: "This week" });
+    expect(card).toHaveClass("card", "rings-card");
+    expect(within(card).getByRole("heading", { name: "This week" })).toHaveClass("card__title");
+    expect(card.querySelector(".rings--hero")).not.toBeNull();
+    expect(within(card).getByText("3 of 5 sessions")).toHaveClass("card__aside");
+    expect(bigNumbers(card)).toEqual(["9,120 of 8,000", "4 of 7", "3 of 5"]);
+  });
+
+  it("says which goals are the app's defaults", () => {
+    render(<FitnessWeek summary={SUMMARY} defaults={{ steps: true, protein: false }} />);
+    expect(screen.getByText(/Steps goal 8,000 \(default; set/)).toBeInTheDocument();
+    expect(screen.queryByText(/Protein goal 170 g \(default/)).not.toBeInTheDocument();
   });
 });
 
