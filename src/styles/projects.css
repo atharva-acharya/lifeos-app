@@ -1,0 +1,35 @@
+/* Projects fits the window: Active and Other side by side, each list
+   scrolling inside its own column; the page never scrolls. */
+
+.page.page--fit.projects {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+/* Only one column (no paused or done projects): it takes the width. */
+.page.page--fit.projects:has(> .projects__column:only-of-type) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.projects > .card,
+.projects > .notice {
+  grid-column: 1 / -1;
+}
+
+.projects__column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.projects__column > .projects__list {
+  flex: 1;
+  align-content: start;
+  min-height: 0;
+  padding: var(--space-1) var(--space-2) var(--space-4) 0;
+  overflow-y: auto;
+  scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  scrollbar-width: thin;
+}

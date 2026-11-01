@@ -6,6 +6,7 @@ import { ErrorState, loadError, type LoadError } from "../components/ErrorState"
 import { Skeleton, type SkeletonGroup } from "../components/Skeleton";
 import { NotConnected } from "../components/NotConnected";
 import type { Navigate } from "../routes";
+import "../styles/projects.css";
 
 /** The active projects, then the others. */
 const SKELETON: SkeletonGroup[][] = [[{ cards: 2, height: 150 }], [{ cards: 2, height: 110 }]];
@@ -14,7 +15,7 @@ function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate 
   const active = data.projects.filter((p) => p.active);
   const other = data.projects.filter((p) => !p.active);
   return (
-    <div className="projects">
+    <div className="page page--fit projects">
       {data.projects.length === 0 ? (
         <section className="card">
           <EmptyHint lead="No project notes yet." guide="projects" onNavigate={onNavigate}>
@@ -26,7 +27,7 @@ function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate 
         </section>
       ) : (
         <>
-          <section className="group" aria-labelledby="projects-active">
+          <section className="group projects__column" aria-labelledby="projects-active">
             <h2 id="projects-active" className="group__title">
               Active
             </h2>
@@ -43,7 +44,7 @@ function Dashboard({ data, onNavigate }: { data: Projects; onNavigate: Navigate 
             )}
           </section>
           {other.length > 0 && (
-            <section className="group" aria-labelledby="projects-other">
+            <section className="group projects__column" aria-labelledby="projects-other">
               <h2 id="projects-other" className="group__title">
                 Other
               </h2>
@@ -108,7 +109,6 @@ export function ProjectsPage({ onNavigate }: { onNavigate: Navigate }) {
   return (
     <>
       <header className="page-header">
-        <p className="kicker">Build</p>
         <h1 className="page-title">Projects</h1>
         {ready && ready.projects.length > 0 && (
           <p className="muted">
