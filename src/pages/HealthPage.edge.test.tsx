@@ -101,9 +101,9 @@ describe("HealthPage edge cases", () => {
     });
     const { container } = render(<HealthPage onNavigate={vi.fn()} />);
     const legend = (await screen.findByText("Active energy")).closest("ul");
-    expect(legend?.textContent).toContain("9,120 / 0");
-    expect(legend?.textContent).toContain("410 kcal / 0 kcal");
-    expect(legend?.textContent).toContain("7 h 12 min / 0 min");
+    expect(legend?.textContent).toContain("9,120 of 0");
+    expect(legend?.textContent).toContain("410 of 0 kcal");
+    expect(legend?.textContent).toContain("7 h 12 min of 0 min");
     expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
   });
 

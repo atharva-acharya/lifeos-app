@@ -45,21 +45,6 @@
   grid-column: span 5;
 }
 
-.today__rings .rings {
-  flex: 1;
-  justify-content: center;
-  gap: 40px;
-  min-height: 0;
-}
-
-/* The rings give way first when banners above take height. */
-.today__rings .rings svg {
-  width: auto;
-  height: 100%;
-  max-height: 200px;
-  aspect-ratio: 1;
-}
-
 .today__rings .habits {
   flex: none;
   flex-wrap: nowrap;

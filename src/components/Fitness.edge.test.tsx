@@ -81,16 +81,19 @@ describe("exerciseText", () => {
   });
 });
 
+/** Each large ring's number with its goal, e.g. "0 of 7". */
+function bigNumbers(container: HTMLElement): string[] {
+  return [...container.querySelectorAll(".rings__big")].map((e) => e.textContent);
+}
+
 describe("FitnessWeek", () => {
   it("shows zeros and the goals with no data", () => {
-    render(
+    const { container } = render(
       <FitnessWeek
         summary={{ avgSteps: null, proteinDays: 0, sessions: 0, stepsGoal: 8000, proteinGoal: 170 }}
       />,
     );
-    expect(screen.getByText("0 / 8,000")).toBeInTheDocument();
-    expect(screen.getByText("0 / 7")).toBeInTheDocument();
-    expect(screen.getByText("0 / 5")).toBeInTheDocument();
+    expect(bigNumbers(container)).toEqual(["0 of 8,000", "0 of 7", "0 of 5"]);
     expect(screen.getByText(/Protein goal is 170 g/)).toBeInTheDocument();
   });
 
@@ -101,8 +104,7 @@ describe("FitnessWeek", () => {
       />,
     );
     expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
-    expect(screen.getByText("5,000 / 0")).toBeInTheDocument();
-    expect(screen.getByText("9 / 5")).toBeInTheDocument();
+    expect(bigNumbers(container)).toEqual(["5,000 of 0", "3 of 7", "9 of 5"]);
   });
 });
 

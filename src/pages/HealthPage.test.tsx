@@ -108,9 +108,9 @@ describe("HealthPage", () => {
     const legend = screen.getByText("Active energy").closest("ul");
     expect(legend).not.toBeNull();
     const text = legend?.textContent ?? "";
-    expect(text).toContain("9,120 / 8,000");
-    expect(text).toContain("410 kcal / 500 kcal");
-    expect(text).toContain("7 h 12 min / 8 h");
+    expect(text).toContain("9,120 of 8,000");
+    expect(text).toContain("410 of 500 kcal");
+    expect(text).toContain("7 h 12 min of 8 h");
 
     expect(screen.queryByText(/No new export/)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Resting heart rate" })).toBeInTheDocument();

@@ -131,7 +131,7 @@ function Dashboard({ today, onNavigate }: { today: Today; onNavigate: Navigate }
         </section>
       )}
       <div className="today__grid">
-        <section className="card today__rings" aria-labelledby={ringsId}>
+        <section className="card rings-card today__rings" aria-labelledby={ringsId}>
           <CardHead
             id={ringsId}
             title="Today's rings"

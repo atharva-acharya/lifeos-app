@@ -1,11 +1,11 @@
-import { useRef, useState, type MouseEvent } from "react";
+import { useId, useRef, useState, type MouseEvent } from "react";
 import type { HealthDay, HealthGoals, HealthRingsDay } from "../api";
 import { shortLabel } from "../fitnessStats";
 import { sleepHours, todayContributors, todayHint } from "../healthStats";
 import { Contributors } from "./Contributors";
 import { EmptyHint } from "./EmptyHint";
 import { Rings, type Ring } from "./Rings";
-import { Group } from "./Card";
+import { CardHead } from "./Card";
 import { Sheet } from "./Sheet";
 import "../styles/contributors.css";
 
@@ -26,6 +26,7 @@ export function HealthToday({
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
+  const id = useId();
   const isToday = day?.isToday ?? true;
   const sleep = day?.sleep?.total ?? null;
   const rings: Ring[] = [
@@ -60,34 +61,39 @@ export function HealthToday({
   // The whole card opens the sheet with the mouse; the button is the
   // keyboard and screen-reader target. Clicks from inside the (portalled)
   // sheet bubble here through React, so only clicks on the card itself count.
-  const onCardClick = (e: MouseEvent<HTMLDivElement>) => {
+  const onCardClick = (e: MouseEvent<HTMLElement>) => {
     if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
     setOpen(true);
   };
 
+  const title = day === null || day.isToday ? "Today" : `Latest: ${shortLabel(day.date)}`;
+
+  if (day === null) {
+    return (
+      <section className="card rings-card" aria-labelledby={id}>
+        <CardHead id={id} title={title} />
+        <EmptyHint lead="No steps, energy or sleep in the exports yet.">
+          Turn on Step Count, Active Energy and Sleep Analysis in Health Auto Export.
+        </EmptyHint>
+      </section>
+    );
+  }
+
   return (
-    <Group title={day === null || day.isToday ? "Today" : `Latest: ${shortLabel(day.date)}`} bare>
-      {day === null ? (
-        <div className="card card--stack">
-          <EmptyHint lead="No steps, energy or sleep in the exports yet.">
-            Turn on Step Count, Active Energy and Sleep Analysis in Health Auto Export.
-          </EmptyHint>
-        </div>
-      ) : (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the details button below is the keyboard target
-        <div className="card card--stack metric--link health-today" onClick={onCardClick}>
-          <div className="fitness__week">
-            <Rings rings={rings} />
-            <p className="muted">
-              {day.isToday
-                ? "Goals come from your plan, with defaults where it sets none."
-                : `Nothing recorded for today yet, so this shows ${day.date}.`}
-            </p>
-          </div>
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the details button is the keyboard target
+    <section
+      className="card rings-card metric--link health-today"
+      aria-labelledby={id}
+      onClick={onCardClick}
+    >
+      <CardHead
+        id={id}
+        title={title}
+        action={
           <button
             ref={button}
             type="button"
-            className="link-button health-today__details"
+            className="link-button card__action health-today__details"
             aria-haspopup="dialog"
             onClick={(e) => {
               e.stopPropagation();
@@ -96,21 +102,27 @@ export function HealthToday({
           >
             What&rsquo;s behind {day.isToday ? "today" : shortLabel(day.date)}
           </button>
-          <Sheet
-            open={open}
-            onClose={() => {
-              setOpen(false);
-            }}
-            title={day.isToday ? "What’s behind today" : `What’s behind ${shortLabel(day.date)}`}
-            trigger={button}
-          >
-            <Contributors
-              lead="Each input against your own average over the 30 days before."
-              items={todayContributors(days, day)}
-            />
-          </Sheet>
-        </div>
-      )}
-    </Group>
+        }
+      />
+      <Rings size={200} variant="hero" rings={rings} />
+      <p className="muted rings-card__note">
+        {day.isToday
+          ? "Goals come from your plan, with defaults where it sets none."
+          : `Nothing recorded for today yet, so this shows ${day.date}.`}
+      </p>
+      <Sheet
+        open={open}
+        onClose={() => {
+          setOpen(false);
+        }}
+        title={day.isToday ? "What’s behind today" : `What’s behind ${shortLabel(day.date)}`}
+        trigger={button}
+      >
+        <Contributors
+          lead="Each input against your own average over the 30 days before."
+          items={todayContributors(days, day)}
+        />
+      </Sheet>
+    </section>
   );
 }
